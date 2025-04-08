@@ -14,7 +14,6 @@ import 'package:group_management_church_app/features/auth/profile_setup_screen.d
 import 'package:group_management_church_app/features/auth/reset_password.dart';
 import 'package:group_management_church_app/features/auth/signup.dart';
 import 'package:group_management_church_app/features/splash_screen.dart';
-import 'package:group_management_church_app/features/super_admin/dashboard.dart';
 import 'package:group_management_church_app/features/user/dashboard.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';

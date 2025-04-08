@@ -138,6 +138,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     }
   }
+  
+  // Logout function
+  Future<void> _logout(BuildContext context) async {
+    try {
+      final authServices = AuthServices();
+      await authServices.logout();
+      
+      // Navigate to login screen and clear all previous routes
+      Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error logging out: $e')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -200,6 +215,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         color: AppColors.primaryColor,
                         isPulsing: true,
                         pulseEffect: PulseEffectType.glow,
+                        isFullWidth: false,
+                        horizontalPadding: 32,
+                      ),
+                      
+                      const SizedBox(height: 16),
+                      
+                      // Logout Button
+                      CustomButton(
+                        label: 'Logout',
+                        onPressed: () => _logout(context),
+                        icon: Icons.logout,
+                        color: AppColors.errorColor,
                         isFullWidth: false,
                         horizontalPadding: 32,
                       ),

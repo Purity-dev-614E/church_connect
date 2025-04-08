@@ -9,12 +9,14 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final bool showBackButton;
   final bool showProfileAvatar;
   final VoidCallback? onProfileTap;
+  final List<Widget>? actions;
 
   CustomAppBar({
     required this.title,
     this.showBackButton = false,
     this.showProfileAvatar = false,
     this.onProfileTap,
+    this.actions,
   });
 
   @override
@@ -32,7 +34,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
       ),
       backgroundColor: AppColors.primaryColor,
       centerTitle: true,
-      actions: [
+      actions: actions ?? [
         if (showProfileAvatar)
           GestureDetector(
             onTap: onProfileTap ?? () {

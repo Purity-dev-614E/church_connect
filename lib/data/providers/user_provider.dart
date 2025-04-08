@@ -10,8 +10,13 @@ class UserProvider with ChangeNotifier {
   UserModel? get currentUser => _currentUser;
 
   Future<void> loadUser(String userId) async {
-    _currentUser = await _userService.fetchCurrentUser(userId);
-    notifyListeners();
+    try {
+      _currentUser = await _userService.fetchCurrentUser(userId);
+      notifyListeners();
+    } catch (e) {
+      print('Error loading user: $e');
+      // Don't update _currentUser if there's an error
+    }
   }
   Future<void> updateUser( UserModel updatedUser) async{
     try {
@@ -22,7 +27,7 @@ class UserProvider with ChangeNotifier {
       print('Error updating user: $error');
     }
   }
-  Future<List> getAllUsers() async {
+  Future<List<UserModel>> getAllUsers() async {
     try {
       List<UserModel> users = await _userService.fetchAllUsers();
       return users;

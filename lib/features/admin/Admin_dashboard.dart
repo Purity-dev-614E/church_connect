@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:group_management_church_app/core/constants/colors.dart';
 import 'package:group_management_church_app/core/constants/text_styles.dart';
@@ -706,19 +707,19 @@ class _AdminDashboardState extends State<AdminDashboard> {
       ),
       floatingActionButton: _selectedIndex == 1 || _selectedIndex == 2
           ? FloatingActionButton(
-              onPressed: () {
-                if (_selectedIndex == 1) {
-                  _showAddMemberDialog();
-                } else if (_selectedIndex == 2) {
-                  _showCreateEventDialog();
-                }
-              },
-              backgroundColor: AppColors.primaryColor,
-              child: Icon(
-                _selectedIndex == 1 ? Icons.person_add : Icons.add,
-                color: Colors.white,
-              ),
-            )
+        onPressed: () {
+          if (_selectedIndex == 1) {
+            _showAddMemberDialog();
+          } else if (_selectedIndex == 2) {
+            _showCreateEventDialog();
+          }
+        },
+        backgroundColor: AppColors.primaryColor,
+        child: Icon(
+          _selectedIndex == 1 ? Icons.person_add : Icons.add,
+          color: Colors.white,
+        ),
+      )
           : null,
     );
   }
@@ -818,7 +819,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 _createQuickActionButton(
                   'Add Member',
                   Icons.person_add,
-                  () {
+                      () {
                     _onItemTapped(1);
                     Future.delayed(const Duration(milliseconds: 500), () {
                       _showAddMemberDialog();
@@ -828,7 +829,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 _createQuickActionButton(
                   'Create Event',
                   Icons.event_available,
-                  () {
+                      () {
                     _onItemTapped(2);
                     Future.delayed(const Duration(milliseconds: 500), () {
                       _showCreateEventDialog();
@@ -838,7 +839,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 _createQuickActionButton(
                   'Analytics',
                   Icons.analytics,
-                  () => _onItemTapped(3),
+                      () => _onItemTapped(3),
                 ),
               ],
             ),
@@ -911,35 +912,35 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-Widget _buildStatisticsGrid() {
-  return FutureBuilder<Map<String, double>>(
-    future: _analyticsData,
-    builder: (context, snapshot) {
-      if (snapshot.connectionState == ConnectionState.waiting) {
-        return Center(child: CircularProgressIndicator());
-      } else if (snapshot.hasError) {
-        return Center(child: Text('Error: ${snapshot.error}'));
-      } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-        return Center(child: Text('No data available'));
-      } else {
-        final data = snapshot.data!;
-        return GridView.count(
-          crossAxisCount: 2,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          children: [
-            _buildStatCard('Total Members', '${data['Total Members']?.toInt()}', Icons.people, AppColors.primaryColor),
-            _buildStatCard('Active Members', '${data['Active Members']?.toInt()}', Icons.person_outline, AppColors.secondaryColor),
-            _buildStatCard('Avg. Attendance', '${data['Average Attendance']?.toInt()}%', Icons.trending_up, AppColors.accentColor),
-            _buildStatCard('Events This Month', '${data['Events This Month']?.toInt()}', Icons.event, AppColors.buttonColor),
-          ],
-        );
-      }
-    },
-  );
-}
+  Widget _buildStatisticsGrid() {
+    return FutureBuilder<Map<String, double>>(
+      future: _analyticsData,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator());
+        } else if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return Center(child: Text('No data available'));
+        } else {
+          final data = snapshot.data!;
+          return GridView.count(
+            crossAxisCount: 2,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            children: [
+              _buildStatCard('Total Members', '${data['Total Members']?.toInt()}', Icons.people, AppColors.primaryColor),
+              _buildStatCard('Active Members', '${data['Active Members']?.toInt()}', Icons.person_outline, AppColors.secondaryColor),
+              _buildStatCard('Avg. Attendance', '${data['Average Attendance']?.toInt()}%', Icons.trending_up, AppColors.accentColor),
+              _buildStatCard('Events This Month', '${data['Events This Month']?.toInt()}', Icons.event, AppColors.buttonColor),
+            ],
+          );
+        }
+      },
+    );
+  }
 
   Widget _buildStatCard(String title, String value, IconData icon, Color color) {
     return Card(
@@ -1289,98 +1290,98 @@ Widget _buildStatisticsGrid() {
 
     return displayEvents.isEmpty
         ? Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.event_busy,
-                  size: 64,
-                  color: AppColors.textColor.withOpacity(0.5),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'No upcoming events',
-                  style: TextStyles.bodyText.copyWith(
-                    color: AppColors.textColor.withOpacity(0.7),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                CustomButton(
-                  label: 'Create Event',
-                  onPressed: _showCreateEventDialog,
-                  icon: Icons.add,
-                  color: AppColors.primaryColor,
-                  isFullWidth: false,
-                  horizontalPadding: 24,
-                ),
-              ],
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.event_busy,
+            size: 64,
+            color: AppColors.textColor.withOpacity(0.5),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No upcoming events',
+            style: TextStyles.bodyText.copyWith(
+              color: AppColors.textColor.withOpacity(0.7),
             ),
-          )
+          ),
+          const SizedBox(height: 24),
+          CustomButton(
+            label: 'Create Event',
+            onPressed: _showCreateEventDialog,
+            icon: Icons.add,
+            color: AppColors.primaryColor,
+            isFullWidth: false,
+            horizontalPadding: 24,
+          ),
+        ],
+      ),
+    )
         : ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: displayEvents.length,
-            shrinkWrap: true,
-            physics: showLimit
-                ? const NeverScrollableScrollPhysics()
-                : const AlwaysScrollableScrollPhysics(),
-            itemBuilder: (context, index) {
-              final event = displayEvents[index];
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12.0),
-                child: GestureDetector(
-                  onTap: () => _showEventOptionsDialog(event),
-                  child: EventCard(
-                    eventTitle: event.title,
-                    eventDate: _formatEventDate(event.dateTime),
-                    eventLocation: event.location,
-                    onTap: () => _showEventOptionsDialog(event),
-                  ),
-                ),
-              );
-            },
-          );
+      padding: const EdgeInsets.all(16),
+      itemCount: displayEvents.length,
+      shrinkWrap: true,
+      physics: showLimit
+          ? const NeverScrollableScrollPhysics()
+          : const AlwaysScrollableScrollPhysics(),
+      itemBuilder: (context, index) {
+        final event = displayEvents[index];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12.0),
+          child: GestureDetector(
+            onTap: () => _showEventOptionsDialog(event),
+            child: EventCard(
+              eventTitle: event.title,
+              eventDate: _formatEventDate(event.dateTime),
+              eventLocation: event.location,
+              onTap: () => _showEventOptionsDialog(event),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Widget _buildPastEventsList() {
     return _pastEvents.isEmpty
         ? Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.event_busy,
-                  size: 64,
-                  color: AppColors.textColor.withOpacity(0.5),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'No past events',
-                  style: TextStyles.bodyText.copyWith(
-                    color: AppColors.textColor.withOpacity(0.7),
-                  ),
-                ),
-              ],
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.event_busy,
+            size: 64,
+            color: AppColors.textColor.withOpacity(0.5),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No past events',
+            style: TextStyles.bodyText.copyWith(
+              color: AppColors.textColor.withOpacity(0.7),
             ),
-          )
+          ),
+        ],
+      ),
+    )
         : ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: _pastEvents.length,
-            itemBuilder: (context, index) {
-              final event = _pastEvents[index];
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12.0),
-                child: GestureDetector(
-                  onTap: () => _showEventOptionsDialog(event),
-                  child: EventCard(
-                    eventTitle: event.title,
-                    eventDate: _formatEventDate(event.dateTime),
-                    eventLocation: event.location,
-                    onTap: () => _showEventOptionsDialog(event),
-                  ),
-                ),
-              );
-            },
-          );
+      padding: const EdgeInsets.all(16),
+      itemCount: _pastEvents.length,
+      itemBuilder: (context, index) {
+        final event = _pastEvents[index];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12.0),
+          child: GestureDetector(
+            onTap: () => _showEventOptionsDialog(event),
+            child: EventCard(
+              eventTitle: event.title,
+              eventDate: _formatEventDate(event.dateTime),
+              eventLocation: event.location,
+              onTap: () => _showEventOptionsDialog(event),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   // ANALYTICS TAB

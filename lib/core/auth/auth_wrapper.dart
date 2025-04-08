@@ -9,10 +9,11 @@ import 'package:group_management_church_app/data/services/user_services.dart';
 import 'package:group_management_church_app/features/admin/Admin_dashboard.dart';
 import 'package:group_management_church_app/features/auth/login.dart';
 import 'package:group_management_church_app/features/auth/profile_setup_screen.dart';
-import 'package:group_management_church_app/features/super_admin/dashboard.dart';
 import 'package:group_management_church_app/features/user/dashboard.dart';
 import 'package:group_management_church_app/features/user/no_group_screen.dart';
 import 'package:provider/provider.dart';
+
+import '../../features/super_admin/dashboard_cleaned.dart';
 
 class AuthWrapper extends StatefulWidget {
   const AuthWrapper({Key? key}) : super(key: key);
