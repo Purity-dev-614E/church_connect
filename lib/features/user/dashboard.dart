@@ -57,6 +57,9 @@ class _UserDashboardState extends State<UserDashboard> {
 
   // Load user data
   Future<void> _loadUserData() async {
+    // Only set loading state if the widget is still mounted
+    if (!mounted) return;
+    
     setState(() {
       _isLoadingUser = true;
     });
@@ -69,7 +72,8 @@ class _UserDashboardState extends State<UserDashboard> {
       if (userId != null) {
         await userProvider.loadUser(userId);
 
-        if (userProvider.currentUser != null) {
+        // Only update state if the widget is still mounted
+        if (mounted && userProvider.currentUser != null) {
           setState(() {
             _userName = userProvider.currentUser!.fullName;
             _isLoadingUser = false;
@@ -78,23 +82,34 @@ class _UserDashboardState extends State<UserDashboard> {
       }
     } catch (e) {
       print('Error loading user data: $e');
-      setState(() {
-        _isLoadingUser = false;
-      });
+      
+      // Only update state if the widget is still mounted
+      if (mounted) {
+        setState(() {
+          _isLoadingUser = false;
+        });
+      }
     }
   }
 
   // Load group data
   Future<void> _loadGroupData() async {
+    // Only set loading state if the widget is still mounted
+    if (!mounted) return;
+    
     setState(() {
       _isLoadingGroup = true;
     });
 
     try {
+      // Get the provider outside of the build context
       final groupProvider = Provider.of<GroupProvider>(context, listen: false);
+      
+      // Fetch the group data
       final group = await groupProvider.getGroupById(widget.groupId);
 
-      if (group != null) {
+      // Only update state if the widget is still mounted
+      if (mounted && group != null) {
         setState(() {
           _currentGroup = group;
           _groupName = group.name;
@@ -103,14 +118,21 @@ class _UserDashboardState extends State<UserDashboard> {
       }
     } catch (e) {
       print('Error loading group data: $e');
-      setState(() {
-        _isLoadingGroup = false;
-      });
+      
+      // Only update state if the widget is still mounted
+      if (mounted) {
+        setState(() {
+          _isLoadingGroup = false;
+        });
+      }
     }
   }
 
   // Load event data
   Future<void> _loadEventData() async {
+    // Only set loading state if the widget is still mounted
+    if (!mounted) return;
+    
     setState(() {
       _isLoadingEvents = true;
     });
@@ -135,22 +157,34 @@ class _UserDashboardState extends State<UserDashboard> {
           .where((event) => event.dateTime.isBefore(oneWeekFromNow))
           .toList();
 
-      setState(() {
-        _weekEvents = weekEvents;
-        _allEvents = eventProvider.upcomingEvents;
-        _isLoadingEvents = false;
-      });
+      // Only update state if the widget is still mounted
+      if (mounted) {
+        setState(() {
+          _weekEvents = weekEvents;
+          _allEvents = eventProvider.upcomingEvents;
+          _isLoadingEvents = false;
+        });
+      }
     } catch (e) {
       print('Error loading event data: $e');
-      setState(() {
-        _isLoadingEvents = false;
-      });
+      
+      // Only update state if the widget is still mounted
+      if (mounted) {
+        setState(() {
+          _isLoadingEvents = false;
+        });
+      }
     }
   }
 
   // Refresh all data
   Future<void> _refreshData() async {
+    // Check if widget is mounted before starting refresh
+    if (!mounted) return;
+    
     await _loadData();
+    
+    // Check again if widget is still mounted after data load
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Data refreshed')),
@@ -192,17 +226,18 @@ class _UserDashboardState extends State<UserDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    // Listen to providers for changes
-    final eventProvider = Provider.of<EventProvider>(context);
-    final groupProvider = Provider.of<GroupProvider>(context);
+    // Listen to providers for changes but with listen: false to avoid rebuild loops
+    final eventProvider = Provider.of<EventProvider>(context, listen: false);
+    final groupProvider = Provider.of<GroupProvider>(context, listen: false);
 
-    // Check for errors
-    final hasEventError = eventProvider.errorMessage != null;
-    final hasGroupError = groupProvider.errorMessage != null;
+    // Use a post-frame callback to check for errors after the build is complete
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Check for errors
+      final hasEventError = eventProvider.errorMessage != null;
+      final hasGroupError = groupProvider.errorMessage != null;
 
-    // Show error snackbar if needed
-    if (hasEventError && mounted) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Show error snackbar if needed
+      if (hasEventError && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Event error: ${eventProvider.errorMessage}'),
@@ -213,11 +248,9 @@ class _UserDashboardState extends State<UserDashboard> {
           ),
         );
         eventProvider.clearError();
-      });
-    }
+      }
 
-    if (hasGroupError && mounted) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (hasGroupError && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Group error: ${groupProvider.errorMessage}'),
@@ -228,8 +261,8 @@ class _UserDashboardState extends State<UserDashboard> {
           ),
         );
         groupProvider.clearError();
-      });
-    }
+      }
+    });
 
     return Scaffold(
       appBar: CustomAppBar(

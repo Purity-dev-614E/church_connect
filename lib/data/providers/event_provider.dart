@@ -65,6 +65,7 @@ class EventProvider extends ChangeNotifier {
     }
   }
 
+
   /// Fetch a specific event by ID
   Future<EventModel?> fetchEventById(String eventId) async {
     _setLoading(true);

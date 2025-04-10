@@ -25,6 +25,7 @@ class ApiEndpoints {
   static String deleteGroup(String id) => '$groups/$id';
   static String getGroupDemographics(String id) => '$groups/$id/groupDemographics';
   static String getGroupMembers(String id) => '$groups/$id/members';
+  static String getmemberGroups(String userId) => '$groups/user/$userId';
   static String addGroupMember(String id, String groupId) => '$groups/$id/members';
   static String removeGroupMember(String groupId, String userId) => '$groups/$groupId/members/$userId';
   static String getGroupsByAdmin(String userId) => '$groups/admin/$userId/groups';

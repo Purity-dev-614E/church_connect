@@ -71,11 +71,47 @@ class _AdminDashboardState extends State<AdminDashboard> {
     }
   }
 
+  // Cache for group events
+  bool _isLoadingEvents = false;
+
+  Future<void> _loadGroupEvents() async {
+    if (_isLoadingEvents) return;
+
+    setState(() {
+      _isLoadingEvents = true;
+    });
+
+    try {
+      final eventProvider = Provider.of<EventProvider>(context, listen: false);
+      
+      // Set current group ID in the provider
+      eventProvider.setCurrentGroup(widget.groupId);
+      
+      // Load both upcoming and past events
+      await Future.wait([
+        eventProvider.fetchUpcomingEvents(widget.groupId),
+        eventProvider.fetchPastEvents(widget.groupId),
+      ]);
+
+      setState(() {
+        _isLoadingEvents = false;
+      });
+    } catch (e) {
+      print('Error loading group events: $e');
+      setState(() {
+        _isLoadingEvents = false;
+      });
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    // Load members when the widget initializes
-    Future.microtask(() => _loadGroupMembers());
+    // Load members and events when the widget initializes
+    Future.microtask(() {
+      _loadGroupMembers();
+      _loadGroupEvents();
+    });
   }
 
   // Getter for group members
@@ -122,38 +158,42 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   // Analytics data from provider
   Future<Map<String, double>> get _analyticsData async {
-    final analyticsProvider = Provider.of<AnalyticsProvider>(context, listen: false);
-    final attendanceProvider = Provider.of<AttendanceProvider>(context, listen: false);
-    final userProvider = Provider.of<UserProvider>(context, listen: false);
-    final groupProvider = Provider.of<GroupProvider>(context, listen: false);
+    try {
+      final analyticsProvider = Provider.of<AnalyticsProvider>(context, listen: false);
+      final attendanceProvider = Provider.of<AttendanceProvider>(context, listen: false);
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final groupProvider = Provider.of<GroupProvider>(context, listen: false);
 
-    final totalMembers = (await groupProvider.getGroupMembers(widget.groupId)).length.toDouble();
-    final activeMembers = (await userProvider.getAllUsers()).length.toDouble(); // Assuming this returns active members
-    final averageAttendance = 0.0; // Replace with actual logic to get average attendance
-    final eventsThisMonth = 0.0; // Replace with actual logic to get events this month
+      final totalMembers = (await groupProvider.getGroupMembers(widget.groupId)).length.toDouble();
+      final activeMembers = (await groupProvider.getGroupMembers(widget.groupId)).length.toDouble(); // Assuming this returns active members
+      final averageAttendance = 0.0; // Replace with actual logic to get average attendance
+      final eventsThisMonth = 0.0; // Replace with actual logic to get events this month
 
-    return {
-      'Total Members': totalMembers,
-      'Active Members': activeMembers,
-      'Average Attendance': averageAttendance,
-      'Events This Month': eventsThisMonth,
-    };
-
+      return {
+        'Total Members': totalMembers,
+        'Active Members': activeMembers,
+        'Average Attendance': averageAttendance,
+        'Events This Month': eventsThisMonth,
+      };
+    } catch (e) {
+      print('Error getting analytics data: $e');
+      // Return default values if providers are not available
+      return {
+        'Total Members': 0.0,
+        'Active Members': 0.0,
+        'Average Attendance': 0.0,
+        'Events This Month': 0.0,
+      };
+    }
   }
 
-  // Controllers for event creation form
-  final TextEditingController _titleController = TextEditingController();
-  final TextEditingController _descriptionController = TextEditingController();
-  final TextEditingController _locationController = TextEditingController();
+  // Date and time for event creation
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   TimeOfDay _selectedTime = TimeOfDay.now();
 
   @override
   void dispose() {
     _pageController.dispose();
-    _titleController.dispose();
-    _descriptionController.dispose();
-    _locationController.dispose();
     super.dispose();
   }
 
@@ -262,10 +302,19 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   void _showCreateEventDialog() {
+    // Create new controllers for each dialog instance
+    final TextEditingController titleController = TextEditingController();
+    final TextEditingController descriptionController = TextEditingController();
+    final TextEditingController locationController = TextEditingController();
+    
+    // Use local copies of date and time
+    DateTime selectedDate = _selectedDate;
+    TimeOfDay selectedTime = _selectedTime;
+
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
           title: Text(
             'Create New Event',
             style: TextStyles.heading2,
@@ -276,7 +325,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 TextField(
-                  controller: _titleController,
+                  controller: titleController,
                   decoration: InputDecoration(
                     labelText: 'Event Title',
                     border: OutlineInputBorder(
@@ -286,7 +335,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 ),
                 const SizedBox(height: 16),
                 TextField(
-                  controller: _descriptionController,
+                  controller: descriptionController,
                   maxLines: 3,
                   decoration: InputDecoration(
                     labelText: 'Description',
@@ -297,7 +346,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 ),
                 const SizedBox(height: 16),
                 TextField(
-                  controller: _locationController,
+                  controller: locationController,
                   decoration: InputDecoration(
                     labelText: 'Location',
                     border: OutlineInputBorder(
@@ -320,11 +369,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         onPressed: () async {
                           final date = await showDatePicker(
                             context: context,
-                            initialDate: _selectedDate,
+                            initialDate: selectedDate,
                             firstDate: DateTime.now(),
                             lastDate: DateTime.now().add(const Duration(days: 365)),
                           );
                           if (date != null) {
+                            setDialogState(() {
+                              selectedDate = date;
+                            });
+                            // Also update the parent state
                             setState(() {
                               _selectedDate = date;
                             });
@@ -332,7 +385,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         },
                         icon: const Icon(Icons.calendar_today),
                         label: Text(
-                          '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
+                          '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
                         ),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.primaryColor,
@@ -345,9 +398,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         onPressed: () async {
                           final time = await showTimePicker(
                             context: context,
-                            initialTime: _selectedTime,
+                            initialTime: selectedTime,
                           );
                           if (time != null) {
+                            setDialogState(() {
+                              selectedTime = time;
+                            });
+                            // Also update the parent state
                             setState(() {
                               _selectedTime = time;
                             });
@@ -355,7 +412,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         },
                         icon: const Icon(Icons.access_time),
                         label: Text(
-                          '${_selectedTime.hour}:${_selectedTime.minute.toString().padLeft(2, '0')}',
+                          '${selectedTime.hour}:${selectedTime.minute.toString().padLeft(2, '0')}',
                         ),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.primaryColor,
@@ -370,10 +427,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
           actions: [
             TextButton(
               onPressed: () {
-                _titleController.clear();
-                _descriptionController.clear();
-                _locationController.clear();
+                // Just close the dialog, no need to clear controllers
                 Navigator.pop(context);
+                
+                // Dispose controllers to prevent memory leaks
+                titleController.dispose();
+                descriptionController.dispose();
+                locationController.dispose();
               },
               child: Text(
                 'Cancel',
@@ -385,9 +445,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ElevatedButton(
               onPressed: () {
                 // Create event using provider
-                if (_titleController.text.isEmpty ||
-                    _descriptionController.text.isEmpty ||
-                    _locationController.text.isEmpty) {
+                if (titleController.text.isEmpty ||
+                    descriptionController.text.isEmpty ||
+                    locationController.text.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Please fill all fields')),
                   );
@@ -396,35 +456,38 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
                 // Combine date and time
                 final DateTime eventDateTime = DateTime(
-                  _selectedDate.year,
-                  _selectedDate.month,
-                  _selectedDate.day,
-                  _selectedTime.hour,
-                  _selectedTime.minute,
+                  selectedDate.year,
+                  selectedDate.month,
+                  selectedDate.day,
+                  selectedTime.hour,
+                  selectedTime.minute,
                 );
 
                 // Create new event
                 final eventProvider = Provider.of<EventProvider>(context, listen: false);
                 eventProvider.createEvent(
                   groupId: widget.groupId,
-                  title: _titleController.text,
-                  description: _descriptionController.text,
+                  title: titleController.text,
+                  description: descriptionController.text,
                   dateTime: eventDateTime,
-                  location: _locationController.text,
+                  location: locationController.text,
                 );
 
+                // Close the dialog
                 Navigator.pop(context);
+                
+                // Show success message
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Event created successfully')),
                 );
 
-                // Clear form
-                _titleController.clear();
-                _descriptionController.clear();
-                _locationController.clear();
-
-                // Refresh UI
+                // Refresh UI in the parent widget
                 setState(() {});
+                
+                // Dispose controllers to prevent memory leaks
+                titleController.dispose();
+                descriptionController.dispose();
+                locationController.dispose();
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryColor,

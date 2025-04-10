@@ -8,6 +8,8 @@ import 'package:group_management_church_app/data/providers/dashboard_analytics_p
 import 'package:group_management_church_app/data/providers/event_provider.dart';
 import 'package:group_management_church_app/data/providers/group_provider.dart';
 import 'package:group_management_church_app/data/providers/user_provider.dart';
+import 'package:group_management_church_app/data/providers/analytics_provider.dart';
+import 'package:group_management_church_app/data/providers/attendance_provider.dart';
 import 'package:group_management_church_app/features/admin/Admin_dashboard.dart';
 import 'package:group_management_church_app/features/auth/login.dart';
 import 'package:group_management_church_app/features/auth/profile_setup_screen.dart';
@@ -80,6 +82,8 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => GroupProvider()),
         ChangeNotifierProvider(create: (_) => EventProvider()),
         ChangeNotifierProvider(create: (_) => DashboardAnalyticsProvider()),
+        ChangeNotifierProvider(create: (_) => AnalyticsProvider()),
+        ChangeNotifierProvider(create: (_) => AttendanceProvider()),
       ],
       child: MaterialApp(
         title: 'Church Connect',

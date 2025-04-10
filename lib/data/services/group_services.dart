@@ -99,6 +99,23 @@ class GroupServices {
     }
     return [];
   }
+  // Get user's groups
+  Future<List<GroupModel>> getUserGroups(String userId) async {
+    try {
+      // Make a GET request to the new endpoint for fetching user groups by user ID
+      final response = await _httpClient.get(ApiEndpoints.getmemberGroups(userId));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((group) => GroupModel.fromJson(group)).toList();
+      } else {
+        throw Exception("Failed to fetch user's groups: HTTP status ${response.statusCode}");
+      }
+    } catch (e) {
+      throw Exception("Failed to fetch user's groups: $e");
+    }
+  }
+
 
   // Update group
   Future<GroupModel> updateGroup(String id, String name) async {
@@ -229,7 +246,7 @@ class GroupServices {
   }
   
   // Get user's groups
-  Future<List<GroupModel>> getUserGroups(String userId) async {
+  Future<List<GroupModel>> getUserGroups1(String userId) async {
     try {
       // Since there's no direct endpoint for getting user's groups,
       // we'll fetch all groups and filter for those where the user is a member

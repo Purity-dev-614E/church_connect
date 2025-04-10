@@ -6,13 +6,15 @@ import 'package:group_management_church_app/data/providers/group_provider.dart';
 import 'package:group_management_church_app/data/providers/user_provider.dart';
 import 'package:group_management_church_app/data/services/auth_services.dart';
 import 'package:group_management_church_app/data/services/user_services.dart';
-import 'package:group_management_church_app/features/admin/Admin_dashboard.dart';
+import 'package:group_management_church_app/features/admin/admin_dashboard_wrapper.dart';
 import 'package:group_management_church_app/features/auth/login.dart';
 import 'package:group_management_church_app/features/auth/profile_setup_screen.dart';
 import 'package:group_management_church_app/features/user/dashboard.dart';
 import 'package:group_management_church_app/features/user/no_group_screen.dart';
 import 'package:provider/provider.dart';
-
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:developer';
+import '../../features/admin/Admin_dashboard.dart';
 import '../../features/super_admin/dashboard_cleaned.dart';
 
 class AuthWrapper extends StatefulWidget {
@@ -164,85 +166,140 @@ class _AuthWrapperState extends State<AuthWrapper> {
 }
 
 // Separate widget to handle role-based navigation
+
+
 class _RoleBasedNavigator extends StatelessWidget {
   final UserModel user;
-  
+
   const _RoleBasedNavigator({Key? key, required this.user}) : super(key: key);
-  
+
   @override
   Widget build(BuildContext context) {
-    switch (user.role) {
-      case 'super_admin':
-        return const SuperAdminDashboard();
-      case 'admin':
-        // For admin, we'll check if they have any groups they administer
-        return FutureBuilder<List<GroupModel>>(
-          future: Provider.of<GroupProvider>(context, listen: false)
-              .getGroupsByAdmin(user.id),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Scaffold(
-                body: Center(child: CircularProgressIndicator()),
-              );
-            }
-            
-            if (snapshot.hasError || !snapshot.hasData) {
-              return const AdminDashboard(
-                groupId: 'default', 
-                groupName: 'Default Group'
-              );
-            }
-            
-            final adminGroups = snapshot.data!;
-            if (adminGroups.isEmpty) {
-              return const AdminDashboard(
-                groupId: 'default', 
-                groupName: 'Default Group'
-              );
-            }
-            
-            // Use the first group the admin manages
-            return AdminDashboard(
-              groupId: adminGroups.first.id, 
-              groupName: adminGroups.first.name
-            );
-          },
-        );
+    log('User role: ${user.role}');
+    
+    // Use FutureBuilder to handle the async operations
+    return FutureBuilder<String>(
+      future: _getUserId(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
         
-      case 'user':
-        // Only regular users need to be assigned to a group
-        // For regular users, check if they belong to any group
-        return FutureBuilder<List<GroupModel>>(
-          future: Provider.of<GroupProvider>(context, listen: false)
-              .getUserGroups(user.id),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Scaffold(
-                body: Center(child: CircularProgressIndicator()),
+        final String userId = snapshot.data ?? '';
+        log('User ID: $userId');
+        
+        switch (user.role) {
+          case 'super_admin':
+            log('Navigating to SuperAdminDashboard');
+            return const SuperAdminDashboard();
+    
+          case 'admin':
+            // Use user.id instead of userId from SharedPreferences for admin
+            // This ensures we're using the ID from the UserModel which should be valid
+            log('Fetching groups for admin with ID: $userId');
+            
+            // Check if user.id is empty
+            if (userId.isEmpty) {
+              log('Admin ID is empty, using default group');
+              return const AdminDashboard(
+                groupId: 'default',
+                groupName: 'Default Group',
               );
             }
             
-            if (snapshot.hasError) {
-              print('Error loading user groups: ${snapshot.error}');
-              // If there's an error, we'll still try to show the dashboard with a default group
-              return const UserDashboard(groupId: 'default');
-            }
+            return FutureBuilder<List<GroupModel>>(
+              future: Provider.of<GroupProvider>(context, listen: false)
+                  .getGroupsByAdmin(userId),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  log('Admin group fetch in progress...');
+                  return const Scaffold(
+                    body: Center(child: CircularProgressIndicator()),
+                  );
+                }
+    
+                if (snapshot.hasError) {
+                  log('Error fetching admin groups: ${snapshot.error}');
+                  return const AdminDashboardWrapper(
+                    groupId: 'default',
+                    groupName: 'Default Group',
+                  );
+                }
+    
+                final adminGroups = snapshot.data ?? [];
+                log('Admin groups fetched: ${adminGroups.length} groups found');
+    
+                if (adminGroups.isEmpty) {
+                  log('No groups found for admin');
+                  return const AdminDashboardWrapper(
+                    groupId: 'default',
+                    groupName: 'Default Group',
+                  );
+                }
+    
+                log('Navigating to AdminDashboard with group ID: ${adminGroups.first.id}');
+                return AdminDashboardWrapper(
+                  groupId: adminGroups.first.id,
+                  groupName: adminGroups.first.name,
+                );
+              },
+            );
+    
+          case 'user':
+            // Use user.id from UserModel instead of userId from SharedPreferences
+            // This ensures we're using the ID from the UserModel which should be valid
+            log('Fetching groups for user with ID: $userId');
             
-            final userGroups = snapshot.data ?? [];
-            
-            // If user doesn't belong to any group, show the no group screen
-            if (userGroups.isEmpty) {
+            // Check if user.id is empty
+            if (userId.isEmpty) {
+              log('User ID is empty, cannot fetch groups');
               return const NoGroupScreen();
             }
             
-            // Use the first group the user belongs to
-            return UserDashboard(groupId: userGroups.first.id);
-          },
-        );
-        
-      default:
-        // For any other role, just go to user dashboard with default group
-        return const UserDashboard(groupId: 'default');
-    }
+            return FutureBuilder<List<GroupModel>>(
+              future: Provider.of<GroupProvider>(context, listen: false)
+                  .fetchUserMemberships(userId),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  log('User group fetch in progress...');
+                  return const Scaffold(
+                    body: Center(child: CircularProgressIndicator()),
+                  );
+                }
+    
+                if (snapshot.hasError) {
+                  log('Error fetching user groups: ${snapshot.error}');
+                  // Show NoGroupScreen instead of default dashboard when there's an error
+                  return const NoGroupScreen();
+                }
+    
+                final userGroups = snapshot.data ?? [];
+                log('User groups fetched: ${userGroups.length} group(s) found');
+    
+                if (userGroups.isEmpty) {
+                  log('No groups found for user');
+                  return const NoGroupScreen();
+                }
+    
+                log('Navigating to UserDashboard with group ID: ${userGroups.first.id}');
+                return UserDashboard(groupId: userGroups.first.id);
+              },
+            );
+    
+          default:
+            log('Unknown role: ${user.role}, navigating to default UserDashboard');
+            return const UserDashboard(groupId: 'default');
+        }
+      },
+    );
+  }
+  
+  // Helper method to get user ID asynchronously
+  Future<String> _getUserId() async {
+    // Use the same key as AuthServices
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    return prefs.getString('user_id') ?? '';
   }
 }

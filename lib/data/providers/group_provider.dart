@@ -156,4 +156,19 @@ class GroupProvider extends ChangeNotifier {
       return [];
     }
   }
+  
+  // Fetch groups where user is a member (alternative implementation if needed)
+  Future<List<GroupModel>> fetchUserMemberships(String userId) async {
+    _setLoading(true);
+    try {
+      final userGroups = await _groupService.getUserGroups(userId);
+      _errorMessage = null;
+      _setLoading(false);
+      return userGroups;
+    } catch (error) {
+      _handleError('fetching user memberships', error);
+      _setLoading(false);
+      return [];
+    }
+  }
 }
