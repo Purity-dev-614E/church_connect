@@ -94,17 +94,28 @@ class AttendanceProvider extends ChangeNotifier {
   }
 
   /// Fetch attendance details for an event
-  Future<void> fetchEventAttendance(String eventId) async {
-    _setLoading(true);
-    try {
-      _eventAttendance = await _eventServices.getEventAttendance(eventId);
-      _errorMessage = null;
-    } catch (error) {
-      _handleError('fetching event attendance', error);
-    } finally {
-      _setLoading(false);
-    }
-  }
+ Future<List<AttendanceModel>> fetchEventAttendance(String eventId) async {
+   _setLoading(true);
+   try {
+     final attendanceData = await _eventServices.getEventAttendance(eventId);
+     _eventAttendance = attendanceData;
+     _errorMessage = null;
+
+     // Transform the map into a list of AttendanceModel
+     List<AttendanceModel> attendanceList = attendanceData.entries.map((entry) {
+       return AttendanceModel.fromMap(entry.value);
+     }).toList();
+
+     return attendanceList;
+   } catch (error) {
+     _handleError('fetching event attendance', error);
+     return [];
+   } finally {
+     _setLoading(false);
+   }
+ }
+
+
 
   /// Fetch attendance statistics for a group
   Future<void> fetchGroupAttendance(String groupId) async {

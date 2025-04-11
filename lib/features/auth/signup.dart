@@ -8,6 +8,9 @@ import 'package:group_management_church_app/widgets/custom_button.dart';
 import 'package:group_management_church_app/widgets/input_field.dart';
 import 'package:provider/provider.dart';
 import 'package:group_management_church_app/data/providers/auth_provider.dart';
+import 'package:group_management_church_app/features/auth/login.dart';
+import 'package:group_management_church_app/widgets/custom_notification.dart';
+
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({Key? key}) : super(key: key);
@@ -21,6 +24,7 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
+  final TextEditingController _fullNameController = TextEditingController();
   bool _isLoading = false;
   bool _agreeToTerms = false;
   late AnimationController _animationController;
@@ -60,6 +64,7 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _fullNameController.dispose();
     _animationController.dispose();
     super.dispose();
   }
@@ -111,93 +116,66 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
     return null;
   }
 
+  void _showError(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.error,
+    );
+  }
+
+  void _showSuccess(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.success,
+    );
+  }
+
   Future<void> _signup() async {
-    if (_formKey.currentState!.validate()) {
-      if (!_agreeToTerms) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Please agree to the Terms and Conditions'),
-            backgroundColor: AppColors.errorColor,
-            behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.all(16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-        );
-        return;
-      }
+    if (!_formKey.currentState!.validate()) {
+      _showError('Please fill in all fields correctly');
+      return;
+    }
 
-      setState(() {
-        _isLoading = true;
-      });
+    if (!_agreeToTerms) {
+      _showError('Please agree to the Terms and Conditions');
+      return;
+    }
 
-      try {
-        // Get the AuthProvider instance
-        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    setState(() {
+      _isLoading = true;
+    });
 
-        // Call signup method from provider
-        final result = await authProvider.signup(
-          _emailController.text.trim(),
-          _passwordController.text,
-        );
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final result = await authProvider.signup(
+        _emailController.text,
+        _passwordController.text,
+      );
 
+      if (result.success) {
         if (mounted) {
-          if (result.success) {
-            // Show success message
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(result.message),
-                backgroundColor: Colors.green,
-                behavior: SnackBarBehavior.floating,
-                margin: const EdgeInsets.all(16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            );
-
-            // Navigate to login screen after a short delay
-            Future.delayed(const Duration(seconds: 2), () {
-              if (mounted) {
-                Navigator.pop(context); // Go back to login screen
-              }
-            });
-          } else {
-            // Show error message
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(result.message),
-                backgroundColor: AppColors.errorColor,
-                behavior: SnackBarBehavior.floating,
-                margin: const EdgeInsets.all(16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            );
-          }
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('An unexpected error occurred. Please try again.'),
-              backgroundColor: AppColors.errorColor,
-              behavior: SnackBarBehavior.floating,
-              margin: const EdgeInsets.all(16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
+          _showSuccess(result.message);
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const LoginScreen()),
           );
         }
-      } finally {
+      } else {
         if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
+          _showError(result.message);
         }
+      }
+    } catch (e) {
+      if (mounted) {
+        _showError('An error occurred. Please try again.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
       }
     }
   }

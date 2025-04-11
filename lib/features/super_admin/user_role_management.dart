@@ -6,6 +6,7 @@ import 'package:group_management_church_app/data/providers/user_provider.dart';
 import 'package:group_management_church_app/widgets/custom_app_bar.dart';
 import 'package:group_management_church_app/widgets/custom_button.dart';
 import 'package:provider/provider.dart';
+import 'package:group_management_church_app/widgets/custom_notification.dart';
 
 class UserRoleManagementScreen extends StatefulWidget {
   const UserRoleManagementScreen({Key? key}) : super(key: key);
@@ -34,6 +35,30 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _showError(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.error,
+    );
+  }
+
+  void _showSuccess(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.success,
+    );
+  }
+
+  void _showInfo(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.info,
+    );
   }
 
   Future<void> _loadUsers() async {
@@ -101,12 +126,7 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
       
       // Show success message
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${user.fullName}\'s role updated to $newRole'),
-            backgroundColor: AppColors.successColor,
-          ),
-        );
+        _showSuccess('${user.fullName}\'s role updated to $newRole');
       }
     } catch (e) {
       setState(() {
@@ -115,12 +135,7 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
       
       // Show error message
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to update role: ${e.toString()}'),
-            backgroundColor: AppColors.errorColor,
-          ),
-        );
+        _showError('Failed to update role: ${e.toString()}');
       }
     }
   }

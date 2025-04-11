@@ -10,10 +10,12 @@ import 'package:group_management_church_app/features/auth/profile_setup_screen.d
 import 'package:group_management_church_app/features/auth/reset_password.dart';
 import 'package:group_management_church_app/features/auth/signup.dart';
 import 'package:group_management_church_app/widgets/custom_button.dart';
-import 'package:group_management_church_app/widgets/input_field.dart';
+import 'package:group_management_church_app/widgets/custom_notification.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import 'package:group_management_church_app/data/providers/auth_provider.dart';
+
+import '../../widgets/input_field.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -93,139 +95,43 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     return null;
   }
 
+  void _showError(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.error,
+    );
+  }
+
   Future<void> _login() async {
-    // First validate the form
     if (!_formKey.currentState!.validate()) {
+      _showError('Please fill in all fields correctly');
       return;
     }
-    
+
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // Get the email and password
-      final email = _emailController.text.trim();
-      final password = _passwordController.text;
-      
-      // Check for empty fields again (belt and suspenders)
-      if (email.isEmpty || password.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Email and password are required'),
-              backgroundColor: AppColors.errorColor,
-            ),
-          );
-        }
-        return;
-      }
-      
-      // Use AuthProvider for login
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      print('Attempting login with email: $email');
-      
-      final result = await authProvider.login(email, password);
-      print('Login result: ${result.success}, message: ${result.message}');
-
-      if (!mounted) return;
+      final result = await authProvider.login(
+        _emailController.text,
+        _passwordController.text,
+      );
 
       if (result.success) {
-        try {
-          // Get user ID
-          final authService = AuthServices();
-          final userId = await authService.getUserId();
-          print('User ID after login: $userId');
-          
-          if (userId == null || userId.isEmpty) {
-            if (!mounted) return;
-            
-            // No user ID found
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Login successful but user ID not found. Please try again.'),
-                backgroundColor: AppColors.errorColor,
-              ),
-            );
-            return;
-          }
-          
-          // Load user data
-          try {
-            final userProvider = Provider.of<UserProvider>(context, listen: false);
-            await userProvider.loadUser(userId);
-            
-            // Check if user has completed profile setup
-            final user = userProvider.currentUser;
-            print('User data loaded: ${user?.fullName}');
-            
-            if (!mounted) return;
-            
-            if (user != null && user.fullName.isNotEmpty) {
-              // User has completed profile setup, navigate based on role
-              print('Navigating to AuthWrapper for role-based routing. User role: ${user.role}');
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const AuthWrapper()),
-              );
-            } else {
-              // User needs to complete profile setup
-              print('Navigating to ProfileSetupScreen');
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ProfileSetupScreen(
-                    userId: userId,
-                    email: email,
-                  ),
-                ),
-              );
-            }
-          } catch (e) {
-            print('Error loading user data: $e');
-            if (!mounted) return;
-            
-            // If we can't load user data, assume they need to complete profile setup
-            print('Error loading user data, navigating to ProfileSetupScreen');
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ProfileSetupScreen(
-                  userId: userId,
-                  email: email,
-                ),
-              ),
-            );
-          }
-        } catch (e) {
-          print('Error in login success flow: $e');
-          if (!mounted) return;
-          
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error after login: ${e.toString()}'),
-              backgroundColor: AppColors.errorColor,
-            ),
-          );
+        if (mounted) {
+          Navigator.pushReplacementNamed(context, '/home');
         }
       } else {
-        // Login failed
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result.message),
-            backgroundColor: AppColors.errorColor,
-          ),
-        );
+        if (mounted) {
+          _showError(result.message);
+        }
       }
     } catch (e) {
       if (mounted) {
-        print('Login exception: $e');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: AppColors.errorColor,
-          ),
-        );
+        _showError('An error occurred. Please try again.');
       }
     } finally {
       if (mounted) {

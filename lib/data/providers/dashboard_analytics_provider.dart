@@ -445,4 +445,49 @@ class DashboardAnalyticsProvider extends ChangeNotifier {
       return 0.0;
     }
   }
+
+  /// Calculate average attendance for events in a group
+  Future<double> calculateAverageAttendance(String groupId) async {
+    _setLoading(true);
+    try {
+      // Get all events for the group
+      final events = await _eventServices.getEventsByGroup(groupId);
+      if (events.isEmpty) {
+        return 0.0;
+      }
+
+      double totalAttendancePercentage = 0.0;
+      int eventsWithAttendance = 0;
+
+      for (final event in events) {
+        // Get attendance data for each event
+        final attendanceData = await _eventServices.getEventAttendance(event.id);
+        
+        // Skip events with no attendance records
+        if (attendanceData.isEmpty) continue;
+
+        // Calculate attendance percentage for this event
+        final totalMembers = attendanceData.length;
+        final presentMembers = attendanceData.values.where((status) => status == true).length;
+        
+        if (totalMembers > 0) {
+          final attendancePercentage = (presentMembers / totalMembers) * 100;
+          totalAttendancePercentage += attendancePercentage;
+          eventsWithAttendance++;
+        }
+      }
+
+      // Calculate average attendance
+      if (eventsWithAttendance > 0) {
+        return totalAttendancePercentage / eventsWithAttendance;
+      }
+      
+      return 0.0;
+    } catch (error) {
+      _handleError('calculating average attendance', error);
+      return 0.0;
+    } finally {
+      _setLoading(false);
+    }
+  }
 }

@@ -5,6 +5,7 @@ import 'package:group_management_church_app/data/models/user_model.dart';
 import 'package:group_management_church_app/data/providers/user_provider.dart';
 import 'package:group_management_church_app/features/super_admin/user_role_management.dart';
 import 'package:provider/provider.dart';
+import 'package:group_management_church_app/widgets/custom_notification.dart';
 
 class UserManagementTab extends StatefulWidget {
   @override
@@ -83,6 +84,30 @@ class _UserManagementTabState extends State<UserManagementTab> {
     });
   }
   
+  void _showError(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.error,
+    );
+  }
+
+  void _showSuccess(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.success,
+    );
+  }
+
+  void _showInfo(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.info,
+    );
+  }
+  
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -140,24 +165,6 @@ class _UserManagementTabState extends State<UserManagementTab> {
                   onChanged: (value) {
                     _filterUsers();
                   },
-                ),
-              ),
-              const SizedBox(width: 16),
-              ElevatedButton.icon(
-                onPressed: () {
-                  // Navigate to user creation screen or show dialog
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Add user functionality will be implemented here')),
-                  );
-                },
-                icon: const Icon(Icons.add),
-                label: const Text('Add User'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryColor,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
                 ),
               ),
               const SizedBox(width: 16),
@@ -304,28 +311,18 @@ class _UserManagementTabState extends State<UserManagementTab> {
             ),
           ],
         ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.edit, color: AppColors.secondaryColor),
-              onPressed: () {
-                // Edit user functionality
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Edit user: ${user.fullName}')),
-                );
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.delete, color: Colors.red),
-              onPressed: () {
-                // Delete user functionality
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Delete user: ${user.fullName}')),
-                );
-              },
-            ),
-          ],
+        trailing: IconButton(
+          icon: const Icon(Icons.edit, color: AppColors.secondaryColor),
+          onPressed: () {
+            // Navigate to user role management screen
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const UserRoleManagementScreen()),
+            ).then((_) {
+              // Refresh the user list when returning from role management
+              _loadUsers();
+            });
+          },
         ),
       ),
     );

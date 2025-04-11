@@ -8,6 +8,7 @@ import 'package:group_management_church_app/widgets/custom_button.dart';
 import 'package:group_management_church_app/widgets/input_field.dart';
 import 'package:provider/provider.dart';
 import 'package:group_management_church_app/data/providers/auth_provider.dart';
+import 'package:group_management_church_app/widgets/custom_notification.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
   const ResetPasswordScreen({Key? key}) : super(key: key);
@@ -60,6 +61,30 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with SingleTi
     super.dispose();
   }
 
+  void _showError(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.error,
+    );
+  }
+
+  void _showSuccess(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.success,
+    );
+  }
+
+  void _showInfo(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.info,
+    );
+  }
+
   String? _validateEmail(String? value) {
     if (value == null || value.isEmpty) {
       return 'Email is required';
@@ -92,32 +117,12 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with SingleTi
               _resetLinkSent = true;
             });
           } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(result.message),
-                backgroundColor: AppColors.errorColor,
-                behavior: SnackBarBehavior.floating,
-                margin: const EdgeInsets.all(16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            );
+            _showError(result.message);
           }
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('An unexpected error occurred. Please try again.'),
-              backgroundColor: AppColors.errorColor,
-              behavior: SnackBarBehavior.floating,
-              margin: const EdgeInsets.all(16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-          );
+          _showError('An unexpected error occurred. Please try again.');
         }
       } finally {
         if (mounted) {
@@ -714,6 +719,30 @@ class _NewPasswordScreenState extends State<NewPasswordScreen> {
     super.dispose();
   }
 
+  void _showError(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.error,
+    );
+  }
+
+  void _showSuccess(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.success,
+    );
+  }
+
+  void _showInfo(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.info,
+    );
+  }
+
   String? _validatePassword(String? value) {
     if (value == null || value.isEmpty) {
       return 'Password is required';
@@ -762,12 +791,7 @@ class _NewPasswordScreenState extends State<NewPasswordScreen> {
           });
 
           // Show success and navigate to login
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Password reset successfully!'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          _showSuccess('Password reset successfully!');
 
           Navigator.pushAndRemoveUntil(
             context,

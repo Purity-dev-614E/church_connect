@@ -9,6 +9,7 @@ import 'package:group_management_church_app/data/providers/user_provider.dart';
 import 'package:group_management_church_app/widgets/custom_button.dart';
 import 'package:group_management_church_app/widgets/input_field.dart';
 import 'package:provider/provider.dart';
+import 'package:group_management_church_app/widgets/custom_notification.dart';
 
 class ProfileSetupScreen extends StatefulWidget {
   final String userId;
@@ -50,6 +51,30 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     });
   }
   
+  void _showError(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.error,
+    );
+  }
+
+  void _showSuccess(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.success,
+    );
+  }
+
+  void _showInfo(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.info,
+    );
+  }
+  
   Future<void> _loadUserData() async {
     // Check if we're in edit mode
     final isEditMode = ModalRoute.of(context)?.settings.arguments == 'edit_mode';
@@ -80,7 +105,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           });
         }
       } catch (e) {
-        print('Error loading user data: $e');
+        _showError('Error loading user data: $e');
       } finally {
         if (mounted) {
           setState(() {
@@ -184,23 +209,13 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           }
         } else {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Failed to update profile. Please try again.'),
-                backgroundColor: AppColors.errorColor,
-              ),
-            );
+            _showError('Failed to update profile. Please try again.');
           }
         }
       } catch (e) {
         // Show error message
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error: ${e.toString()}'),
-              backgroundColor: AppColors.errorColor,
-            ),
-          );
+          _showError('Error: ${e.toString()}');
         }
       } finally {
         if (mounted) {
@@ -337,11 +352,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                     ),
                     onPressed: () {
                       // TODO: Implement image picker
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Profile picture upload will be implemented'),
-                        ),
-                      );
+                      _showInfo('Profile picture upload will be implemented');
                     },
                   ),
                 ),

@@ -10,12 +10,14 @@ import 'package:group_management_church_app/widgets/custom_app_bar.dart';
 import 'package:provider/provider.dart';
 import 'package:group_management_church_app/data/providers/dashboard_analytics_provider.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:group_management_church_app/widgets/custom_notification.dart';
 
 import '../../data/models/event_model.dart';
 import '../../data/providers/event_provider.dart';
 import '../../data/providers/group_provider.dart';
 import '../../data/providers/user_provider.dart';
 import '../../data/services/event_services.dart';
+import '../../data/providers/auth_provider.dart';
 
 class SuperAdminDashboard extends StatefulWidget {
   const SuperAdminDashboard({Key? key}) : super(key: key);
@@ -153,6 +155,131 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const ProfileScreen()),
+    );
+  }
+
+  void _showError(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.error,
+    );
+  }
+
+  void _showSuccess(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.success,
+    );
+  }
+
+  void _showInfo(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.info,
+    );
+  }
+
+  Future<void> _loadUsers() async {
+    try {
+      await _analyticsProvider.fetchRecentMembers();
+      if (mounted) {
+        setState(() {
+          _recentUsers = _analyticsProvider.recentMembers;
+        });
+      }
+    } catch (e) {
+      print('Error refreshing users: $e');
+      if (mounted) {
+        _showError('Failed to refresh users');
+      }
+    }
+  }
+
+  void _showEditUserDialog(UserModel user) {
+    final TextEditingController nameController = TextEditingController(text: user.fullName);
+    final TextEditingController emailController = TextEditingController(text: user.email);
+    String selectedRole = user.role;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit User'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: 'Full Name'),
+              ),
+              TextField(
+                controller: emailController,
+                decoration: const InputDecoration(labelText: 'Email'),
+                keyboardType: TextInputType.emailAddress,
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: selectedRole,
+                decoration: const InputDecoration(labelText: 'Role'),
+                items: const [
+                  DropdownMenuItem(value: 'user', child: Text('Member')),
+                  DropdownMenuItem(value: 'admin', child: Text('Group Leader')),
+                  DropdownMenuItem(value: 'super_admin', child: Text('Super Admin')),
+                ],
+                onChanged: (value) {
+                  if (value != null) {
+                    selectedRole = value;
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (nameController.text.isEmpty || emailController.text.isEmpty) {
+                _showError('Please fill all fields');
+                return;
+              }
+
+              try {
+                final updatedUser = UserModel(
+                  id: user.id,
+                  fullName: nameController.text.trim(),
+                  email: emailController.text.trim(),
+                  contact: user.contact,
+                  nextOfKin: user.nextOfKin,
+                  nextOfKinContact: user.nextOfKinContact,
+                  role: selectedRole,
+                  gender: user.gender,
+                );
+
+                final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                final success = await authProvider.updateProfile(updatedUser);
+
+                if (success) {
+                  _showSuccess('User updated successfully');
+                  Navigator.pop(context);
+                  _loadUsers(); // Refresh the user list
+                } else {
+                  _showError('Failed to update user');
+                }
+              } catch (e) {
+                _showError('Failed to update user: ${e.toString()}');
+              }
+            },
+            child: const Text('Update'),
+          ),
+        ],
+      ),
     );
   }
 

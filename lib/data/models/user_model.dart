@@ -36,8 +36,8 @@ class UserModel{
     return UserModel(
       id: json['uid'] ?? '',
       fullName: json['full_name'] ?? '',
-      contact: json['contact'] ?? '',
-      nextOfKin: json['next_of_kin'] ?? '',
+      contact: json['phone_number'] ?? '',
+      nextOfKin: json['next_of_kin_name'] ?? '',
       nextOfKinContact: json['next_of_kin_contact'] ?? '',
       role: role,
       email: json['email'] ?? '',
@@ -49,8 +49,8 @@ class UserModel{
     return {
       'uid': id,
       'full_name': fullName,
-      'contact': contact,
-      'next_of_kin': nextOfKin,
+      'phone_number': contact,
+      'next_of_kin_name': nextOfKin,
       'next_of_kin_contact': nextOfKinContact,
       'role': role,
       'email': email,

@@ -180,17 +180,19 @@ class EventProvider extends ChangeNotifier {
   }
 
   /// Fetch past events for a group
-  Future<void> fetchPastEvents(String groupId) async {
-    _setLoading(true);
-    try {
-      _pastEvents = await _eventServices.getPastEvents(groupId);
-      _errorMessage = null;
-    } catch (error) {
-      _handleError('fetching past events', error);
-    } finally {
-      _setLoading(false);
-    }
+  Future<List<EventModel>> fetchPastEvents(String groupId) async {
+  _setLoading(true);
+  try {
+    _pastEvents = await _eventServices.getPastEvents(groupId);
+    _errorMessage = null;
+    return _pastEvents; // Return the list of past events
+  } catch (error) {
+    _handleError('fetching past events', error);
+    return []; // Return an empty list in case of an error
+  } finally {
+    _setLoading(false);
   }
+}
 
   /// Fetch events for a specific date range
   Future<List<EventModel>> fetchEventsByDateRange(

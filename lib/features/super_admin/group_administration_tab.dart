@@ -10,6 +10,7 @@ import 'package:group_management_church_app/data/providers/group_provider.dart';
 import 'package:group_management_church_app/data/providers/user_provider.dart';
 import 'package:group_management_church_app/data/services/user_services.dart';
 import 'package:provider/provider.dart';
+import 'package:group_management_church_app/widgets/custom_notification.dart';
 
 class GroupAdministrationTab extends StatefulWidget {
   const GroupAdministrationTab({Key? key}) : super(key: key);
@@ -57,7 +58,29 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
     }
   }
   
+  void _showError(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.error,
+    );
+  }
 
+  void _showSuccess(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.success,
+    );
+  }
+
+  void _showInfo(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.info,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -297,9 +320,7 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
                 TextButton.icon(
                   onPressed: () {
                     // View group details
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('View details for ${group.name}')),
-                    );
+                    _showInfo('View details for ${group.name}');
                   },
                   icon: const Icon(Icons.visibility, size: 18),
                   label: const Text('View'),
@@ -432,20 +453,10 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
                   await groupProvider.createGroup(newGroup);
                   
                   Navigator.pop(dialogContext);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Group "${nameController.text}" created successfully'),
-                      backgroundColor: AppColors.successColor,
-                    ),
-                  );
+                  _showSuccess('Group "${nameController.text}" created successfully');
                   completer.complete(true); // Group created successfully
                 } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Failed to create group: $e'),
-                      backgroundColor: AppColors.errorColor,
-                    ),
-                  );
+                  _showError('Failed to create group: $e');
                   completer.complete(false); // Failed to create group
                 }
               } else {
@@ -513,20 +524,10 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
                   await groupProvider.updateGroup(group.id, updatedGroup);
                   
                   Navigator.pop(dialogContext);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Group "${nameController.text}" updated successfully'),
-                      backgroundColor: AppColors.successColor,
-                    ),
-                  );
+                  _showSuccess('Group "${nameController.text}" updated successfully');
                   completer.complete(true); // Group updated successfully
                 } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Failed to update group: $e'),
-                      backgroundColor: AppColors.errorColor,
-                    ),
-                  );
+                  _showError('Failed to update group: $e');
                   completer.complete(false); // Failed to update group
                 }
               } else {
@@ -611,20 +612,10 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
                 await groupProvider.deleteGroup(group.id);
                 
                 Navigator.pop(dialogContext);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Group "${group.name}" deleted successfully'),
-                    backgroundColor: AppColors.successColor,
-                  ),
-                );
+                _showSuccess('Group "${group.name}" deleted successfully');
                 completer.complete(true); // Group deleted successfully
               } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Failed to delete group: $e'),
-                    backgroundColor: AppColors.errorColor,
-                  ),
-                );
+                _showError('Failed to delete group: $e');
                 completer.complete(false); // Failed to delete group
               }
             },

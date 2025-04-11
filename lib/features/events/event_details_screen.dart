@@ -5,6 +5,7 @@ import 'package:group_management_church_app/data/models/event_model.dart';
 import 'package:group_management_church_app/data/providers/auth_provider.dart';
 import 'package:group_management_church_app/data/providers/event_provider.dart';
 import 'package:group_management_church_app/widgets/custom_app_bar.dart';
+import 'package:group_management_church_app/widgets/custom_notification.dart';
 import 'package:provider/provider.dart';
 
 class EventDetailsScreen extends StatefulWidget {
@@ -65,6 +66,30 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
     return '$weekday, $month $day at $hour:$minute $amPm';
   }
   
+  void _showError(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.error,
+    );
+  }
+
+  void _showSuccess(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.success,
+    );
+  }
+
+  void _showInfo(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.info,
+    );
+  }
+  
   // Submit attendance
   Future<void> _submitAttendance() async {
     // Validate form based on attendance choice
@@ -85,9 +110,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
       final userId = authProvider.currentUser?.id;
       
       if (userId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User not authenticated')),
-        );
+        _showError('User not authenticated');
         setState(() {
           _isLoading = false;
         });
@@ -110,23 +133,13 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
         });
         
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(_isAttending 
-                ? 'Attendance marked successfully!' 
-                : 'Absence recorded successfully!'),
-              backgroundColor: AppColors.successColor,
-            ),
-          );
+          _showSuccess(_isAttending 
+            ? 'Attendance marked successfully!' 
+            : 'Absence recorded successfully!');
         }
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to mark attendance. Please try again.'),
-              backgroundColor: AppColors.errorColor,
-            ),
-          );
+          _showError('Failed to mark attendance. Please try again.');
         }
         setState(() {
           _isLoading = false;
@@ -135,12 +148,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
     } catch (e) {
       print('Error marking attendance: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: AppColors.errorColor,
-          ),
-        );
+        _showError('Error: ${e.toString()}');
       }
       setState(() {
         _isLoading = false;

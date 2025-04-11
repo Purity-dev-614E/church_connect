@@ -7,6 +7,7 @@ import 'package:group_management_church_app/data/providers/user_provider.dart';
 import 'package:group_management_church_app/widgets/custom_app_bar.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:group_management_church_app/widgets/custom_notification.dart';
 
 class MemberAttendanceScreen extends StatefulWidget {
   final String userId;
@@ -33,6 +34,30 @@ class _MemberAttendanceScreenState extends State<MemberAttendanceScreen> {
   void initState() {
     super.initState();
     _loadData();
+  }
+
+  void _showError(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.error,
+    );
+  }
+
+  void _showSuccess(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.success,
+    );
+  }
+
+  void _showInfo(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.info,
+    );
   }
 
   Future<void> _loadData() async {
@@ -70,7 +95,7 @@ class _MemberAttendanceScreenState extends State<MemberAttendanceScreen> {
         _isLoading = false;
         _errorMessage = 'Error loading attendance data: $e';
       });
-      print('Error loading attendance data: $e');
+      _showError('Error loading attendance data: $e');
     }
   }
   

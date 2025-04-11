@@ -9,6 +9,7 @@ import 'package:group_management_church_app/data/services/auth_services.dart';
 import 'package:group_management_church_app/features/auth/profile_setup_screen.dart';
 import 'package:group_management_church_app/widgets/custom_app_bar.dart';
 import 'package:group_management_church_app/widgets/custom_button.dart';
+import 'package:group_management_church_app/widgets/custom_notification.dart';
 import 'package:provider/provider.dart';
 import '../data/providers/user_provider.dart';
 
@@ -24,6 +25,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String? _profileImageUrl;
   bool _isLoading = true;
   String? _errorMessage;
+  final _formKey = GlobalKey<FormState>();
   
   // User and group data
   UserModel? _user;
@@ -110,9 +112,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final userId = await authService.getUserId();
       
       if (userId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cannot edit profile: User ID not found')),
-        );
+        _showError('Cannot edit profile: User ID not found');
         return;
       }
       
@@ -133,9 +133,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _loadUserData();
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString()}')),
-      );
+      _showError('Error: ${e.toString()}');
     }
   }
   
@@ -148,9 +146,83 @@ class _ProfileScreenState extends State<ProfileScreen> {
       // Navigate to login screen and clear all previous routes
       Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error logging out: $e')),
+      _showError('Error logging out: $e');
+    }
+  }
+
+  void _showError(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.error,
+    );
+  }
+
+  void _showSuccess(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.success,
+    );
+  }
+
+  Future<void> _updateProfile() async {
+    if (!_formKey.currentState!.validate()) {
+      _showError('Please fill in all required fields correctly');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      // Get current user to preserve existing data
+      final currentUser = userProvider.currentUser;
+      if (currentUser == null) {
+        _showError('User data not found');
+        return;
+      }
+
+      // Create updated user model
+      final updatedUser = UserModel(
+        id: currentUser.id,
+        fullName: currentUser.fullName,
+        email: currentUser.email,
+        contact: currentUser.contact,
+        nextOfKin: currentUser.nextOfKin,
+        nextOfKinContact: currentUser.nextOfKinContact,
+        role: currentUser.role,
+        gender: currentUser.gender,
       );
+
+      // Update user profile
+      final success = await authProvider.updateProfile(updatedUser);
+
+      if (success) {
+        if (mounted) {
+          _showSuccess('Profile updated successfully!');
+          // Reload user data to reflect changes
+          await userProvider.loadUser(currentUser.id);
+        }
+      } else {
+        if (mounted) {
+          _showError('Failed to update profile. Please try again.');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        _showError('An error occurred. Please try again.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -170,77 +242,80 @@ class _ProfileScreenState extends State<ProfileScreen> {
             : SingleChildScrollView(
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      const SizedBox(height: 20),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        const SizedBox(height: 20),
 
-                      // Profile Picture or Initials
-                      _buildProfileAvatar(_user!.fullName),
+                        // Profile Picture or Initials
+                        _buildProfileAvatar(_user!.fullName),
 
-                      const SizedBox(height: 24),
+                        const SizedBox(height: 24),
 
-                      // User Name
-                      Text(
-                        _user!.fullName,
-                        style: TextStyles.heading1.copyWith(
-                          color: AppColors.textColor,
-                          fontWeight: FontWeight.bold,
+                        // User Name
+                        Text(
+                          _user!.fullName,
+                          style: TextStyles.heading1.copyWith(
+                            color: AppColors.textColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
                         ),
-                        textAlign: TextAlign.center,
-                      ),
 
-                      const SizedBox(height: 8),
+                        const SizedBox(height: 8),
 
-                      // User Role and Group
-                      Text(
-                        _primaryGroup != null 
-                          ? '${_user!.role} • ${_primaryGroup!.name}'
-                          : _user!.role,
-                        style: TextStyles.bodyText.copyWith(
-                          color: AppColors.secondaryColor,
-                          fontWeight: FontWeight.w500,
-                          fontSize: 18,
+                        // User Role and Group
+                        Text(
+                          _primaryGroup != null 
+                            ? '${_user!.role} • ${_primaryGroup!.name}'
+                            : _user!.role,
+                          style: TextStyles.bodyText.copyWith(
+                            color: AppColors.secondaryColor,
+                            fontWeight: FontWeight.w500,
+                            fontSize: 18,
+                          ),
+                          textAlign: TextAlign.center,
                         ),
-                        textAlign: TextAlign.center,
-                      ),
 
-                      const SizedBox(height: 32),
+                        const SizedBox(height: 32),
 
-                      // Edit Profile Button
-                      CustomButton(
-                        label: 'Edit Profile',
-                        onPressed: _navigateToEditProfile,
-                        icon: Icons.edit,
-                        color: AppColors.primaryColor,
-                        isPulsing: true,
-                        pulseEffect: PulseEffectType.glow,
-                        isFullWidth: false,
-                        horizontalPadding: 32,
-                      ),
-                      
-                      const SizedBox(height: 16),
-                      
-                      // Logout Button
-                      CustomButton(
-                        label: 'Logout',
-                        onPressed: () => _logout(context),
-                        icon: Icons.logout,
-                        color: AppColors.errorColor,
-                        isFullWidth: false,
-                        horizontalPadding: 32,
-                      ),
+                        // Edit Profile Button
+                        CustomButton(
+                          label: 'Edit Profile',
+                          onPressed: _navigateToEditProfile,
+                          icon: Icons.edit,
+                          color: AppColors.primaryColor,
+                          isPulsing: true,
+                          pulseEffect: PulseEffectType.glow,
+                          isFullWidth: false,
+                          horizontalPadding: 32,
+                        ),
+                        
+                        const SizedBox(height: 16),
+                        
+                        // Logout Button
+                        CustomButton(
+                          label: 'Logout',
+                          onPressed: () => _logout(context),
+                          icon: Icons.logout,
+                          color: AppColors.errorColor,
+                          isFullWidth: false,
+                          horizontalPadding: 32,
+                        ),
 
-                      const SizedBox(height: 40),
+                        const SizedBox(height: 40),
 
-                      // User Information Card
-                      _buildUserInfoCard(_user!),
+                        // User Information Card
+                        _buildUserInfoCard(_user!),
 
-                      const SizedBox(height: 24),
+                        const SizedBox(height: 24),
 
-                      // Emergency Contact Card
-                      _buildEmergencyContactCard(_user!),
-                    ],
+                        // Emergency Contact Card
+                        _buildEmergencyContactCard(_user!),
+                      ],
+                    ),
                   ),
                 ),
               ),

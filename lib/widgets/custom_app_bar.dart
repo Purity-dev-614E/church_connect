@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:group_management_church_app/core/constants/text_styles.dart';
 import '../core/constants/colors.dart';
+import 'custom_notification.dart';
 
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
@@ -39,8 +40,10 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
           GestureDetector(
             onTap: onProfileTap ?? () {
               // Default action if no callback provided
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Profile avatar tapped')),
+              CustomNotification.show(
+                context: context,
+                message: 'Profile avatar tapped',
+                type: NotificationType.info,
               );
             },
             child: Container(

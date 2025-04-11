@@ -1,16 +1,17 @@
-
 import 'package:flutter/material.dart';
 import 'package:group_management_church_app/core/constants/colors.dart';
 import 'package:group_management_church_app/core/constants/text_styles.dart';
 import 'package:group_management_church_app/data/models/event_model.dart';
 import 'package:group_management_church_app/data/models/group_model.dart';
 import 'package:group_management_church_app/data/models/user_model.dart';
+import 'package:group_management_church_app/features/events/overall_event_details.dart';
 import 'package:group_management_church_app/features/member/member_attendance_screen.dart';
 import 'package:group_management_church_app/features/member/member_profile_screen.dart';
 import 'package:group_management_church_app/features/profile_screen.dart';
 import 'package:group_management_church_app/widgets/custom_app_bar.dart';
 import 'package:group_management_church_app/widgets/custom_button.dart';
 import 'package:group_management_church_app/widgets/event_card.dart';
+import 'package:group_management_church_app/widgets/custom_notification.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:group_management_church_app/data/providers/event_provider.dart';
@@ -159,36 +160,69 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
 
   // Analytics data from provider
-  Future<Map<String, double>> get _analyticsData async {
-    try {
-      final analyticsProvider = Provider.of<AnalyticsProvider>(context, listen: false);
-      final attendanceProvider = Provider.of<AttendanceProvider>(context, listen: false);
-      final userProvider = Provider.of<UserProvider>(context, listen: false);
-      final groupProvider = Provider.of<GroupProvider>(context, listen: false);
+ Future<Map<String, double>> get _analyticsData async {
+   try {
+     final groupProvider = Provider.of<GroupProvider>(context, listen: false);
+     final eventProvider = Provider.of<EventProvider>(context, listen: false);
+     final attendanceProvider = Provider.of<AttendanceProvider>(context, listen: false);
 
-      final totalMembers = (await groupProvider.getGroupMembers(widget.groupId)).length.toDouble();
-      final activeMembers = (await groupProvider.getGroupMembers(widget.groupId)).length.toDouble(); // Assuming this returns active members
-      final averageAttendance = 0.0; // Replace with actual logic to get average attendance
-      final eventsThisMonth = 0.0; // Replace with actual logic to get events this month
+     // Get total and active members
+     final members = await groupProvider.getGroupMembers(widget.groupId);
+     final totalMembers = members.length.toDouble();
+     final activeMembers = members.where((member) => member.isActive).length.toDouble();
 
-      return {
-        'Total Members': totalMembers,
-        'Active Members': activeMembers,
-        'Average Attendance': averageAttendance,
-        'Events This Month': eventsThisMonth,
-      };
-    } catch (e) {
-      print('Error getting analytics data: $e');
-      // Return default values if providers are not available
-      return {
-        'Total Members': 0.0,
-        'Active Members': 0.0,
-        'Average Attendance': 0.0,
-        'Events This Month': 0.0,
-      };
-    }
-  }
+     // Fetch past events
+     final pastEvents = await eventProvider.fetchPastEvents(widget.groupId);
 
+     // Calculate average attendance
+     double averageAttendance = 0.0;
+     if (pastEvents.isNotEmpty) {
+       double totalAttendanceRate = 0.0;
+       int eventsWithAttendance = 0;
+
+       for (var event in pastEvents) {
+         final attendanceList = await attendanceProvider.fetchEventAttendance(event.id) ?? [];
+         if (attendanceList.isNotEmpty) {
+           final presentCount = attendanceList.where((a) => a.isPresent).length;
+           final attendanceRate = (presentCount / attendanceList.length) * 100;
+           totalAttendanceRate += attendanceRate;
+           eventsWithAttendance++;
+         }
+       }
+
+       if (eventsWithAttendance > 0) {
+         averageAttendance = totalAttendanceRate / eventsWithAttendance;
+       }
+     }
+
+     // Calculate events this month
+     final now = DateTime.now();
+     final firstDayOfMonth = DateTime(now.year, now.month, 1);
+     final lastDayOfMonth = DateTime(now.year, now.month + 1, 0);
+
+     final upcomingEvents = eventProvider.upcomingEvents;
+     final allEvents = [...pastEvents, ...upcomingEvents];
+     final eventsThisMonth = allEvents.where((event) {
+       return event.dateTime.isAfter(firstDayOfMonth.subtract(const Duration(days: 1))) &&
+              event.dateTime.isBefore(lastDayOfMonth.add(const Duration(days: 1)));
+     }).length.toDouble();
+
+     return {
+       'totalMembers': totalMembers,
+       'activeMembers': activeMembers,
+       'averageAttendance': averageAttendance,
+       'eventsThisMonth': eventsThisMonth,
+     };
+   } catch (e) {
+     print('Error calculating analytics data: $e');
+     return {
+       'totalMembers': 0.0,
+       'activeMembers': 0.0,
+       'averageAttendance': 0.0,
+       'eventsThisMonth': 0.0,
+     };
+   }
+ }
   // Date and time for event creation
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   TimeOfDay _selectedTime = TimeOfDay.now();
@@ -214,6 +248,30 @@ class _AdminDashboardState extends State<AdminDashboard> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const ProfileScreen()),
+    );
+  }
+
+  void _showError(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.error,
+    );
+  }
+
+  void _showSuccess(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.success,
+    );
+  }
+
+  void _showInfo(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.info,
     );
   }
 
@@ -366,15 +424,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 
                 groupProvider.addMemberToGroup(widget.groupId, selectedUser!.id).then((success) {
                   if (success) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('${selectedUser!.fullName} added to group successfully')),
-                    );
+                    _showSuccess('${selectedUser!.fullName} added to group successfully');
                     // Refresh the members list
                     _loadGroupMembers();
                   } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Failed to add ${selectedUser!.fullName} to group')),
-                    );
+                    _showError('Failed to add ${selectedUser!.fullName} to group');
                   }
                 });
                 
@@ -548,9 +602,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 if (titleController.text.isEmpty ||
                     descriptionController.text.isEmpty ||
                     locationController.text.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please fill all fields')),
-                  );
+                  _showError('Please fill all fields');
                   return;
                 }
 
@@ -577,9 +629,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 Navigator.pop(context);
                 
                 // Show success message
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Event created successfully')),
-                );
+                _showSuccess('Event created successfully');
 
                 // Refresh UI in the parent widget
                 setState(() {});
@@ -695,15 +745,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
               final groupProvider = Provider.of<GroupProvider>(context, listen: false);
               groupProvider.removeMemberFromGroup(widget.groupId, member.id).then((success) {
                 if (success) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('${member.fullName} has been removed from the group')),
-                  );
+                  _showSuccess('${member.fullName} has been removed from the group');
                   // Refresh UI
                   setState(() {});
                 } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to remove ${member.fullName} from the group')),
-                  );
+                  _showError('Failed to remove ${member.fullName} from the group');
                 }
               });
 
@@ -727,30 +773,40 @@ class _AdminDashboardState extends State<AdminDashboard> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(
-              leading: const Icon(Icons.visibility),
-              title: const Text('View Details'),
-              onTap: () {
-                Navigator.pop(context);
-                // Navigate to event details
-              },
+          ListTile(
+            leading: const Icon(
+              Icons.visibility,
+              color: AppColors.primaryColor, // App theme color
             ),
+            title: Text(
+              'View Details',
+              style: TextStyles.bodyText.copyWith(
+                fontWeight: FontWeight.w600,
+                color: AppColors.textColor,
+              ),
+            ),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => OverallEventDetailsScreen(
+                    eventId: event.id,
+                    eventTitle: event.title,
+                  ),
+                ),
+              );
+            },
+          ),
             ListTile(
               leading: const Icon(Icons.edit),
               title: const Text('Edit Event'),
               onTap: () {
                 Navigator.pop(context);
-                // Show edit event dialog
+                _showEditEventDialog(event);
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.people),
-              title: const Text('Manage Attendance'),
-              onTap: () {
-                Navigator.pop(context);
-                // Navigate to attendance management
-              },
-            ),
+           
             ListTile(
               leading: const Icon(Icons.delete, color: Colors.red),
               title: const Text('Delete Event'),
@@ -792,13 +848,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
               final eventProvider = Provider.of<EventProvider>(context, listen: false);
               eventProvider.deleteEvent(event.id, widget.groupId).then((success) {
                 if (success) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Event deleted successfully')),
-                  );
+                  _showSuccess('Event deleted successfully');
                 } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Failed to delete event')),
-                  );
+                  _showError('Failed to delete event');
                 }
               });
               Navigator.pop(context);
@@ -812,6 +864,209 @@ class _AdminDashboardState extends State<AdminDashboard> {
             child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showEditEventDialog(EventModel event) {
+    // Create controllers and initialize with existing event data
+    final TextEditingController titleController = TextEditingController(text: event.title);
+    final TextEditingController descriptionController = TextEditingController(text: event.description);
+    final TextEditingController locationController = TextEditingController(text: event.location);
+    
+    // Use event's date and time
+    DateTime selectedDate = event.dateTime;
+    TimeOfDay selectedTime = TimeOfDay(
+      hour: event.dateTime.hour,
+      minute: event.dateTime.minute,
+    );
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(
+            'Edit Event',
+            style: TextStyles.heading2,
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: titleController,
+                  decoration: InputDecoration(
+                    labelText: 'Event Title',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: descriptionController,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    labelText: 'Description',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: locationController,
+                  decoration: InputDecoration(
+                    labelText: 'Location',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Date & Time',
+                  style: TextStyles.bodyText.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final date = await showDatePicker(
+                            context: context,
+                            initialDate: selectedDate,
+                            firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                            lastDate: DateTime.now().add(const Duration(days: 365)),
+                          );
+                          if (date != null) {
+                            setDialogState(() {
+                              selectedDate = date;
+                            });
+                          }
+                        },
+                        icon: const Icon(Icons.calendar_today),
+                        label: Text(
+                          '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primaryColor,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final time = await showTimePicker(
+                            context: context,
+                            initialTime: selectedTime,
+                          );
+                          if (time != null) {
+                            setDialogState(() {
+                              selectedTime = time;
+                            });
+                          }
+                        },
+                        icon: const Icon(Icons.access_time),
+                        label: Text(
+                          '${selectedTime.hour}:${selectedTime.minute.toString().padLeft(2, '0')}',
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primaryColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                // Just close the dialog
+                Navigator.pop(context);
+                
+                // Dispose controllers to prevent memory leaks
+                titleController.dispose();
+                descriptionController.dispose();
+                locationController.dispose();
+              },
+              child: Text(
+                'Cancel',
+                style: TextStyles.bodyText.copyWith(
+                  color: AppColors.textColor,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                // Update event using provider
+                if (titleController.text.isEmpty ||
+                    descriptionController.text.isEmpty ||
+                    locationController.text.isEmpty) {
+                  _showError('Please fill all fields');
+                  return;
+                }
+
+                // Combine date and time
+                final DateTime eventDateTime = DateTime(
+                  selectedDate.year,
+                  selectedDate.month,
+                  selectedDate.day,
+                  selectedTime.hour,
+                  selectedTime.minute,
+                );
+
+                // Update event
+                final eventProvider = Provider.of<EventProvider>(context, listen: false);
+                eventProvider.updateEvent(
+                  eventId: event.id,
+                  title: titleController.text,
+                  description: descriptionController.text,
+                  dateTime: eventDateTime,
+                  location: locationController.text,
+                  groupId: widget.groupId,
+                ).then((updatedEvent) {
+                  if (updatedEvent != null) {
+                    // Close the dialog
+                    Navigator.pop(context);
+                    
+                    // Show success message
+                    _showSuccess('Event updated successfully');
+
+                    // Refresh UI in the parent widget
+                    setState(() {});
+                  } else {
+                    _showError('Failed to update event');
+                  }
+                });
+                
+                // Dispose controllers to prevent memory leaks
+                titleController.dispose();
+                descriptionController.dispose();
+                locationController.dispose();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: Text(
+                'Update',
+                style: TextStyles.bodyText.copyWith(
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1112,10 +1367,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             children: [
-              _buildStatCard('Total Members', '${data['Total Members']?.toInt()}', Icons.people, AppColors.primaryColor),
-              _buildStatCard('Active Members', '${data['Active Members']?.toInt()}', Icons.person_outline, AppColors.secondaryColor),
-              _buildStatCard('Avg. Attendance', '${data['Average Attendance']?.toInt()}%', Icons.trending_up, AppColors.accentColor),
-              _buildStatCard('Events This Month', '${data['Events This Month']?.toInt()}', Icons.event, AppColors.buttonColor),
+              _buildStatCard('Total Members', '${data['totalMembers']?.toInt()}', Icons.people, AppColors.primaryColor),
+              _buildStatCard('Active Members', '${data['activeMembers']?.toInt()}', Icons.person_outline, AppColors.secondaryColor),
+              _buildStatCard('Avg. Attendance', '${data['averageAttendance']?.toInt()}%', Icons.trending_up, AppColors.accentColor),
+              _buildStatCard('Events This Month', '${data['eventsThisMonth']?.toInt()}', Icons.event, AppColors.buttonColor),
             ],
           );
         }
@@ -1664,9 +1919,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               ElevatedButton.icon(
                 onPressed: () {
                   // Export as PDF
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Exporting as PDF...')),
-                  );
+                  _showInfo('Exporting as PDF...');
                 },
                 icon: const Icon(Icons.picture_as_pdf),
                 label: const Text('Export as PDF'),
@@ -1682,9 +1935,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               OutlinedButton.icon(
                 onPressed: () {
                   // Export as CSV
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Exporting as CSV...')),
-                  );
+                  _showInfo('Exporting as CSV...');
                 },
                 icon: const Icon(Icons.table_chart),
                 label: const Text('Export as CSV'),

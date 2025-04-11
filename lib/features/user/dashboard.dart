@@ -11,6 +11,7 @@ import 'package:group_management_church_app/features/events/event_details_screen
 import 'package:group_management_church_app/features/profile_screen.dart';
 import 'package:group_management_church_app/widgets/custom_app_bar.dart';
 import 'package:group_management_church_app/widgets/event_card.dart';
+import 'package:group_management_church_app/widgets/custom_notification.dart';
 import 'package:provider/provider.dart';
 
 class UserDashboard extends StatefulWidget {
@@ -256,6 +257,30 @@ class _UserDashboardState extends State<UserDashboard> {
     }
   }
 
+  void _showError(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.error,
+    );
+  }
+
+  void _showSuccess(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.success,
+    );
+  }
+
+  void _showInfo(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.info,
+    );
+  }
+
   // Refresh all data
   Future<void> _refreshData() async {
     // Check if widget is mounted before starting refresh
@@ -265,9 +290,7 @@ class _UserDashboardState extends State<UserDashboard> {
     
     // Check again if widget is still mounted after data load
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Data refreshed')),
-      );
+      _showSuccess('Data refreshed');
     }
   }
 
@@ -323,30 +346,14 @@ class _UserDashboardState extends State<UserDashboard> {
       final hasEventError = eventProvider.errorMessage != null;
       final hasGroupError = groupProvider.errorMessage != null;
 
-      // Show error snackbar if needed
+      // Show error notification if needed
       if (hasEventError && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Event error: ${eventProvider.errorMessage}'),
-            action: SnackBarAction(
-              label: 'Retry',
-              onPressed: _loadEventData,
-            ),
-          ),
-        );
+        _showError('Event error: ${eventProvider.errorMessage}');
         eventProvider.clearError();
       }
 
       if (hasGroupError && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Group error: ${groupProvider.errorMessage}'),
-            action: SnackBarAction(
-              label: 'Retry',
-              onPressed: _loadGroupData,
-            ),
-          ),
-        );
+        _showError('Group error: ${groupProvider.errorMessage}');
         groupProvider.clearError();
       }
     });

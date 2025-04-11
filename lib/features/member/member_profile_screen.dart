@@ -7,6 +7,7 @@ import 'package:group_management_church_app/data/providers/group_provider.dart';
 import 'package:group_management_church_app/data/providers/user_provider.dart';
 import 'package:group_management_church_app/widgets/custom_app_bar.dart';
 import 'package:group_management_church_app/widgets/custom_button.dart';
+import 'package:group_management_church_app/widgets/custom_notification.dart';
 import 'package:provider/provider.dart';
 
 class MemberProfileScreen extends StatefulWidget {
@@ -207,10 +208,35 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
     }
   }
   
+  void _showError(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.error,
+    );
+  }
+
+  void _showSuccess(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.success,
+    );
+  }
+
+  void _showInfo(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.info,
+    );
+  }
+
   void _contactMember(UserModel user) {
-    // This would typically launch a messaging app or show contact options
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Contact ${user.fullName} at ${user.contact}')),
+    CustomNotification.show(
+      context: context,
+      message: 'Contact ${user.fullName} at ${user.contact}',
+      type: NotificationType.info,
     );
   }
   
@@ -466,9 +492,7 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
                   ),
                   onTap: () {
                     // Navigate to group details
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Navigate to ${group.name} details')),
-                    );
+                    _showInfo('Navigate to ${group.name} details');
                   },
                 );
               },
