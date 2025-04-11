@@ -117,4 +117,35 @@ class UserServices {
       throw Exception('Failed to load users');
     }
   }
+  
+  // Search users by name or email
+  Future<List<UserModel>> searchUsers(String query) async {
+    try {
+      final response = await _httpClient.get('${ApiEndpoints.searchUsers}?query=$query');
+      
+      if (response.statusCode == 200) {
+        List<dynamic> jsonResponse = jsonDecode(response.body);
+        return jsonResponse.map((user) => UserModel.fromJson(user)).toList();
+      } else {
+        // If the search endpoint fails, fall back to filtering all users locally
+        final allUsers = await fetchAllUsers();
+        final lowercaseQuery = query.toLowerCase();
+        
+        return allUsers.where((user) => 
+          user.fullName.toLowerCase().contains(lowercaseQuery) || 
+          user.email.toLowerCase().contains(lowercaseQuery)
+        ).toList();
+      }
+    } catch (e) {
+      print('Error searching users: $e');
+      // Fall back to filtering all users locally
+      final allUsers = await fetchAllUsers();
+      final lowercaseQuery = query.toLowerCase();
+      
+      return allUsers.where((user) => 
+        user.fullName.toLowerCase().contains(lowercaseQuery) || 
+        user.email.toLowerCase().contains(lowercaseQuery)
+      ).toList();
+    }
+  }
 }

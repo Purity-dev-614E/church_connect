@@ -43,22 +43,66 @@ class _UserDashboardState extends State<UserDashboard> {
   @override
   void initState() {
     super.initState();
-    _loadData();
+    // Schedule data loading after the current build is complete
+    Future.microtask(() => _loadData());
+    
+    // Add a timeout to reset loading state if it takes too long
+    Future.delayed(const Duration(seconds: 10), () {
+      if (mounted && (_isLoadingUser || _isLoadingGroup)) {
+        print('Loading timeout reached, resetting loading state');
+        setState(() {
+          _isLoadingUser = false;
+          _isLoadingGroup = false;
+        });
+      }
+    });
   }
 
   // Load all necessary data
   Future<void> _loadData() async {
-    await Future.wait([
-      _loadUserData(),
-      _loadGroupData(),
-      _loadEventData(),
-    ]);
+    print('Starting _loadData');
+    try {
+      // Load data sequentially to avoid concurrent provider updates
+      await _loadUserData();
+      await _loadGroupData();
+      await _loadEventData();
+      print('All data loaded successfully');
+    } catch (e) {
+      print('Error loading data: $e');
+      
+      // Reset loading states if there was an error
+      if (mounted) {
+        setState(() {
+          if (_isLoadingUser) _isLoadingUser = false;
+          if (_isLoadingGroup) _isLoadingGroup = false;
+          if (_isLoadingEvents) _isLoadingEvents = false;
+        });
+      }
+    } finally {
+      // Ensure loading states are reset even if there was an error
+      if (mounted) {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (_isLoadingUser || _isLoadingGroup || _isLoadingEvents) {
+            print('Forcing reset of loading states in finally block');
+            setState(() {
+              _isLoadingUser = false;
+              _isLoadingGroup = false;
+              _isLoadingEvents = false;
+            });
+          }
+        });
+      }
+    }
   }
 
   // Load user data
   Future<void> _loadUserData() async {
+    print('Starting _loadUserData');
     // Only set loading state if the widget is still mounted
-    if (!mounted) return;
+    if (!mounted) {
+      print('Widget not mounted in _loadUserData');
+      return;
+    }
     
     setState(() {
       _isLoadingUser = true;
@@ -69,13 +113,32 @@ class _UserDashboardState extends State<UserDashboard> {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
 
       final userId = authProvider.currentUser?.id;
+      print('User ID from auth provider: $userId');
+      
       if (userId != null) {
+        print('Loading user with ID: $userId');
         await userProvider.loadUser(userId);
+        print('User loaded, current user: ${userProvider.currentUser?.fullName}');
 
         // Only update state if the widget is still mounted
         if (mounted && userProvider.currentUser != null) {
           setState(() {
             _userName = userProvider.currentUser!.fullName;
+            _isLoadingUser = false;
+          });
+          print('User state updated, name: $_userName, loading: $_isLoadingUser');
+        } else {
+          print('Widget not mounted or user is null after loading');
+          if (mounted) {
+            setState(() {
+              _isLoadingUser = false;
+            });
+          }
+        }
+      } else {
+        print('User ID is null, cannot load user');
+        if (mounted) {
+          setState(() {
             _isLoadingUser = false;
           });
         }
@@ -94,8 +157,12 @@ class _UserDashboardState extends State<UserDashboard> {
 
   // Load group data
   Future<void> _loadGroupData() async {
+    print('Starting _loadGroupData with groupId: ${widget.groupId}');
     // Only set loading state if the widget is still mounted
-    if (!mounted) return;
+    if (!mounted) {
+      print('Widget not mounted in _loadGroupData');
+      return;
+    }
     
     setState(() {
       _isLoadingGroup = true;
@@ -106,7 +173,9 @@ class _UserDashboardState extends State<UserDashboard> {
       final groupProvider = Provider.of<GroupProvider>(context, listen: false);
       
       // Fetch the group data
+      print('Fetching group with ID: ${widget.groupId}');
       final group = await groupProvider.getGroupById(widget.groupId);
+      print('Group loaded: ${group?.name}');
 
       // Only update state if the widget is still mounted
       if (mounted && group != null) {
@@ -115,6 +184,15 @@ class _UserDashboardState extends State<UserDashboard> {
           _groupName = group.name;
           _isLoadingGroup = false;
         });
+        print('Group state updated, name: $_groupName, loading: $_isLoadingGroup');
+      } else {
+        print('Widget not mounted or group is null after loading');
+        if (mounted) {
+          setState(() {
+            _isLoadingGroup = false;
+            _groupName = 'Group not found';
+          });
+        }
       }
     } catch (e) {
       print('Error loading group data: $e');
@@ -123,6 +201,7 @@ class _UserDashboardState extends State<UserDashboard> {
       if (mounted) {
         setState(() {
           _isLoadingGroup = false;
+          _groupName = 'Error loading group';
         });
       }
     }
@@ -209,7 +288,11 @@ class _UserDashboardState extends State<UserDashboard> {
       )
     ).then((_) {
       // Refresh events when returning from event details
-      _loadEventData();
+      // Use microtask to ensure we're not in the build phase
+      if (mounted) {
+        print('Returned from event details, refreshing events');
+        Future.microtask(() => _loadEventData());
+      }
     });
   }
 
@@ -220,7 +303,11 @@ class _UserDashboardState extends State<UserDashboard> {
       MaterialPageRoute(builder: (context) => const ProfileScreen())
     ).then((_) {
       // Refresh user data when returning from profile screen
-      _loadUserData();
+      // Use microtask to ensure we're not in the build phase
+      if (mounted) {
+        print('Returned from profile, refreshing user data');
+        Future.microtask(() => _loadUserData());
+      }
     });
   }
 
@@ -316,7 +403,10 @@ class _UserDashboardState extends State<UserDashboard> {
 
   Widget _buildHomeTab() {
     return RefreshIndicator(
-      onRefresh: _refreshData,
+      onRefresh: () async {
+        // Ensure we're not in the build phase when refreshing
+        await Future.microtask(() => _refreshData());
+      },
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         child: Column(
@@ -324,13 +414,7 @@ class _UserDashboardState extends State<UserDashboard> {
           children: [
             Container(
               padding: const EdgeInsets.all(16.0),
-              child: _isLoadingUser || _isLoadingGroup
-                ? _buildLoadingCard()
-                : CardWidget(
-                    userName: _userName,
-                    icon: Icons.person,
-                    group_name: _groupName,
-                  ),
+              child: _buildWelcomeCard(),
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -387,6 +471,56 @@ class _UserDashboardState extends State<UserDashboard> {
     );
   }
 
+  // Build welcome card with fallback handling
+  Widget _buildWelcomeCard() {
+    // If loading, show loading card with timeout
+    if (_isLoadingUser || _isLoadingGroup) {
+      // Start a timer to force a fallback if loading takes too long
+      Future.delayed(const Duration(seconds: 5), () {
+        if (mounted && (_isLoadingUser || _isLoadingGroup)) {
+          print('Loading card timeout reached, forcing fallback');
+          setState(() {
+            _isLoadingUser = false;
+            _isLoadingGroup = false;
+          });
+        }
+      });
+      
+      return Column(
+        children: [
+          _buildLoadingCard(),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: TextButton(
+              onPressed: () {
+                print('Force refreshing data');
+                setState(() {
+                  _isLoadingUser = false;
+                  _isLoadingGroup = false;
+                });
+                Future.microtask(() => _loadData());
+              },
+              child: Text(
+                'Tap if stuck loading',
+                style: TextStyles.bodyText.copyWith(
+                  color: Colors.red,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+    
+    // If not loading, show the actual card
+    return CardWidget(
+      userName: _userName,
+      icon: Icons.person,
+      group_name: _groupName,
+    );
+  }
+
   // Loading card widget
   Widget _buildLoadingCard() {
     return SizedBox(
@@ -411,10 +545,21 @@ class _UserDashboardState extends State<UserDashboard> {
               ],
             ),
           ),
-          child: const Center(
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-            ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Loading...',
+                style: TextStyles.bodyText.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -487,7 +632,10 @@ class _UserDashboardState extends State<UserDashboard> {
               const Spacer(),
               IconButton(
                 icon: const Icon(Icons.refresh),
-                onPressed: _loadEventData,
+                onPressed: () {
+                  // Ensure we're not in the build phase when refreshing
+                  Future.microtask(() => _loadEventData());
+                },
                 tooltip: 'Refresh events',
               ),
             ],
@@ -535,7 +683,10 @@ class _UserDashboardState extends State<UserDashboard> {
                   )
                 : Expanded(
                     child: RefreshIndicator(
-                      onRefresh: _loadEventData,
+                      onRefresh: () async {
+                        // Ensure we're not in the build phase when refreshing
+                        await Future.microtask(() => _loadEventData());
+                      },
                       child: ListView.builder(
                         itemCount: _allEvents.length,
                         padding: const EdgeInsets.symmetric(horizontal: 16.0),

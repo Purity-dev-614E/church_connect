@@ -35,8 +35,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final TextEditingController _nextOfKinContactController = TextEditingController();
   
   // Selected gender
-  String _selectedGender = 'Male';
-  final List<String> _genderOptions = ['Male', 'Female', 'Prefer not to say'];
+  String _selectedGender = 'male';
+  final List<String> _genderOptions = ['male', 'female'];
   
   // Default role is 'user' - only super_admin can change roles
   final String _userRole = 'user';

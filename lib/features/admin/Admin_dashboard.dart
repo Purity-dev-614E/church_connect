@@ -5,6 +5,8 @@ import 'package:group_management_church_app/core/constants/text_styles.dart';
 import 'package:group_management_church_app/data/models/event_model.dart';
 import 'package:group_management_church_app/data/models/group_model.dart';
 import 'package:group_management_church_app/data/models/user_model.dart';
+import 'package:group_management_church_app/features/member/member_attendance_screen.dart';
+import 'package:group_management_church_app/features/member/member_profile_screen.dart';
 import 'package:group_management_church_app/features/profile_screen.dart';
 import 'package:group_management_church_app/widgets/custom_app_bar.dart';
 import 'package:group_management_church_app/widgets/custom_button.dart';
@@ -216,87 +218,185 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   void _showAddMemberDialog() {
+    final TextEditingController searchController = TextEditingController();
+    List<UserModel> searchResults = [];
+    UserModel? selectedUser;
+    bool isSearching = false;
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          'Add New Member',
-          style: TextStyles.heading2,
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Search for members to add to your group',
-              style: TextStyles.bodyText,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(
+            'Add New Member',
+            style: TextStyles.heading2,
+          ),
+          content: Container(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Search for members to add to your group',
+                  style: TextStyles.bodyText,
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: searchController,
+                        decoration: InputDecoration(
+                          hintText: 'Search by name or email',
+                          prefixIcon: const Icon(Icons.search),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onChanged: (value) {
+                          // Clear selection when search query changes
+                          setDialogState(() {
+                            selectedUser = null;
+                          });
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: () async {
+                        if (searchController.text.isEmpty) return;
+                        
+                        setDialogState(() {
+                          isSearching = true;
+                        });
+                        
+                        try {
+                          final userProvider = Provider.of<UserProvider>(context, listen: false);
+                          final results = await userProvider.searchUsers(searchController.text);
+                          
+                          setDialogState(() {
+                            searchResults = results;
+                            isSearching = false;
+                          });
+                        } catch (e) {
+                          print('Error searching users: $e');
+                          setDialogState(() {
+                            isSearching = false;
+                          });
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryColor,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Text(
+                        'Search',
+                        style: TextStyles.bodyText.copyWith(
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                if (isSearching)
+                  const Center(child: CircularProgressIndicator())
+                else if (searchResults.isNotEmpty)
+                  Flexible(
+                    child: Container(
+                      constraints: BoxConstraints(maxHeight: 300),
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: searchResults.length,
+                        itemBuilder: (context, index) {
+                          final user = searchResults[index];
+                          final isSelected = selectedUser?.id == user.id;
+                          
+                          return ListTile(
+                            title: Text(user.fullName),
+                            subtitle: Text(user.email),
+                            selected: isSelected,
+                            tileColor: isSelected ? AppColors.primaryColor.withOpacity(0.1) : null,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              side: isSelected 
+                                ? BorderSide(color: AppColors.primaryColor, width: 1)
+                                : BorderSide.none,
+                            ),
+                            onTap: () {
+                              setDialogState(() {
+                                selectedUser = user;
+                              });
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  )
+                else if (searchController.text.isNotEmpty)
+                  Center(
+                    child: Text(
+                      'No users found matching "${searchController.text}"',
+                      style: TextStyles.bodyText,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+              ],
             ),
-            const SizedBox(height: 16),
-            TextField(
-              decoration: InputDecoration(
-                hintText: 'Search by name or email',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                searchController.dispose();
+                Navigator.pop(context);
+              },
+              child: Text(
+                'Cancel',
+                style: TextStyles.bodyText.copyWith(
+                  color: AppColors.textColor,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: selectedUser == null ? null : () {
+                final groupProvider = Provider.of<GroupProvider>(context, listen: false);
+                
+                groupProvider.addMemberToGroup(widget.groupId, selectedUser!.id).then((success) {
+                  if (success) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('${selectedUser!.fullName} added to group successfully')),
+                    );
+                    // Refresh the members list
+                    _loadGroupMembers();
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to add ${selectedUser!.fullName} to group')),
+                    );
+                  }
+                });
+                
+                searchController.dispose();
+                Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                disabledBackgroundColor: AppColors.primaryColor.withOpacity(0.5),
+              ),
+              child: Text(
+                'Add',
+                style: TextStyles.bodyText.copyWith(
+                  color: Colors.white,
                 ),
               ),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Cancel',
-              style: TextStyles.bodyText.copyWith(
-                color: AppColors.textColor,
-              ),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              // This is a simplified implementation
-              // In a real app, you would first search for users and then select one
-
-              // For now, we'll just show a success message
-              // In a real implementation, you would:
-              // 1. Get the selected user ID from the search results
-              // 2. Use the GroupProvider to add the member
-
-              final groupProvider = Provider.of<GroupProvider>(context, listen: false);
-
-              // Mock implementation - in a real app, you would get the userId from selection
-              String mockUserId = "new_user_id";
-
-              groupProvider.addMemberToGroup(widget.groupId, mockUserId).then((success) {
-                if (success) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Member added successfully')),
-                  );
-                  // Refresh UI
-                  setState(() {});
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Failed to add member')),
-                  );
-                }
-              });
-
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryColor,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: Text(
-              'Add',
-              style: TextStyles.bodyText.copyWith(
-                color: Colors.white,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -525,6 +625,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
               onTap: () {
                 Navigator.pop(context);
                 // Navigate to member profile
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => MemberProfileScreen(
+                      userId: member.id,
+                      groupId: widget.groupId,
+                    ),
+                  ),
+                );
               },
             ),
             ListTile(
@@ -532,7 +641,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
               title: const Text('View Attendance'),
               onTap: () {
                 Navigator.pop(context);
-                // Show member attendance
+                // Navigate to member attendance screen
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => MemberAttendanceScreen(
+                      userId: member.id,
+                      groupId: widget.groupId,
+                    ),
+                  ),
+                );
               },
             ),
             ListTile(

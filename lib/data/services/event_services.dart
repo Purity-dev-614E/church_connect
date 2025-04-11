@@ -393,4 +393,53 @@ class EventServices {
       throw Exception('Failed to mark attendance: $e');
     }
   }
+  
+  /// Get attendance records for a specific user
+  ///
+  /// Returns a list of attendance records with event details for the specified user
+  Future<List<Map<String, dynamic>>> getUserAttendanceRecords(String userId) async {
+    try {
+      final response = await http.get(
+        Uri.parse(ApiEndpoints.getAttendanceByUser(userId)),
+        headers: await _getHeaders(),
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        
+        // Fetch event details for each attendance record
+        List<Map<String, dynamic>> attendanceWithEvents = [];
+        
+        for (var record in data) {
+          try {
+            final eventId = record['event_Id'] ?? '';
+            if (eventId.isNotEmpty) {
+              final eventDetails = await getEventById(eventId);
+              attendanceWithEvents.add({
+                'attendance': record,
+                'event': eventDetails.toJson(),
+              });
+            } else {
+              attendanceWithEvents.add({
+                'attendance': record,
+                'event': null,
+              });
+            }
+          } catch (e) {
+            print('Error fetching event details: $e');
+            attendanceWithEvents.add({
+              'attendance': record,
+              'event': null,
+            });
+          }
+        }
+        
+        return attendanceWithEvents;
+      } else {
+        throw Exception('Failed to fetch user attendance records: HTTP status ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Failed to fetch user attendance records: $e');
+    }
+  }
 }

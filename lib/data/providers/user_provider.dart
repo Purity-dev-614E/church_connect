@@ -36,4 +36,23 @@ class UserProvider with ChangeNotifier {
       return [];
     }
   }
+  
+  // Search users by name or email
+  Future<List<UserModel>> searchUsers(String query) async {
+    try {
+      return await _userService.searchUsers(query);
+    } catch (error) {
+      print('Error searching users: $error');
+      return [];
+    }
+  }
+  
+  Future<UserModel?> getUserById(String userId) async {
+    try {
+      return await _userService.fetchCurrentUser(userId);
+    } catch (error) {
+      print('Error fetching user by ID: $error');
+      return null;
+    }
+  }
 }

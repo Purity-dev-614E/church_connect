@@ -228,4 +228,19 @@ class AttendanceProvider extends ChangeNotifier {
       _setLoading(false);
     }
   }
+  
+  /// Get attendance records for a specific user with event details
+  Future<List<Map<String, dynamic>>> getUserAttendanceRecords(String userId) async {
+    _setLoading(true);
+    try {
+      final records = await _eventServices.getUserAttendanceRecords(userId);
+      _errorMessage = null;
+      return records;
+    } catch (error) {
+      _handleError('fetching user attendance records', error);
+      return [];
+    } finally {
+      _setLoading(false);
+    }
+  }
 }

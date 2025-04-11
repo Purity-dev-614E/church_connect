@@ -147,23 +147,46 @@ class AuthServices {
     print('Logout successful');
   }
 
-  // Signup method with error handling
+  // Signup method with proper error handling
   Future<bool> signup(String email, String password) async {
     try {
+      print("Attempting signup with email: $email");
+      
+      // Use JSON format for the request body, similar to login
       final response = await http.post(
         Uri.parse(ApiEndpoints.signup),
-        body: {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: json.encode({
           "email": email,
           "password": password
-        }
+        })
       );
 
-      if (response.statusCode == 201) {
-        print("Signup Successful");
+      print("Signup response status code: ${response.statusCode}");
+      print("Signup response body: ${response.body}");
+
+      // Parse response body
+      Map<String, dynamic> responseData;
+      try {
+        responseData = json.decode(response.body);
+      } catch (e) {
+        print("Error parsing signup response: $e");
+        print("Raw response body: ${response.body}");
+        return false;
+      }
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        print("Signup Successful: ${responseData['message'] ?? 'User created successfully'}");
         return true;
       } else {
-        final data = json.decode(response.body);
-        print("Signup Failed: ${data['message']}");
+        // Extract error message with fallback
+        final errorMessage = responseData['message'] ?? 
+                            responseData['error'] ?? 
+                            'Failed to create account. Email may already be in use.';
+        print("Signup Failed: $errorMessage");
         return false;
       }
     } catch (e) {
