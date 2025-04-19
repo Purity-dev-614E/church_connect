@@ -62,10 +62,24 @@ class HttpClient {
   
   /// GET request with automatic token refresh
   Future<http.Response> get(String url) async {
-    return _handleResponse(() async {
-      final headers = await getHeaders();
-      return await http.get(Uri.parse(url), headers: headers);
-    });
+    print('HTTP GET request to: $url');
+    try {
+      final response = await _handleResponse(() async {
+        final headers = await getHeaders();
+        print('HTTP GET headers: $headers');
+        return await http.get(Uri.parse(url), headers: headers);
+      });
+      
+      print('HTTP GET response status: ${response.statusCode}');
+      if (response.statusCode >= 400) {
+        print('HTTP GET error response body: ${response.body}');
+      }
+      
+      return response;
+    } catch (e) {
+      print('HTTP GET request failed: $e');
+      rethrow;
+    }
   }
   
   /// POST request with automatic token refresh

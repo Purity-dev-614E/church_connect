@@ -50,32 +50,73 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
    final attendanceProvider = Provider.of<AttendanceProvider>(context, listen: false);
    final userProvider = Provider.of<UserProvider>(context, listen: false);
 
-   final event = await eventProvider.fetchEventById(widget.eventId);
-   final attendanceList = await attendanceProvider.fetchEventAttendance(widget.eventId);
+   try {
+     // Fetch event details
+     final event = await eventProvider.fetchEventById(widget.eventId);
+     if (event == null) {
+       throw Exception('Event not found');
+     }
+     
+     // Fetch attendance records
+     final attendanceList = await attendanceProvider.fetchEventAttendance(widget.eventId);
+     print('Fetched ${attendanceList.length} attendance records for event ${widget.eventId}');
 
-   final attendees = <Map<String, dynamic>>[];
-   final nonAttendees = <Map<String, dynamic>>[];
+     final attendees = <Map<String, dynamic>>[];
+     final nonAttendees = <Map<String, dynamic>>[];
 
-   for (final record in attendanceList) {
-     final user = await userProvider.getUserById(record.userId);
-     if (user != null) {
-       final attendanceData = {
-         'user': user,
-         'attendance': record,
-       };
-       if (record.isPresent) { // Use isPresent as defined in the model
-         attendees.add(attendanceData);
-       } else {
-         nonAttendees.add(attendanceData);
+     // Process each attendance record
+     for (final record in attendanceList) {
+       try {
+         if (record.userId.isEmpty) {
+           print('Skipping attendance record with empty userId');
+           continue;
+         }
+         
+         final user = await userProvider.getUserById(record.userId);
+         if (user != null) {
+           final attendanceData = {
+             'user': user,
+             'attendance': record,
+           };
+           
+           if (record.isPresent) {
+             attendees.add(attendanceData);
+           } else {
+             nonAttendees.add(attendanceData);
+           }
+         } else {
+           print('User not found for userId: ${record.userId}');
+         }
+       } catch (e) {
+         print('Error processing attendance record: $e');
+         // Continue with the next record
        }
      }
-   }
 
-   return {
-     'event': event,
-     'attendees': attendees,
-     'nonAttendees': nonAttendees,
-   };
+     print('Processed ${attendees.length} attendees and ${nonAttendees.length} non-attendees');
+     
+     return {
+       'event': event,
+       'attendees': attendees,
+       'nonAttendees': nonAttendees,
+     };
+   } catch (e) {
+     print('Error in _fetchEventData: $e');
+     // Return empty data structure on error
+     return {
+       'event': EventModel(
+         id: widget.eventId,
+         title: widget.eventTitle,
+         description: 'Error loading event details',
+         dateTime: DateTime.now(),
+         location: 'Unknown',
+         groupId: '',
+       ),
+       'attendees': [],
+       'nonAttendees': [],
+       'error': e.toString(),
+     };
+   }
  }
 
  void _showAttendanceDetailsDialog(UserModel user, bool markAsPresent, {AttendanceModel? attendance}) {

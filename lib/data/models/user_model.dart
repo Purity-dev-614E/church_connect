@@ -7,6 +7,8 @@ class UserModel{
   final String nextOfKinContact;
   final String role;
   final String gender;
+  final String? regionId;
+  final String? regionName;
 
   UserModel({
     required this.id,
@@ -17,6 +19,8 @@ class UserModel{
     required this.nextOfKinContact,
     required this.role,
     required this.gender,
+    this.regionId,
+    this.regionName,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -28,6 +32,8 @@ class UserModel{
       role = 'super_admin';
     } else if (role == 'admin') {
       role = 'admin';
+    } else if (role == 'region_manager') {
+      role = 'region_manager';
     } else {
       // Default to 'user' for any other role
       role = 'user';
@@ -42,6 +48,8 @@ class UserModel{
       role: role,
       email: json['email'] ?? '',
       gender: json['gender'] ?? '',
+      regionId: json['region_id'],
+      regionName: json['region_name'],
     );
   }
 
@@ -55,6 +63,7 @@ class UserModel{
       'role': role,
       'email': email,
       'gender': gender,
+      'region_id': regionId,
     };
   }
 }

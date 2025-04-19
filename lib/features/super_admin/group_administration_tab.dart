@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:group_management_church_app/core/constants/colors.dart';
 import 'package:group_management_church_app/core/constants/text_styles.dart';
@@ -11,6 +10,9 @@ import 'package:group_management_church_app/data/providers/user_provider.dart';
 import 'package:group_management_church_app/data/services/user_services.dart';
 import 'package:provider/provider.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
+
+import '../admin/Admin_dashboard.dart';
+
 
 class GroupAdministrationTab extends StatefulWidget {
   const GroupAdministrationTab({Key? key}) : super(key: key);
@@ -228,16 +230,12 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
   }
   
   Widget _buildGroupListItem(GroupModel group) {
-    // Wrap with IgnorePointer to disable any automatic navigation that might be happening
-    return IgnorePointer(
-      ignoring: false, // Set to true to completely disable all interactions
-      child: Card(
-        margin: const EdgeInsets.only(bottom: 16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        // Explicitly set onTap to null to prevent any navigation
-        child: Padding(
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -261,7 +259,6 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      // Fetch admin name safely
                       FutureBuilder<String>(
                         future: _fetchAdminName(group.group_admin),
                         builder: (context, snapshot) {
@@ -296,7 +293,6 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
               ],
             ),
             const SizedBox(height: 16),
-            // Fetch group stats safely
             FutureBuilder<Map<String, dynamic>>(
               future: _fetchGroupStats(group.id),
               builder: (context, snapshot) {
@@ -306,8 +302,40 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
                 return Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildGroupStat('Members', memberCount.toString(), Icons.people),
-                    _buildGroupStat('Events', eventCount.toString(), Icons.event),
+                    _buildGroupStat(
+                      'Members', 
+                      memberCount.toString(), 
+                      Icons.people,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => AdminDashboard(
+                              groupId: group.id,
+                              groupName: group.name,
+                              initialTabIndex: 1,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    _buildGroupStat(
+                      'Events', 
+                      eventCount.toString(), 
+                      Icons.event,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => AdminDashboard(
+                              groupId: group.id,
+                              groupName: group.name,
+                              initialTabIndex: 2,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
                     _buildGroupStat('Attendance', '0%', Icons.trending_up),
                   ],
                 );
@@ -319,8 +347,16 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
               children: [
                 TextButton.icon(
                   onPressed: () {
-                    // View group details
-                    _showInfo('View details for ${group.name}');
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => AdminDashboard(
+                          groupId: group.id,
+                          groupName: group.name,
+                          initialTabIndex: 0,
+                        ),
+                      ),
+                    );
                   },
                   icon: const Icon(Icons.visibility, size: 18),
                   label: const Text('View'),
@@ -331,7 +367,6 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
                 const SizedBox(width: 8),
                 TextButton.icon(
                   onPressed: () {
-                    // Edit group
                     _showEditGroupDialog(context, group).then((updated) {
                       if (updated) {
                         _loadGroups();
@@ -347,7 +382,6 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
                 const SizedBox(width: 8),
                 TextButton.icon(
                   onPressed: () {
-                    // Delete group
                     _showDeleteGroupDialog(context, group).then((deleted) {
                       if (deleted) {
                         _loadGroups();
@@ -365,39 +399,41 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
           ],
         ),
       ),
-      ),
     );
   }
   
-  Widget _buildGroupStat(String label, String value, IconData icon) {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Icon(
-              icon,
-              size: 16,
-              color: AppColors.primaryColor,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              value,
-              style: TextStyles.bodyText.copyWith(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
+  Widget _buildGroupStat(String label, String value, IconData icon, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(
+                icon,
+                size: 16,
+                color: AppColors.primaryColor,
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyles.bodyText.copyWith(
-            fontSize: 12,
-            color: AppColors.textColor.withOpacity(0.7),
+              const SizedBox(width: 4),
+              Text(
+                value,
+                style: TextStyles.bodyText.copyWith(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ],
           ),
-        ),
-      ],
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyles.bodyText.copyWith(
+              fontSize: 12,
+              color: AppColors.textColor.withOpacity(0.7),
+            ),
+          ),
+        ],
+      ),
     );
   }
   

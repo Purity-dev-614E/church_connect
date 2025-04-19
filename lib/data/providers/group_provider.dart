@@ -44,39 +44,64 @@ class GroupProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> createGroup(GroupModel group) async {
+  Future<bool> createGroup(String name, String description, String adminId, String regionId) async {
     _setLoading(true);
     try {
-      await _groupService.createGroup(group.name);
-      await fetchGroups();
+      final success = await _groupService.createGroupWithRegion(name, description, adminId, regionId);
+      if (success) {
+        await fetchGroups();
+      }
       _errorMessage = null;
+      _setLoading(false);
+      return success;
     } catch (error) {
       _handleError('creating group', error);
-      _setLoading(false); // Need to set loading to false here since fetchGroups won't be called
+      _setLoading(false);
+      return false;
     }
   }
 
-  Future<void> updateGroup(String groupId, GroupModel updatedGroup) async {
+  Future<bool> updateGroup(GroupModel updatedGroup) async {
     _setLoading(true);
     try {
-      await _groupService.updateGroup(groupId, updatedGroup.name);
-      await fetchGroups();
+      final success = await _groupService.updateGroupWithRegion(
+        updatedGroup.id,
+        updatedGroup.name,
+        updatedGroup.description,
+        updatedGroup.group_admin,
+        updatedGroup.regionId ?? '',
+      );
+      
+      if (success) {
+        await fetchGroups();
+      }
+      
       _errorMessage = null;
+      _setLoading(false);
+      return success;
     } catch (error) {
       _handleError('updating group', error);
       _setLoading(false);
+      return false;
     }
   }
 
-  Future<void> deleteGroup(String groupId) async {
+  Future<bool> deleteGroup(String groupId) async {
     _setLoading(true);
     try {
-      await _groupService.deleteGroup(groupId);
-      await fetchGroups();
+      final success = await _groupService.deleteGroup(groupId);
+      
+      if (success) {
+        await fetchGroups();
+      }
+      
       _errorMessage = null;
+      _setLoading(false);
+      return success;
     } catch (error) {
       _handleError('deleting group', error);
       _setLoading(false);
+      return false;
     }
   }
 
@@ -169,6 +194,35 @@ class GroupProvider extends ChangeNotifier {
       _handleError('fetching user memberships', error);
       _setLoading(false);
       return [];
+    }
+  }
+  
+  // Region-specific methods
+  
+  Future<List<GroupModel>> getGroupsByRegion(String regionId) async {
+    try {
+      return await _groupService.getGroupsByRegion(regionId);
+    } catch (error) {
+      _handleError('getting groups by region', error);
+      return [];
+    }
+  }
+  
+  Future<bool> assignGroupToRegion(String groupId, String regionId) async {
+    try {
+      return await _groupService.assignGroupToRegion(groupId, regionId);
+    } catch (error) {
+      _handleError('assigning group to region', error);
+      return false;
+    }
+  }
+  
+  Future<bool> removeGroupFromRegion(String groupId) async {
+    try {
+      return await _groupService.removeGroupFromRegion(groupId);
+    } catch (error) {
+      _handleError('removing group from region', error);
+      return false;
     }
   }
 }

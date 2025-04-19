@@ -17,6 +17,15 @@ class ApiEndpoints {
   static String deleteUser(String id) => '$users/$id';
   static String uploadUserImage(String id) => '$users/$id/uploadimage';
 
+  // Region Endpoints
+  static const String regions = '$baseUrl/regions';
+  static String getRegionById(String id) => '$regions/$id';
+  static String updateRegion(String id) => '$regions/$id';
+  static String deleteRegion(String id) => '$regions/$id';
+  static String getRegionUsers(String regionId) => '$regions/$regionId/users';
+  static String getRegionGroups(String regionId) => '$regions/$regionId/groups';
+  static String getRegionAnalytics(String regionId) => '$regions/$regionId/analytics';
+
   // Group Endpoints
   static const String groups = '$baseUrl/groups';
   static String getGroupById(String id) => '$groups/$id';
@@ -32,6 +41,7 @@ class ApiEndpoints {
   static String assignAdmin = '$groups/assign-admin';
   static String getGroupAttendance(String id) => '$groups/$id/attendance';
   static String getOverallAttendanceByPeriod(String period) => '$groups/attendance/$period';
+  static String getGroupsByRegion(String regionId) => '$groups/region/$regionId';
 
   // Event Endpoints
   static const String events = '$baseUrl/events';
@@ -40,6 +50,7 @@ class ApiEndpoints {
   static String updateEvent(String id) => '$events/$id';
   static String deleteEvent(String id) => '$events/$id';
   static String getEventsByGroup(String groupId) => '$events/group/$groupId';
+  static String getEventsByRegion(String regionId) => '$events/region/$regionId';
 
   // Attendance Endpoints
   static const String attendance = '$baseUrl/attendance';
@@ -55,4 +66,51 @@ class ApiEndpoints {
   static String getAttendanceByEvent(String eventId) => '$attendance/event/$eventId';
   static String getAttendanceByUser(String userId) => '$attendance/user/$userId';
   static String getAttendanceByPeriod(String period) => '$attendance/$period';
+  static String getAttendanceByRegion(String regionId) => '$attendance/region/$regionId';
+
+  // Analytics Endpoints
+  static const String analytics = '$baseUrl/analytics';
+  
+  // Group Analytics
+  static String getGroupEngagement(String groupId) => '$analytics/groups/$groupId/engagement';
+  static String getGroupActivityTimeline(String groupId) => '$analytics/groups/$groupId/activity-timeline';
+  static String getGroupAttendanceTrends(String groupId) => '$analytics/groups/$groupId/attendance-trends';
+  static String getGroupGrowth(String groupId) => '$analytics/groups/$groupId/growth';
+  static String compareGroups(List<String> groupIds) => '$analytics/groups/compare';
+  
+  // Region Analytics
+  static String getRegionEngagement(String regionId) => '$analytics/regions/$regionId/engagement';
+  static String getRegionGrowth(String regionId) => '$analytics/regions/$regionId/growth';
+  static String getRegionAttendanceTrends(String regionId) => '$analytics/regions/$regionId/attendance-trends';
+  static String compareRegions(List<String> regionIds) => '$analytics/regions/compare';
+  
+  // Event Analytics
+  static String getAttendanceByEventType(String eventType) => '$analytics/events/type/$eventType';
+  static const String getUpcomingEventsParticipationForecast = '$analytics/events/forecast';
+  static const String getPopularEvents = '$analytics/events/popular';
+  static const String getAttendanceByEventCategory = '$analytics/events/categories';
+  static String compareEventAttendance(List<String> eventIds) => '$analytics/events/compare-attendance';
+  
+  // Member Analytics
+  static const String getMemberEngagementScores = '$analytics/members/engagement';
+  static const String getMemberActivityLevels = '$analytics/members/activity';
+  static const String getMemberParticipationStats = '$analytics/members/participation';
+  static const String getMemberRetentionStats = '$analytics/members/retention';
+  
+  // Dashboard Analytics
+  static const String getDashboardSummary = '$analytics/dashboard/summary';
+  static const String getDashboardTrends = '$analytics/dashboard/trends';
+  static const String getPerformanceMetrics = '$analytics/dashboard/performance-metrics';
+  static String getCustomDashboardData(String timeframe) => '$analytics/dashboard/custom/$timeframe';
+  static String getRegionDashboardSummary(String regionId) => '$analytics/dashboard/region/$regionId/summary';
+  
+  // Correlation Analytics
+  static const String getAttendanceCorrelationFactors = '$analytics/correlation/attendance-correlation';
+  
+  // Export Endpoints
+  static const String exportAttendanceReport = '$analytics/export/attendance';
+  static const String exportMemberReport = '$analytics/export/member-report';
+  static String exportGroupReport(String groupId) => '$analytics/export/group-report/$groupId';
+  static String exportCustomReport(String reportType) => '$analytics/export/custom/$reportType';
+  static String exportRegionReport(String regionId) => '$analytics/export/region-report/$regionId';
 }

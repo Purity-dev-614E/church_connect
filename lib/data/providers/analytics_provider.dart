@@ -1,79 +1,133 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:group_management_church_app/data/models/attendance_model.dart';
 import 'package:group_management_church_app/data/models/event_model.dart';
 import 'package:group_management_church_app/data/models/group_model.dart';
 import 'package:group_management_church_app/data/models/user_model.dart';
+import 'package:group_management_church_app/data/models/analytics_model.dart';
 import 'package:group_management_church_app/data/services/analytics_services.dart';
+import 'package:group_management_church_app/data/providers/attendance_provider.dart';
+import 'package:group_management_church_app/data/providers/event_provider.dart';
+import 'package:group_management_church_app/data/providers/group_provider.dart';
+import 'package:group_management_church_app/data/providers/user_provider.dart';
 
 class AnalyticsProvider extends ChangeNotifier {
   // Private fields
-  final AnalyticsServices _analyticsServices = AnalyticsServices();
+  final AnalyticsServices _analyticsService = AnalyticsServices();
+  final AttendanceProvider _attendanceProvider = AttendanceProvider();
+  final EventProvider _eventProvider = EventProvider();
+  final GroupProvider _groupProvider = GroupProvider();
+  final UserProvider _userProvider = UserProvider();
+  
+  // State management
   bool _isLoading = false;
   String? _errorMessage;
-
+  final Map<String, Completer<dynamic>> _pendingRequests = {};
+  
+  // Date range for analytics
+  DateTime _startDate = DateTime.now().subtract(const Duration(days: 180));
+  DateTime _endDate = DateTime.now();
+  
   // Group analytics data
-  Map<String, dynamic> _groupDemographics = {};
-  Map<String, dynamic> _groupAttendanceStats = {};
-  Map<String, dynamic> _groupGrowthAnalytics = {};
-  Map<String, dynamic> _groupComparisonData = {};
-  Map<String, dynamic> _groupDashboardData = {};
+  GroupDemographics? _groupDemographics;
+  GroupAttendanceStats? _groupAttendanceStats;
+  GroupGrowthAnalytics? _groupGrowthAnalytics;
+  GroupComparisonResult? _groupComparisonData;
+  GroupDashboardData? _groupDashboardData;
 
   // Attendance analytics data
-  Map<String, dynamic> _weeklyAttendance = {};
-  Map<String, dynamic> _monthlyAttendance = {};
-  Map<String, dynamic> _yearlyAttendance = {};
-  Map<String, dynamic> _periodAttendance = {};
-  Map<String, dynamic> _overallAttendance = {};
-  Map<String, dynamic> _userAttendanceTrends = {};
+  AttendanceData? _weeklyAttendance;
+  AttendanceData? _monthlyAttendance;
+  AttendanceData? _yearlyAttendance;
+  AttendanceData? _periodAttendance;
+  OverallAttendanceData? _overallAttendance;
+  UserAttendanceTrends? _userAttendanceTrends;
 
   // Event analytics data
-  Map<String, dynamic> _eventParticipationStats = {};
-  Map<String, dynamic> _eventComparisonData = {};
+  EventParticipationStats? _eventParticipationStats;
+  EventAttendanceComparison? _eventComparisonData;
+  Map<String, dynamic> _eventAttendance = {}; // Keep as Map for custom processing
 
   // Member analytics data
-  Map<String, dynamic> _memberParticipationStats = {};
-  Map<String, dynamic> _memberRetentionStats = {};
+  MemberParticipationStats? _memberParticipationStats;
+  MemberRetentionStats? _memberRetentionStats;
 
   // Dashboard data
-  Map<String, dynamic> _dashboardSummary = {};
+  DashboardSummary? _dashboardSummary;
 
   // Custom report data
-  Map<String, dynamic> _customReportData = {};
+  ReportData? _customReportData;
   String _exportUrl = '';
+
+  // Enhanced analytics data - keep as Map<String, dynamic> for flexibility
+  Map<String, dynamic>? _groupEngagementMetrics;
+  Map<String, dynamic>? _groupActivityTimeline;
+  Map<String, dynamic>? _groupAttendanceTrends;
+  Map<String, dynamic>? _attendanceByEventType;
+  Map<String, dynamic>? _upcomingEventsParticipationForecast;
+  Map<String, dynamic>? _popularEvents;
+  Map<String, dynamic>? _attendanceByEventCategory;
+  Map<String, dynamic>? _memberEngagementScores;
+  Map<String, dynamic>? _memberActivityLevels;
+  Map<String, dynamic>? _attendanceCorrelationFactors;
+  Map<String, dynamic>? _dashboardTrends;
+  Map<String, dynamic>? _performanceMetrics;
+  Map<String, dynamic>? _customDashboardData;
 
   // Getters
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+  DateTime get startDate => _startDate;
+  DateTime get endDate => _endDate;
 
   // Group analytics getters
-  Map<String, dynamic> get groupDemographics => _groupDemographics;
-  Map<String, dynamic> get groupAttendanceStats => _groupAttendanceStats;
-  Map<String, dynamic> get groupGrowthAnalytics => _groupGrowthAnalytics;
-  Map<String, dynamic> get groupComparisonData => _groupComparisonData;
-  Map<String, dynamic> get groupDashboardData => _groupDashboardData;
+  GroupDemographics? get groupDemographics => _groupDemographics;
+  GroupAttendanceStats? get groupAttendanceStats => _groupAttendanceStats;
+  GroupGrowthAnalytics? get groupGrowthAnalytics => _groupGrowthAnalytics;
+  GroupComparisonResult? get groupComparisonData => _groupComparisonData;
+  GroupDashboardData? get groupDashboardData => _groupDashboardData;
 
   // Attendance analytics getters
-  Map<String, dynamic> get weeklyAttendance => _weeklyAttendance;
-  Map<String, dynamic> get monthlyAttendance => _monthlyAttendance;
-  Map<String, dynamic> get yearlyAttendance => _yearlyAttendance;
-  Map<String, dynamic> get periodAttendance => _periodAttendance;
-  Map<String, dynamic> get overallAttendance => _overallAttendance;
-  Map<String, dynamic> get userAttendanceTrends => _userAttendanceTrends;
+  AttendanceData? get weeklyAttendance => _weeklyAttendance;
+  AttendanceData? get monthlyAttendance => _monthlyAttendance;
+  AttendanceData? get yearlyAttendance => _yearlyAttendance;
+  AttendanceData? get periodAttendance => _periodAttendance;
+  OverallAttendanceData? get overallAttendance => _overallAttendance;
+  UserAttendanceTrends? get userAttendanceTrends => _userAttendanceTrends;
 
   // Event analytics getters
-  Map<String, dynamic> get eventParticipationStats => _eventParticipationStats;
-  Map<String, dynamic> get eventComparisonData => _eventComparisonData;
+  EventParticipationStats? get eventParticipationStats => _eventParticipationStats;
+  EventAttendanceComparison? get eventComparisonData => _eventComparisonData;
+  Map<String, dynamic> get eventAttendance => _eventAttendance;
 
   // Member analytics getters
-  Map<String, dynamic> get memberParticipationStats => _memberParticipationStats;
-  Map<String, dynamic> get memberRetentionStats => _memberRetentionStats;
+  MemberParticipationStats? get memberParticipationStats => _memberParticipationStats;
+  MemberRetentionStats? get memberRetentionStats => _memberRetentionStats;
 
   // Dashboard getters
-  Map<String, dynamic> get dashboardSummary => _dashboardSummary;
+  DashboardSummary? get dashboardSummary => _dashboardSummary;
 
   // Custom report getters
-  Map<String, dynamic> get customReportData => _customReportData;
+  ReportData? get customReportData => _customReportData;
   String get exportUrl => _exportUrl;
+
+  // Enhanced analytics getters
+  Map<String, dynamic>? get groupEngagementMetrics => _groupEngagementMetrics;
+  Map<String, dynamic>? get groupActivityTimeline => _groupActivityTimeline;
+  Map<String, dynamic>? get groupAttendanceTrends => _groupAttendanceTrends;
+  Map<String, dynamic>? get attendanceByEventType => _attendanceByEventType;
+  Map<String, dynamic>? get upcomingEventsParticipationForecast => _upcomingEventsParticipationForecast;
+  Map<String, dynamic>? get popularEvents => _popularEvents;
+  Map<String, dynamic>? get attendanceByEventCategory => _attendanceByEventCategory;
+  Map<String, dynamic>? get memberEngagementScores => _memberEngagementScores;
+  Map<String, dynamic>? get memberActivityLevels => _memberActivityLevels;
+  Map<String, dynamic>? get attendanceCorrelationFactors => _attendanceCorrelationFactors;
+  Map<String, dynamic>? get dashboardTrends => _dashboardTrends;
+  Map<String, dynamic>? get performanceMetrics => _performanceMetrics;
+  Map<String, dynamic>? get customDashboardData => _customDashboardData;
 
   // Helper methods
   void _setLoading(bool loading) {
@@ -91,149 +145,421 @@ class AnalyticsProvider extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
   }
+  
+  /// Set the date range for analytics queries
+  void setDateRange(DateTime startDate, DateTime endDate) {
+    _startDate = startDate;
+    _endDate = endDate;
+    notifyListeners();
+  }
+  
+  /// Clear all analytics data
+  void clearAllData() {
+    _groupDemographics = null;
+    _groupAttendanceStats = null;
+    _groupGrowthAnalytics = null;
+    _groupComparisonData = null;
+    _groupDashboardData = null;
+    _weeklyAttendance = null;
+    _monthlyAttendance = null;
+    _yearlyAttendance = null;
+    _periodAttendance = null;
+    _overallAttendance = null;
+    _userAttendanceTrends = null;
+    _eventParticipationStats = null;
+    _eventComparisonData = null;
+    _eventAttendance = {};
+    _memberParticipationStats = null;
+    _memberRetentionStats = null;
+    _dashboardSummary = null;
+    _customReportData = null;
+    _exportUrl = '';
+    _groupEngagementMetrics = null;
+    _groupActivityTimeline = null;
+    _groupAttendanceTrends = null;
+    _attendanceByEventType = null;
+    _upcomingEventsParticipationForecast = null;
+    _popularEvents = null;
+    _attendanceByEventCategory = null;
+    _memberEngagementScores = null;
+    _memberActivityLevels = null;
+    _attendanceCorrelationFactors = null;
+    _dashboardTrends = null;
+    _performanceMetrics = null;
+    _customDashboardData = null;
+    
+    // Clear service cache if method exists
+    if (_analyticsService is AnalyticsServices) {
+      // Check if clearCache method exists
+      try {
+        // Use reflection to check if method exists
+        final clearCacheMethod = _analyticsService.runtimeType.toString().contains('clearCache');
+        if (clearCacheMethod) {
+          // Call the method using dynamic to avoid compile-time errors
+          (_analyticsService as dynamic).clearCache();
+        }
+      } catch (e) {
+        debugPrint('Error clearing cache: $e');
+      }
+    }
+    
+    notifyListeners();
+  }
+  
+  /// Generic method to handle API requests with deduplication
+  Future<T> _fetchData<T>(
+    String requestKey,
+    Future<T> Function() apiCall,
+    void Function(T) updateState,
+    {bool forceRefresh = false}
+  ) async {
+    // If we're already loading this data and not forcing a refresh, return the existing request
+    if (!forceRefresh && _pendingRequests.containsKey(requestKey)) {
+      return _pendingRequests[requestKey]!.future as T;
+    }
+    
+    // Create a new completer for this request
+    final completer = Completer<T>();
+    _pendingRequests[requestKey] = completer;
+    
+    try {
+      // Add date range parameters to the request key to ensure cache invalidation when date range changes
+      final dateRangeKey = '${requestKey}_${_startDate.toIso8601String()}_${_endDate.toIso8601String()}';
+      
+      final response = await apiCall();
+      
+      // Update state
+      updateState(response);
+      
+      // Complete the pending request
+      completer.complete(response);
+      _pendingRequests.remove(requestKey);
+      
+      return response;
+    } catch (error) {
+      // Handle error
+      _handleError('fetching $requestKey', error);
+      
+      // Complete the pending request with error
+      completer.completeError(error);
+      _pendingRequests.remove(requestKey);
+      
+      // Rethrow the error to be handled by the caller
+      throw error;
+    }
+  }
+  
+  /// Convert API response to Map<String, dynamic> with enhanced handling of different formats
+  Map<String, dynamic> _convertToMap(dynamic response) {
+    if (response == null) {
+      return {};
+    }
+    
+    // If it's already a Map<String, dynamic>, return it
+    if (response is Map<String, dynamic>) {
+      return response;
+    }
+    
+    // If it's a Map but not <String, dynamic>, convert it
+    if (response is Map) {
+      try {
+        Map<String, dynamic> convertedMap = {};
+        response.forEach((key, value) {
+          convertedMap[key.toString()] = value;
+        });
+        return convertedMap;
+      } catch (e) {
+        debugPrint('Error converting map: $e');
+        return {'error': e.toString()};
+      }
+    }
+    
+    // If it's a List, convert it to a map with appropriate structure
+    if (response is List) {
+      try {
+        // If it's a list of maps, try to find a common key to use as map keys
+        if (response.isNotEmpty && response.first is Map) {
+          final firstItem = response.first as Map;
+          String? idField;
+          
+          // Try to find an ID field
+          for (var possibleIdField in ['id', '_id', 'uid', 'key', 'name']) {
+            if (firstItem.containsKey(possibleIdField)) {
+              idField = possibleIdField;
+              break;
+            }
+          }
+          
+          // If we found an ID field, use it to create a map
+          if (idField != null) {
+            Map<String, dynamic> itemsMap = {};
+            for (var item in response) {
+              if (item is Map && item.containsKey(idField)) {
+                String key = item[idField].toString();
+                itemsMap[key] = item;
+              }
+            }
+            
+            return {
+              'items': response,
+              'itemsMap': itemsMap,
+              'count': response.length,
+              'hasData': response.isNotEmpty
+            };
+          }
+        }
+        
+        // Default list conversion
+        return {
+          'items': response,
+          'count': response.length,
+          'hasData': response.isNotEmpty
+        };
+      } catch (e) {
+        debugPrint('Error converting list: $e');
+        return {
+          'error': e.toString(),
+          'items': response,
+          'count': response.length
+        };
+      }
+    }
+    
+    // If it's a string, try to parse it as JSON
+    if (response is String) {
+      try {
+        final decoded = jsonDecode(response);
+        return _convertToMap(decoded);
+      } catch (e) {
+        debugPrint('Error parsing JSON string: $e');
+        return {'value': response};
+      }
+    }
+    
+    // For primitive types, wrap them in a map
+    if (response is num || response is bool) {
+      return {'value': response};
+    }
+    
+    // If all else fails, return an empty map with error
+    return {'error': 'Unable to convert response to map'};
+  }
 
   // SECTION: Group Analytics
 
   /// Fetch demographic information for a specific group
-  Future<void> fetchGroupDemographics(String groupId) async {
-    _setLoading(true);
-    try {
-      _groupDemographics = await _analyticsServices.getGroupDemographics(groupId);
-      _errorMessage = null;
-    } catch (error) {
-      _handleError('fetching group demographics', error);
-    } finally {
-      _setLoading(false);
-    }
+  Future<GroupDemographics> fetchGroupDemographics(String groupId) async {
+    return _fetchData<GroupDemographics>(
+      'group_demographics_$groupId',
+      () => _analyticsService.getGroupDemographics(
+        groupId, 
+        startDate: _startDate, 
+        endDate: _endDate
+      ),
+      (response) {
+        _groupDemographics = response;
+        notifyListeners();
+      }
+    );
   }
 
   /// Fetch attendance statistics for a specific group
-  Future<void> fetchGroupAttendanceStats(String groupId) async {
-    _setLoading(true);
-    try {
-      _groupAttendanceStats = await _analyticsServices.getGroupAttendanceStats(groupId);
-      _errorMessage = null;
-    } catch (error) {
-      _handleError('fetching group attendance statistics', error);
-    } finally {
-      _setLoading(false);
-    }
+  Future<GroupAttendanceStats> fetchGroupAttendanceStats(String groupId) async {
+    return _fetchData<GroupAttendanceStats>(
+      'group_attendance_stats_$groupId',
+      () => _analyticsService.getGroupAttendanceStats(
+        groupId,
+        startDate: _startDate,
+        endDate: _endDate
+      ),
+      (response) {
+        _groupAttendanceStats = response;
+        notifyListeners();
+      }
+    );
   }
 
   /// Fetch group growth analytics
-  Future<void> fetchGroupGrowthAnalytics(String groupId) async {
-    _setLoading(true);
-    try {
-      _groupGrowthAnalytics = await _analyticsServices.getGroupGrowthAnalytics(groupId);
-      _errorMessage = null;
-    } catch (error) {
-      _handleError('fetching group growth analytics', error);
-    } finally {
-      _setLoading(false);
-    }
+  Future<GroupGrowthAnalytics> fetchGroupGrowthAnalytics(String groupId) async {
+    return _fetchData<GroupGrowthAnalytics>(
+      'group_growth_analytics_$groupId',
+      () => _analyticsService.getGroupGrowthAnalytics(groupId),
+      (response) {
+        _groupGrowthAnalytics = response;
+        notifyListeners();
+      }
+    );
   }
 
   /// Compare multiple groups
-  Future<void> compareGroups(List<String> groupIds) async {
-    _setLoading(true);
-    try {
-      _groupComparisonData = await _analyticsServices.compareGroups(groupIds);
-      _errorMessage = null;
-    } catch (error) {
-      _handleError('comparing groups', error);
-    } finally {
-      _setLoading(false);
-    }
+  Future<GroupComparisonResult> compareGroups(List<String> groupIds) async {
+    final groupIdsString = groupIds.join('_');
+    return _fetchData<GroupComparisonResult>(
+      'compare_groups_$groupIdsString',
+      () => _analyticsService.compareGroups(groupIds),
+      (response) {
+        _groupComparisonData = response;
+        notifyListeners();
+      }
+    );
   }
 
   /// Fetch group dashboard data
-  Future<void> fetchGroupDashboardData(String groupId) async {
-    _setLoading(true);
-    try {
-      _groupDashboardData = await _analyticsServices.getGroupDashboardData(groupId);
-      _errorMessage = null;
-    } catch (error) {
-      _handleError('fetching group dashboard data', error);
-    } finally {
-      _setLoading(false);
-    }
+  Future<GroupDashboardData> fetchGroupDashboardData(String groupId) async {
+    return _fetchData<GroupDashboardData>(
+      'group_dashboard_data_$groupId',
+      () => _analyticsService.getGroupDashboardData(groupId),
+      (response) {
+        _groupDashboardData = response;
+        notifyListeners();
+      }
+    );
   }
+  
+  // /// Fetch group engagement metrics
+  // Future<Map<String, dynamic>> fetchGroupEngagementMetrics(String groupId) async {
+  //   try {
+  //     final response = await _analyticsService.getGroupEngagementMetrics(groupId);
+  //     _groupEngagementMetrics = _convertToMap(response);
+  //     notifyListeners();
+  //     return _groupEngagementMetrics ?? {};
+  //   } catch (e) {
+  //     _errorMessage = e.toString();
+  //     notifyListeners();
+  //     return {
+  //       'error': e.toString(),
+  //       'items': [],
+  //       'count': 0,
+  //       'hasData': false
+  //     };
+  //   }
+  // }
+  //
+  // /// Fetch group activity timeline
+  // Future<void> fetchGroupActivityTimeline(String groupId) async {
+  //   try {
+  //     final response = await _analyticsService.getGroupActivityTimeline(groupId);
+  //     _groupActivityTimeline = _convertToMap(response);
+  //     notifyListeners();
+  //   } catch (e) {
+  //     _errorMessage = e.toString();
+  //     notifyListeners();
+  //   }
+  // }
+  //
+  // /// Fetch group attendance trends
+  // Future<Map<String, dynamic>> fetchGroupAttendanceTrends(String groupId) async {
+  //   try {
+  //     final response = await _analyticsService.getGroupAttendanceTrends(groupId);
+  //     _groupAttendanceTrends = _convertToMap(response);
+  //     notifyListeners();
+  //     return _groupAttendanceTrends ?? {};
+  //   } catch (e) {
+  //     _errorMessage = e.toString();
+  //     notifyListeners();
+  //     return {};
+  //   }
+  // }
 
   // SECTION: Attendance Analytics
 
   /// Fetch weekly attendance statistics
-  Future<void> fetchWeeklyAttendance() async {
+  Future<AttendanceData> fetchWeeklyAttendance() async {
     _setLoading(true);
     try {
-      _weeklyAttendance = await _analyticsServices.getAttendanceByWeek();
+      final result = await _analyticsService.getAttendanceByWeek();
+      _weeklyAttendance = result;
       _errorMessage = null;
+      notifyListeners();
+      return result;
     } catch (error) {
       _handleError('fetching weekly attendance', error);
+      rethrow;
     } finally {
       _setLoading(false);
     }
   }
 
   /// Fetch monthly attendance statistics
-  Future<void> fetchMonthlyAttendance() async {
+  Future<AttendanceData> fetchMonthlyAttendance() async {
     _setLoading(true);
     try {
-      _monthlyAttendance = await _analyticsServices.getAttendanceByMonth();
+      final result = await _analyticsService.getAttendanceByMonth();
+      _monthlyAttendance = result;
       _errorMessage = null;
+      notifyListeners();
+      return result;
     } catch (error) {
       _handleError('fetching monthly attendance', error);
+      rethrow;
     } finally {
       _setLoading(false);
     }
   }
 
   /// Fetch yearly attendance statistics
-  Future<void> fetchYearlyAttendance() async {
+  Future<AttendanceData> fetchYearlyAttendance() async {
     _setLoading(true);
     try {
-      _yearlyAttendance = await _analyticsServices.getAttendanceByYear();
+      final result = await _analyticsService.getAttendanceByYear();
+      _yearlyAttendance = result;
       _errorMessage = null;
+      notifyListeners();
+      return result;
     } catch (error) {
       _handleError('fetching yearly attendance', error);
+      rethrow;
     } finally {
       _setLoading(false);
     }
   }
 
   /// Fetch attendance statistics for a specific period
-  Future<void> fetchPeriodAttendance(String period) async {
+  Future<AttendanceData> fetchPeriodAttendance(String period) async {
     _setLoading(true);
     try {
-      _periodAttendance = await _analyticsServices.getAttendanceByPeriod(period);
+      final result = await _analyticsService.getAttendanceByPeriod(period);
+      _periodAttendance = result;
       _errorMessage = null;
+      notifyListeners();
+      return result;
     } catch (error) {
       _handleError('fetching period attendance', error);
+      rethrow;
     } finally {
       _setLoading(false);
     }
   }
 
   /// Fetch overall attendance statistics
-  Future<void> fetchOverallAttendance(String period) async {
+  Future<OverallAttendanceData> fetchOverallAttendance(String period) async {
     _setLoading(true);
     try {
-      _overallAttendance = await _analyticsServices.getOverallAttendanceByPeriod(period);
+      final result = await _analyticsService.getOverallAttendanceByPeriod(period);
+      _overallAttendance = result;
       _errorMessage = null;
+      notifyListeners();
+      return result;
     } catch (error) {
       _handleError('fetching overall attendance', error);
+      rethrow;
     } finally {
       _setLoading(false);
     }
   }
 
   /// Fetch user attendance trends
-  Future<void> fetchUserAttendanceTrends(String userId) async {
+  Future<UserAttendanceTrends> fetchUserAttendanceTrends(String userId) async {
     _setLoading(true);
     try {
-      _userAttendanceTrends = await _analyticsServices.getUserAttendanceTrends(userId);
+      final result = await _analyticsService.getUserAttendanceTrends(userId);
+      _userAttendanceTrends = result;
       _errorMessage = null;
+      notifyListeners();
+      return result;
     } catch (error) {
       _handleError('fetching user attendance trends', error);
+      rethrow;
     } finally {
       _setLoading(false);
     }
@@ -242,26 +568,38 @@ class AnalyticsProvider extends ChangeNotifier {
   // SECTION: Event Analytics
 
   /// Fetch event participation statistics
-  Future<void> fetchEventParticipationStats(String eventId) async {
+  Future<EventParticipationStats> fetchEventParticipationStats(String eventId) async {
     _setLoading(true);
     try {
-      _eventParticipationStats = await _analyticsServices.getEventParticipationStats(eventId);
+      final result = await _analyticsService.getEventParticipationStats(
+        eventId,
+        startDate: _startDate,
+        endDate: _endDate
+      );
+      _eventParticipationStats = result;
       _errorMessage = null;
+      notifyListeners();
+      return result;
     } catch (error) {
       _handleError('fetching event participation stats', error);
+      rethrow;
     } finally {
       _setLoading(false);
     }
   }
 
   /// Compare event attendance
-  Future<void> compareEventAttendance(List<String> eventIds) async {
+  Future<EventAttendanceComparison> compareEventAttendance(List<String> eventIds) async {
     _setLoading(true);
     try {
-      _eventComparisonData = await _analyticsServices.compareEventAttendance(eventIds);
+      final result = await _analyticsService.compareEventAttendance(eventIds);
+      _eventComparisonData = result;
       _errorMessage = null;
+      notifyListeners();
+      return result;
     } catch (error) {
       _handleError('comparing event attendance', error);
+      rethrow;
     } finally {
       _setLoading(false);
     }
@@ -270,26 +608,37 @@ class AnalyticsProvider extends ChangeNotifier {
   // SECTION: Member Analytics
 
   /// Fetch member participation statistics
-  Future<void> fetchMemberParticipationStats() async {
+  Future<MemberParticipationStats> fetchMemberParticipationStats() async {
     _setLoading(true);
     try {
-      _memberParticipationStats = await _analyticsServices.getMemberParticipationStats();
+      final result = await _analyticsService.getMemberParticipationStats(
+        startDate: _startDate,
+        endDate: _endDate
+      );
+      _memberParticipationStats = result;
       _errorMessage = null;
+      notifyListeners();
+      return result;
     } catch (error) {
       _handleError('fetching member participation stats', error);
+      rethrow;
     } finally {
       _setLoading(false);
     }
   }
 
   /// Fetch member retention statistics
-  Future<void> fetchMemberRetentionStats() async {
+  Future<MemberRetentionStats> fetchMemberRetentionStats() async {
     _setLoading(true);
     try {
-      _memberRetentionStats = await _analyticsServices.getMemberRetentionStats();
+      final result = await _analyticsService.getMemberRetentionStats();
+      _memberRetentionStats = result;
       _errorMessage = null;
+      notifyListeners();
+      return result;
     } catch (error) {
       _handleError('fetching member retention stats', error);
+      rethrow;
     } finally {
       _setLoading(false);
     }
@@ -298,13 +647,17 @@ class AnalyticsProvider extends ChangeNotifier {
   // SECTION: Dashboard Analytics
 
   /// Fetch dashboard summary
-  Future<void> fetchDashboardSummary() async {
+  Future<DashboardSummary> fetchDashboardSummary() async {
     _setLoading(true);
     try {
-      _dashboardSummary = await _analyticsServices.getDashboardSummary();
+      final result = await _analyticsService.getDashboardSummary();
+      _dashboardSummary = result;
       _errorMessage = null;
+      notifyListeners();
+      return result;
     } catch (error) {
       _handleError('fetching dashboard summary', error);
+      rethrow;
     } finally {
       _setLoading(false);
     }
@@ -312,41 +665,55 @@ class AnalyticsProvider extends ChangeNotifier {
 
   // SECTION: Custom Analytics
 
-  /// Generate custom report
-  Future<void> generateCustomReport({
-    required String reportType,
-    required Map<String, dynamic> parameters,
-  }) async {
+  /// Export attendance report
+  Future<ReportData> exportAttendanceReport() async {
     _setLoading(true);
     try {
-      _customReportData = await _analyticsServices.generateCustomReport(
-        reportType: reportType,
-        parameters: parameters,
-      );
+      final result = await _analyticsService.exportAttendanceReport();
+      _customReportData = result;
+      _exportUrl = result.downloadUrl;
       _errorMessage = null;
+      notifyListeners();
+      return result;
     } catch (error) {
-      _handleError('generating custom report', error);
+      _handleError('exporting attendance report', error);
+      rethrow;
     } finally {
       _setLoading(false);
     }
   }
 
-  /// Export analytics data
-  Future<void> exportAnalyticsData({
-    required String dataType,
-    required String format,
-    required Map<String, dynamic> parameters,
-  }) async {
+  /// Export member report
+  Future<ReportData> exportMemberReport() async {
     _setLoading(true);
     try {
-      _exportUrl = await _analyticsServices.exportAnalyticsData(
-        dataType: dataType,
-        format: format,
-        parameters: parameters,
-      );
+      final result = await _analyticsService.exportMemberReport();
+      _customReportData = result;
+      _exportUrl = result.downloadUrl;
       _errorMessage = null;
+      notifyListeners();
+      return result;
     } catch (error) {
-      _handleError('exporting analytics data', error);
+      _handleError('exporting member report', error);
+      rethrow;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Export group report
+  Future<ReportData> exportGroupReport(String groupId) async {
+    _setLoading(true);
+    try {
+      final result = await _analyticsService.exportGroupReport(groupId);
+      _customReportData = result;
+      _exportUrl = result.downloadUrl;
+      _errorMessage = null;
+      notifyListeners();
+      return result;
+    } catch (error) {
+      _handleError('exporting group report', error);
+      rethrow;
     } finally {
       _setLoading(false);
     }
@@ -356,32 +723,37 @@ class AnalyticsProvider extends ChangeNotifier {
 
   /// Calculate attendance rate
   double calculateAttendanceRate(List<AttendanceModel> attendanceRecords) {
-    return _analyticsServices.calculateAttendanceRate(attendanceRecords);
+    if (attendanceRecords.isEmpty) return 0.0;
+    
+    // Simple calculation: number of attendances / total possible attendances
+    int totalEvents = attendanceRecords.map((a) => a.eventId).toSet().length;
+    if (totalEvents == 0) return 0.0;
+    
+    return attendanceRecords.length / totalEvents;
   }
 
   /// Calculate growth rate
   double calculateGrowthRate(int previousValue, int currentValue) {
-    return _analyticsServices.calculateGrowthRate(previousValue, currentValue);
-  }
-
-  /// Generate attendance trend data
-  Map<String, dynamic> generateAttendanceTrendData(
-    List<AttendanceModel> attendanceRecords,
-    List<EventModel> events
-  ) {
-    return _analyticsServices.generateAttendanceTrendData(attendanceRecords, events);
+    if (previousValue == 0) return currentValue > 0 ? 1.0 : 0.0;
+    
+    return (currentValue - previousValue) / previousValue;
   }
 
   /// Refresh all analytics data for a group
   Future<void> refreshAllGroupAnalytics(String groupId) async {
     _setLoading(true);
     try {
-      await Future.wait([
+      // Create a list of futures to execute in parallel
+      final futures = [
         fetchGroupDemographics(groupId),
         fetchGroupAttendanceStats(groupId),
         fetchGroupGrowthAnalytics(groupId),
         fetchGroupDashboardData(groupId),
-      ]);
+      ];
+      
+      // Execute all futures in parallel
+      await Future.wait(futures);
+      
       _errorMessage = null;
     } catch (error) {
       _handleError('refreshing group analytics', error);
@@ -415,6 +787,243 @@ class AnalyticsProvider extends ChangeNotifier {
       _errorMessage = null;
     } catch (error) {
       _handleError('refreshing dashboard analytics', error);
+    } finally {
+      _setLoading(false);
+    }
+  }
+  //
+  // // Enhanced analytics methods
+  // Future<void> fetchAttendanceByEventType(String eventType) async {
+  //   _setLoading(true);
+  //   try {
+  //     final response = await _analyticsService.getAttendanceByEventType(eventType);
+  //     _attendanceByEventType = _convertToMap(response);
+  //     notifyListeners();
+  //   } catch (e) {
+  //     _errorMessage = e.toString();
+  //     notifyListeners();
+  //   } finally {
+  //     _setLoading(false);
+  //   }
+  // }
+  //
+  // Future<void> fetchUpcomingEventsParticipationForecast() async {
+  //   _setLoading(true);
+  //   try {
+  //     final response = await _analyticsService.getUpcomingEventsParticipationForecast();
+  //     _upcomingEventsParticipationForecast = _convertToMap(response);
+  //     notifyListeners();
+  //   } catch (e) {
+  //     _errorMessage = e.toString();
+  //     notifyListeners();
+  //   } finally {
+  //     _setLoading(false);
+  //   }
+  // }
+  //
+  // Future<void> fetchPopularEvents() async {
+  //   _setLoading(true);
+  //   try {
+  //     final response = await _analyticsService.getPopularEvents();
+  //     _popularEvents = _convertToMap(response);
+  //     notifyListeners();
+  //   } catch (e) {
+  //     _errorMessage = e.toString();
+  //     notifyListeners();
+  //   } finally {
+  //     _setLoading(false);
+  //   }
+  // }
+  //
+  // Future<void> fetchAttendanceByEventCategory() async {
+  //   _setLoading(true);
+  //   try {
+  //     final response = await _analyticsService.getAttendanceByEventCategory();
+  //     _attendanceByEventCategory = _convertToMap(response);
+  //     notifyListeners();
+  //   } catch (e) {
+  //     _errorMessage = e.toString();
+  //     notifyListeners();
+  //   } finally {
+  //     _setLoading(false);
+  //   }
+  // }
+  //
+  // Future<void> fetchMemberEngagementScores() async {
+  //   _setLoading(true);
+  //   try {
+  //     final response = await _analyticsService.getMemberEngagementScores();
+  //     _memberEngagementScores = _convertToMap(response);
+  //     notifyListeners();
+  //   } catch (e) {
+  //     _errorMessage = e.toString();
+  //     notifyListeners();
+  //   } finally {
+  //     _setLoading(false);
+  //   }
+  // }
+  //
+  // Future<void> fetchMemberActivityLevels() async {
+  //   _setLoading(true);
+  //   try {
+  //     final response = await _analyticsService.getMemberActivityLevels();
+  //     _memberActivityLevels = _convertToMap(response);
+  //     notifyListeners();
+  //   } catch (e) {
+  //     _errorMessage = e.toString();
+  //     notifyListeners();
+  //   } finally {
+  //     _setLoading(false);
+  //   }
+  // }
+  //
+  // Future<void> fetchAttendanceCorrelationFactors() async {
+  //   _setLoading(true);
+  //   try {
+  //     final response = await _analyticsService.getAttendanceCorrelationFactors();
+  //     _attendanceCorrelationFactors = _convertToMap(response);
+  //     notifyListeners();
+  //   } catch (e) {
+  //     _errorMessage = e.toString();
+  //     notifyListeners();
+  //   } finally {
+  //     _setLoading(false);
+  //   }
+  // }
+  //
+  // Future<void> fetchDashboardTrends() async {
+  //   _setLoading(true);
+  //   try {
+  //     final response = await _analyticsService.getDashboardTrends();
+  //     _dashboardTrends = _convertToMap(response);
+  //     notifyListeners();
+  //   } catch (e) {
+  //     _errorMessage = e.toString();
+  //     notifyListeners();
+  //   } finally {
+  //     _setLoading(false);
+  //   }
+  // }
+  //
+  // Future<void> fetchPerformanceMetrics() async {
+  //   _setLoading(true);
+  //   try {
+  //     final response = await _analyticsService.getPerformanceMetrics();
+  //     _performanceMetrics = _convertToMap(response);
+  //     notifyListeners();
+  //   } catch (e) {
+  //     _errorMessage = e.toString();
+  //     notifyListeners();
+  //   } finally {
+  //     _setLoading(false);
+  //   }
+  // }
+  //
+  // Future<void> fetchCustomDashboardData(String timeframe) async {
+  //   _setLoading(true);
+  //   try {
+  //     final response = await _analyticsService.getCustomDashboardData(timeframe);
+  //     _customDashboardData = _convertToMap(response);
+  //     notifyListeners();
+  //   } catch (e) {
+  //     _errorMessage = e.toString();
+  //     notifyListeners();
+  //   } finally {
+  //     _setLoading(false);
+  //   }
+  // }
+
+  // Method to fetch all analytics data for a group
+  Future<void> fetchAllGroupAnalytics(String groupId) async {
+    _setLoading(true);
+    try {
+      // Create a list of futures to execute in parallel
+      final futures = [
+        fetchGroupDemographics(groupId),
+        fetchGroupAttendanceStats(groupId),
+        fetchGroupGrowthAnalytics(groupId),
+        fetchGroupDashboardData(groupId),
+        // fetchGroupEngagementMetrics(groupId),
+        // fetchGroupAttendanceTrends(groupId),
+        // fetchGroupActivityTimeline(groupId),
+      ];
+      
+      // Execute all futures in parallel
+      await Future.wait(futures);
+      
+      _errorMessage = null;
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  // Method to fetch all dashboard data
+  // Future<void> fetchAllDashboardData() async {
+  //   _setLoading(true);
+  //   try {
+  //     await Future.wait([
+  //       fetchDashboardSummary(),
+  //       fetchDashboardTrends(),
+  //       fetchPerformanceMetrics(),
+  //       fetchPopularEvents(),
+  //       fetchAttendanceByEventCategory(),
+  //       fetchMemberEngagementScores(),
+  //       fetchMemberActivityLevels(),
+  //       fetchAttendanceCorrelationFactors(),
+  //     ]);
+  //     _errorMessage = null;
+  //   } catch (e) {
+  //     _errorMessage = e.toString();
+  //     notifyListeners();
+  //   } finally {
+  //     _setLoading(false);
+  //   }
+  // }
+
+  // Method to clear all analytics data
+  void clearAnalyticsData() {
+    _groupEngagementMetrics = null;
+    _groupActivityTimeline = null;
+    _groupAttendanceTrends = null;
+    _attendanceByEventType = null;
+    _upcomingEventsParticipationForecast = null;
+    _popularEvents = null;
+    _attendanceByEventCategory = null;
+    _memberEngagementScores = null;
+    _memberActivityLevels = null;
+    _attendanceCorrelationFactors = null;
+    _dashboardTrends = null;
+    _performanceMetrics = null;
+    _customDashboardData = null;
+    notifyListeners();
+  }
+
+  // Add new method to handle event attendance
+  Future<void> fetchEventAttendance(String eventId) async {
+    _setLoading(true);
+    try {
+      final response = await _attendanceProvider.fetchEventAttendance(eventId);
+      
+      // Since response is a List<AttendanceModel>, convert it to a map structure
+      _eventAttendance = {
+        'items': response,
+        'count': response.length,
+        'hasData': response.isNotEmpty,
+        'attendanceRate': response.isNotEmpty ? response.length / 100 : 0.0,
+        'totalAttendees': response.length
+      };
+      _errorMessage = null;
+    } catch (error) {
+      _handleError('fetching event attendance', error);
+      _eventAttendance = {
+        'error': error.toString(),
+        'items': [],
+        'count': 0,
+        'hasData': false
+      };
     } finally {
       _setLoading(false);
     }

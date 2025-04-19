@@ -16,6 +16,12 @@ class UserServices {
   //get current user data
   Future<UserModel> fetchCurrentUser(String id, [BuildContext? context]) async {
     try {
+      // Validate the ID parameter
+      if (id.isEmpty) {
+        print('Error: Empty user ID provided to fetchCurrentUser');
+        throw Exception('User ID cannot be empty');
+      }
+      
       print('Fetching user data for ID: $id');
       
       final response = await _httpClient.get(ApiEndpoints.getUserById(id));
@@ -45,10 +51,10 @@ class UserServices {
         // If the user doesn't exist in the database yet, create a minimal user model
         // This handles the case where a user has authenticated but hasn't set up their profile
         if (response.statusCode == 404) {
-          print('User not found, creating minimal user model');
+          print('User not found, creating minimal user model with ID: $id');
           return UserModel(
             id: id,
-            fullName: '',
+            fullName: 'User $id',  // Add a default name to make it more user-friendly
             email: '',
             contact: '',
             nextOfKin: '',
@@ -64,8 +70,8 @@ class UserServices {
       print('Exception in fetchCurrentUser: $e');
       // Return a minimal user model instead of throwing
       return UserModel(
-        id: id,
-        fullName: '',
+        id: id.isNotEmpty ? id : 'unknown',
+        fullName: 'User ${id.isNotEmpty ? id : "Unknown"}',  // Add a default name
         email: '',
         contact: '',
         nextOfKin: '',
@@ -146,6 +152,116 @@ class UserServices {
         user.fullName.toLowerCase().contains(lowercaseQuery) || 
         user.email.toLowerCase().contains(lowercaseQuery)
       ).toList();
+    }
+  }
+  
+  // Region-specific methods
+  
+  // Get users by region
+  Future<List<UserModel>> getUsersByRegion(String regionId) async {
+    try {
+      final response = await _httpClient.get(ApiEndpoints.getRegionUsers(regionId));
+      
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        final List<dynamic> usersData = jsonResponse['data'] ?? [];
+        return usersData.map((user) => UserModel.fromJson(user)).toList();
+      } else {
+        // If the API fails, fall back to filtering all users locally by region
+        final allUsers = await fetchAllUsers();
+        return allUsers.where((user) => user.regionId == regionId).toList();
+      }
+    } catch (e) {
+      print('Error fetching users by region: $e');
+      // Fall back to filtering all users locally
+      final allUsers = await fetchAllUsers();
+      return allUsers.where((user) => user.regionId == regionId).toList();
+    }
+  }
+  
+  // Create a new user with region
+  Future<bool> createUser(String fullName, String email, String contact, String gender, String regionId) async {
+    try {
+      final response = await _httpClient.post(
+        ApiEndpoints.users,
+        body: jsonEncode({
+          'full_name': fullName,
+          'email': email,
+          'phone_number': contact,
+          'gender': gender,
+          'region_id': regionId,
+          'role': 'user',
+        }),
+      );
+      
+      return response.statusCode == 201;
+    } catch (e) {
+      print('Error creating user: $e');
+      return false;
+    }
+  }
+  
+  // Assign user to region
+  Future<bool> assignUserToRegion(String userId, String regionId) async {
+    try {
+      // First get the current user
+      final user = await fetchCurrentUser(userId);
+      
+      // Update the user with the new region ID
+      final updatedUser = UserModel(
+        id: user.id,
+        fullName: user.fullName,
+        email: user.email,
+        contact: user.contact,
+        nextOfKin: user.nextOfKin,
+        nextOfKinContact: user.nextOfKinContact,
+        role: user.role,
+        gender: user.gender,
+        regionId: regionId,
+      );
+      
+      // Update the user
+      final response = await _httpClient.put(
+        ApiEndpoints.updateUser(userId),
+        body: jsonEncode(updatedUser.toJson()),
+      );
+      
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error assigning user to region: $e');
+      return false;
+    }
+  }
+  
+  // Remove user from region
+  Future<bool> removeUserFromRegion(String userId, String regionId) async {
+    try {
+      // First get the current user
+      final user = await fetchCurrentUser(userId);
+      
+      // Update the user with null region ID
+      final updatedUser = UserModel(
+        id: user.id,
+        fullName: user.fullName,
+        email: user.email,
+        contact: user.contact,
+        nextOfKin: user.nextOfKin,
+        nextOfKinContact: user.nextOfKinContact,
+        role: user.role,
+        gender: user.gender,
+        regionId: null, // Remove region ID
+      );
+      
+      // Update the user
+      final response = await _httpClient.put(
+        ApiEndpoints.updateUser(userId),
+        body: jsonEncode(updatedUser.toJson()),
+      );
+      
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error removing user from region: $e');
+      return false;
     }
   }
 }

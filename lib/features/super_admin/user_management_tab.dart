@@ -311,19 +311,7 @@ class _UserManagementTabState extends State<UserManagementTab> {
             ),
           ],
         ),
-        trailing: IconButton(
-          icon: const Icon(Icons.edit, color: AppColors.secondaryColor),
-          onPressed: () {
-            // Navigate to user role management screen
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const UserRoleManagementScreen()),
-            ).then((_) {
-              // Refresh the user list when returning from role management
-              _loadUsers();
-            });
-          },
-        ),
+     
       ),
     );
   }

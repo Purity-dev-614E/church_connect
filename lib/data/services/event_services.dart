@@ -442,4 +442,34 @@ class EventServices {
       throw Exception('Failed to fetch user attendance records: $e');
     }
   }
+  
+  /// Get events by region
+  Future<List<EventModel>> getEventsByRegion(String regionId) async {
+    try {
+      final response = await http.get(
+        Uri.parse(ApiEndpoints.getEventsByRegion(regionId)),
+        headers: await _getHeaders(),
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((event) => EventModel.fromJson(event)).toList();
+      } else if (response.statusCode == 404) {
+        // No events found for this region
+        return [];
+      } else {
+        throw Exception('Failed to fetch region events: HTTP status ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error fetching events by region: $e');
+      
+      // Fallback: Try to get all events and filter by region
+      try {
+        final allEvents = await getAllEvents();
+        return allEvents.where((event) => event.regionId == regionId).toList();
+      } catch (fallbackError) {
+        throw Exception('Failed to fetch region events: $e, Fallback error: $fallbackError');
+      }
+    }
+  }
 }

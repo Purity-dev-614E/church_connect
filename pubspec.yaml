@@ -43,6 +43,13 @@ dependencies:
   fl_chart: ^0.66.2
   lottie: ^3.1.0
   animated_text_kit: ^4.2.2
+  url_launcher: ^6.1.7
+  flutter_hooks: ^0.20.0
+  path_provider: ^2.1.2
+  permission_handler: ^11.3.0
+  share_plus: ^7.2.2
+  csv: ^5.1.1
+  pdf: ^3.10.8
 
 
   # The following adds the Cupertino Icons font to your application.

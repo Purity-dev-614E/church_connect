@@ -9,6 +9,7 @@ import 'package:group_management_church_app/widgets/custom_app_bar.dart';
 import 'package:group_management_church_app/widgets/custom_button.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class MemberProfileScreen extends StatefulWidget {
   final String userId;
@@ -33,6 +34,7 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
   @override
   void initState() {
     super.initState();
+    print('Received user id: ${widget.userId}, group id: ${widget.groupId}');
     _loadMemberData();
   }
 
@@ -43,18 +45,44 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
     });
 
     try {
+      // Validate userId
+      if (widget.userId.isEmpty) {
+        throw Exception('Member ID is empty or invalid');
+      }
+      
       // Load user data
       final userProvider = Provider.of<UserProvider>(context, listen: false);
-      _user = await userProvider.getUserById(widget.userId);
+      print('Loading member data for user: ${widget.userId}');
+      print('groupId: ${widget.groupId}');
+      
+      // Add a retry mechanism for better reliability
+      int retryCount = 0;
+      const maxRetries = 2;
+      
+      while (retryCount <= maxRetries) {
+        _user = await userProvider.getUserById(widget.userId);
+        
+        if (_user != null) {
+          print('Successfully loaded user: ${_user!.fullName} (ID: ${_user!.id})');
+          break;
+        }
+        
+        retryCount++;
+        if (retryCount <= maxRetries) {
+          print('Retry $retryCount: Failed to load user, retrying...');
+          await Future.delayed(Duration(milliseconds: 500 * retryCount));
+        }
+      }
       
       if (_user == null) {
-        throw Exception('Failed to load member data');
+        throw Exception('Failed to load member data after $maxRetries retries');
       }
       
       // Load user groups if groupId is not provided
       if (widget.groupId == null) {
         final groupProvider = Provider.of<GroupProvider>(context, listen: false);
         _userGroups = await groupProvider.getUserGroups(widget.userId);
+        print('Loaded ${_userGroups.length} groups for user ${widget.userId}');
       }
       
       setState(() {
@@ -232,12 +260,17 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
     );
   }
 
-  void _contactMember(UserModel user) {
-    CustomNotification.show(
-      context: context,
-      message: 'Contact ${user.fullName} at ${user.contact}',
-      type: NotificationType.info,
-    );
+  void _contactMember(UserModel user) async {
+    final Uri phoneUri = Uri(scheme: 'tel', path: user.contact);
+    if (await canLaunchUrl(phoneUri)) {
+      await launchUrl(phoneUri);
+    } else {
+      CustomNotification.show(
+        context: context,
+        message: 'Could not launch phone app for ${user.contact}',
+        type: NotificationType.error,
+      );
+    }
   }
   
   Widget _buildErrorView() {

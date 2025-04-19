@@ -3,8 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:group_management_church_app/core/auth/auth_wrapper.dart';
 import 'package:group_management_church_app/core/constants/colors.dart';
 import 'package:group_management_church_app/core/constants/text_styles.dart';
+import 'package:group_management_church_app/data/models/region_model.dart';
 import 'package:group_management_church_app/data/models/user_model.dart';
 import 'package:group_management_church_app/data/providers/auth_provider.dart';
+import 'package:group_management_church_app/data/providers/region_provider.dart';
 import 'package:group_management_church_app/data/providers/user_provider.dart';
 import 'package:group_management_church_app/widgets/custom_button.dart';
 import 'package:group_management_church_app/widgets/input_field.dart';
@@ -28,6 +30,7 @@ class ProfileSetupScreen extends StatefulWidget {
 class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
+  bool _isLoadingRegions = false;
   
   // Form controllers
   final TextEditingController _fullNameController = TextEditingController();
@@ -39,6 +42,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   String _selectedGender = 'male';
   final List<String> _genderOptions = ['male', 'female'];
   
+  // Selected region
+  String? _selectedRegionId;
+  List<RegionModel> _regions = [];
+  
   // Default role is 'user' - only super_admin can change roles
   final String _userRole = 'user';
 
@@ -48,7 +55,30 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     // We need to use a post-frame callback because ModalRoute.of(context) is not available in initState
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadUserData();
+      _loadRegions();
     });
+  }
+  
+  // Load available regions
+  Future<void> _loadRegions() async {
+    setState(() {
+      _isLoadingRegions = true;
+    });
+    
+    try {
+      final regionProvider = Provider.of<RegionProvider>(context, listen: false);
+      await regionProvider.loadRegions();
+      
+      setState(() {
+        _regions = regionProvider.regions;
+        _isLoadingRegions = false;
+      });
+    } catch (e) {
+      _showError('Error loading regions: $e');
+      setState(() {
+        _isLoadingRegions = false;
+      });
+    }
   }
   
   void _showError(String message) {
@@ -101,6 +131,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             // Set gender if it's one of the available options
             if (_genderOptions.contains(currentUser.gender)) {
               _selectedGender = currentUser.gender;
+            }
+            
+            // Set region if available
+            if (currentUser.regionId != null) {
+              _selectedRegionId = currentUser.regionId;
             }
           });
         }
@@ -156,6 +191,12 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   // Submit form
   Future<void> _submitForm() async {
     if (_formKey.currentState!.validate()) {
+      // Validate region selection
+      if (_selectedRegionId == null || _selectedRegionId!.isEmpty) {
+        _showError('Please select your region');
+        return;
+      }
+      
       setState(() {
         _isLoading = true;
       });
@@ -182,6 +223,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           nextOfKinContact: _nextOfKinContactController.text.trim(),
           role: role, // Preserve existing role
           gender: _selectedGender,
+          regionId: _selectedRegionId,
         );
         
         // Update user profile
@@ -475,6 +517,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         _buildSectionHeader('Additional Information', Icons.info_outline),
         const SizedBox(height: 16),
         
+        // Region selection dropdown
+        _buildRegionDropdown(),
+        const SizedBox(height: 16),
+        
         // Display role information (not editable)
         Container(
           decoration: BoxDecoration(
@@ -525,6 +571,108 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           ),
         ),
       ],
+    );
+  }
+  
+  Widget _buildRegionDropdown() {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.primaryColor.withOpacity(0.5)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.location_on,
+                color: AppColors.primaryColor,
+                size: 24,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Your Region',
+                      style: TextStyles.bodyText.copyWith(
+                        color: AppColors.textColor.withOpacity(0.7),
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    if (_isLoadingRegions)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8.0),
+                        child: Center(
+                          child: SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                            ),
+                          ),
+                        ),
+                      )
+                    else if (_regions.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8.0),
+                        child: Text(
+                          'No regions available. Please contact an administrator.',
+                          style: TextStyles.bodyText.copyWith(
+                            color: AppColors.errorColor,
+                            fontSize: 14,
+                          ),
+                        ),
+                      )
+                    else
+                      DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _selectedRegionId,
+                          isExpanded: true,
+                          hint: Text(
+                            'Select your region',
+                            style: TextStyles.bodyText.copyWith(
+                              color: AppColors.textColor.withOpacity(0.5),
+                            ),
+                          ),
+                          icon: const Icon(Icons.arrow_drop_down, color: AppColors.primaryColor),
+                          style: TextStyles.bodyText,
+                          onChanged: (String? newValue) {
+                            setState(() {
+                              _selectedRegionId = newValue;
+                            });
+                          },
+                          items: _regions.map<DropdownMenuItem<String>>((RegionModel region) {
+                            return DropdownMenuItem<String>(
+                              value: region.id,
+                              child: Text(region.name),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (!_isLoadingRegions && _regions.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(left: 40.0, bottom: 8.0),
+              child: Text(
+                'Please select the region you belong to',
+                style: TextStyles.bodyText.copyWith(
+                  fontSize: 12,
+                  color: AppColors.textColor.withOpacity(0.6),
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 

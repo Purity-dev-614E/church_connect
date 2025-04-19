@@ -3,12 +3,14 @@ import 'package:group_management_church_app/data/models/group_model.dart';
 import 'package:group_management_church_app/data/models/user_model.dart';
 import 'package:group_management_church_app/data/providers/auth_provider.dart';
 import 'package:group_management_church_app/data/providers/group_provider.dart';
+import 'package:group_management_church_app/data/providers/region_provider.dart';
 import 'package:group_management_church_app/data/providers/user_provider.dart';
 import 'package:group_management_church_app/data/services/auth_services.dart';
 import 'package:group_management_church_app/data/services/user_services.dart';
 import 'package:group_management_church_app/features/admin/admin_dashboard_wrapper.dart';
 import 'package:group_management_church_app/features/auth/login.dart';
 import 'package:group_management_church_app/features/auth/profile_setup_screen.dart';
+import 'package:group_management_church_app/features/region_manager/region_dashboard.dart';
 import 'package:group_management_church_app/features/user/dashboard.dart';
 import 'package:group_management_church_app/features/user/no_group_screen.dart';
 import 'package:provider/provider.dart';
@@ -194,6 +196,51 @@ class _RoleBasedNavigator extends StatelessWidget {
           case 'super_admin':
             log('Navigating to SuperAdminDashboard');
             return const SuperAdminDashboard();
+          
+          case 'region_manager':
+            log('Navigating to RegionDashboard');
+            
+            // Check if user has a region assigned
+            if (user.regionId == null || user.regionId!.isEmpty) {
+              log('Region manager has no region assigned');
+              return Scaffold(
+                body: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'No Region Assigned',
+                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'You have been assigned as a Region Manager but no region has been assigned to you yet.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 16),
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton(
+                        onPressed: () async {
+                          final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                          await authProvider.logout();
+                          if (context.mounted) {
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(builder: (context) => const LoginScreen()),
+                            );
+                          }
+                        },
+                        child: const Text('Logout'),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+            
+            return RegionDashboard(regionId: user.regionId!);
     
           case 'admin':
             // Use user.id instead of userId from SharedPreferences for admin

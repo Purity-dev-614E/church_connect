@@ -4,14 +4,10 @@ import 'package:group_management_church_app/core/auth/auth_wrapper.dart';
 import 'package:group_management_church_app/core/constants/colors.dart';
 import 'package:group_management_church_app/core/constants/text_styles.dart';
 import 'package:group_management_church_app/core/navigation/page_router.dart';
-import 'package:group_management_church_app/data/providers/user_provider.dart';
-import 'package:group_management_church_app/data/services/auth_services.dart';
-import 'package:group_management_church_app/features/auth/profile_setup_screen.dart';
 import 'package:group_management_church_app/features/auth/reset_password.dart';
 import 'package:group_management_church_app/features/auth/signup.dart';
 import 'package:group_management_church_app/widgets/custom_button.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import 'package:group_management_church_app/data/providers/auth_provider.dart';
 
@@ -122,7 +118,10 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
       if (result.success) {
         if (mounted) {
-          Navigator.pushReplacementNamed(context, '/home');
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const AuthWrapper()),
+          );
         }
       } else {
         if (mounted) {
@@ -131,6 +130,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       }
     } catch (e) {
       if (mounted) {
+        print(e);
         _showError('An error occurred. Please try again.');
       }
     } finally {

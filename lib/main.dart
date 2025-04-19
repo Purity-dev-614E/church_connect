@@ -1,22 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:group_management_church_app/core/navigation/page_router.dart';
 import 'package:group_management_church_app/core/theme/app_theme.dart';
 import 'package:group_management_church_app/core/utils/auth_error_handler.dart';
 import 'package:group_management_church_app/data/providers/auth_provider.dart';
-import 'package:group_management_church_app/data/providers/dashboard_analytics_provider.dart';
 import 'package:group_management_church_app/data/providers/event_provider.dart';
 import 'package:group_management_church_app/data/providers/group_provider.dart';
+import 'package:group_management_church_app/data/providers/region_provider.dart';
 import 'package:group_management_church_app/data/providers/user_provider.dart';
 import 'package:group_management_church_app/data/providers/analytics_provider.dart';
 import 'package:group_management_church_app/data/providers/attendance_provider.dart';
-import 'package:group_management_church_app/features/admin/Admin_dashboard.dart';
 import 'package:group_management_church_app/features/auth/login.dart';
-import 'package:group_management_church_app/features/auth/profile_setup_screen.dart';
 import 'package:group_management_church_app/features/auth/reset_password.dart';
 import 'package:group_management_church_app/features/auth/signup.dart';
 import 'package:group_management_church_app/features/splash_screen.dart';
-import 'package:group_management_church_app/features/user/dashboard.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
 
@@ -81,9 +76,10 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => GroupProvider()),
         ChangeNotifierProvider(create: (_) => EventProvider()),
-        ChangeNotifierProvider(create: (_) => DashboardAnalyticsProvider()),
         ChangeNotifierProvider(create: (_) => AnalyticsProvider()),
         ChangeNotifierProvider(create: (_) => AttendanceProvider()),
+        ChangeNotifierProvider(create: (_) => RegionProvider()),
+        ChangeNotifierProvider(create: (_) => RegionProvider()),
       ],
       child: MaterialApp(
         title: 'Church Connect',

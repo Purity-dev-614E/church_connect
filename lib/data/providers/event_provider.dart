@@ -333,4 +333,19 @@ class EventProvider extends ChangeNotifier {
       _setLoading(false);
     }
   }
+  
+  /// Get events by region
+  Future<List<EventModel>> getEventsByRegion(String regionId) async {
+    _setLoading(true);
+    try {
+      final events = await _eventServices.getEventsByRegion(regionId);
+      _errorMessage = null;
+      return events;
+    } catch (error) {
+      _handleError('fetching events by region', error);
+      return [];
+    } finally {
+      _setLoading(false);
+    }
+  }
 }
