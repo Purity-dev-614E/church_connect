@@ -351,11 +351,14 @@ class AnalyticsProvider extends ChangeNotifier {
   Future<GroupDemographics> fetchGroupDemographics(String groupId) async {
     return _fetchData<GroupDemographics>(
       'group_demographics_$groupId',
-      () => _analyticsService.getGroupDemographics(
-        groupId, 
-        startDate: _startDate, 
-        endDate: _endDate
-      ),
+      () async {
+        final response = await _analyticsService.getGroupDemographics(
+          groupId, 
+          startDate: _startDate, 
+          endDate: _endDate
+        );
+        return GroupDemographics.fromJson(response);
+      },
       (response) {
         _groupDemographics = response;
         notifyListeners();
@@ -367,11 +370,14 @@ class AnalyticsProvider extends ChangeNotifier {
   Future<GroupAttendanceStats> fetchGroupAttendanceStats(String groupId) async {
     return _fetchData<GroupAttendanceStats>(
       'group_attendance_stats_$groupId',
-      () => _analyticsService.getGroupAttendanceStats(
-        groupId,
-        startDate: _startDate,
-        endDate: _endDate
-      ),
+      () async {
+        final response = await _analyticsService.getGroupAttendanceStats(
+          groupId,
+          startDate: _startDate,
+          endDate: _endDate
+        );
+        return GroupAttendanceStats.fromJson(response);
+      },
       (response) {
         _groupAttendanceStats = response;
         notifyListeners();
@@ -383,7 +389,10 @@ class AnalyticsProvider extends ChangeNotifier {
   Future<GroupGrowthAnalytics> fetchGroupGrowthAnalytics(String groupId) async {
     return _fetchData<GroupGrowthAnalytics>(
       'group_growth_analytics_$groupId',
-      () => _analyticsService.getGroupGrowthAnalytics(groupId),
+      () async {
+        final response = await _analyticsService.getGroupGrowthAnalytics(groupId);
+        return GroupGrowthAnalytics.fromJson(response);
+      },
       (response) {
         _groupGrowthAnalytics = response;
         notifyListeners();
@@ -396,7 +405,10 @@ class AnalyticsProvider extends ChangeNotifier {
     final groupIdsString = groupIds.join('_');
     return _fetchData<GroupComparisonResult>(
       'compare_groups_$groupIdsString',
-      () => _analyticsService.compareGroups(groupIds),
+      () async {
+        final response = await _analyticsService.compareGroups(groupIds);
+        return GroupComparisonResult.fromJson(response);
+      },
       (response) {
         _groupComparisonData = response;
         notifyListeners();
@@ -408,7 +420,10 @@ class AnalyticsProvider extends ChangeNotifier {
   Future<GroupDashboardData> fetchGroupDashboardData(String groupId) async {
     return _fetchData<GroupDashboardData>(
       'group_dashboard_data_$groupId',
-      () => _analyticsService.getGroupDashboardData(groupId),
+      () async {
+        final response = await _analyticsService.getGroupDashboardData(groupId);
+        return GroupDashboardData.fromJson(response);
+      },
       (response) {
         _groupDashboardData = response;
         notifyListeners();
@@ -467,7 +482,8 @@ class AnalyticsProvider extends ChangeNotifier {
   Future<AttendanceData> fetchWeeklyAttendance() async {
     _setLoading(true);
     try {
-      final result = await _analyticsService.getAttendanceByWeek();
+      final response = await _analyticsService.getAttendanceByWeek();
+      final result = AttendanceData.fromJson(response);
       _weeklyAttendance = result;
       _errorMessage = null;
       notifyListeners();
@@ -484,7 +500,8 @@ class AnalyticsProvider extends ChangeNotifier {
   Future<AttendanceData> fetchMonthlyAttendance() async {
     _setLoading(true);
     try {
-      final result = await _analyticsService.getAttendanceByMonth();
+      final response = await _analyticsService.getAttendanceByMonth();
+      final result = AttendanceData.fromJson(response);
       _monthlyAttendance = result;
       _errorMessage = null;
       notifyListeners();
@@ -501,7 +518,8 @@ class AnalyticsProvider extends ChangeNotifier {
   Future<AttendanceData> fetchYearlyAttendance() async {
     _setLoading(true);
     try {
-      final result = await _analyticsService.getAttendanceByYear();
+      final response = await _analyticsService.getAttendanceByYear();
+      final result = AttendanceData.fromJson(response);
       _yearlyAttendance = result;
       _errorMessage = null;
       notifyListeners();
@@ -518,7 +536,8 @@ class AnalyticsProvider extends ChangeNotifier {
   Future<AttendanceData> fetchPeriodAttendance(String period) async {
     _setLoading(true);
     try {
-      final result = await _analyticsService.getAttendanceByPeriod(period);
+      final response = await _analyticsService.getAttendanceByPeriod(period);
+      final result = AttendanceData.fromJson(response);
       _periodAttendance = result;
       _errorMessage = null;
       notifyListeners();
@@ -535,7 +554,8 @@ class AnalyticsProvider extends ChangeNotifier {
   Future<OverallAttendanceData> fetchOverallAttendance(String period) async {
     _setLoading(true);
     try {
-      final result = await _analyticsService.getOverallAttendanceByPeriod(period);
+      final response = await _analyticsService.getOverallAttendanceByPeriod(period);
+      final result = OverallAttendanceData.fromJson(response);
       _overallAttendance = result;
       _errorMessage = null;
       notifyListeners();
@@ -552,7 +572,8 @@ class AnalyticsProvider extends ChangeNotifier {
   Future<UserAttendanceTrends> fetchUserAttendanceTrends(String userId) async {
     _setLoading(true);
     try {
-      final result = await _analyticsService.getUserAttendanceTrends(userId);
+      final response = await _analyticsService.getUserAttendanceTrends(userId);
+      final result = UserAttendanceTrends.fromJson(response);
       _userAttendanceTrends = result;
       _errorMessage = null;
       notifyListeners();
@@ -571,11 +592,12 @@ class AnalyticsProvider extends ChangeNotifier {
   Future<EventParticipationStats> fetchEventParticipationStats(String eventId) async {
     _setLoading(true);
     try {
-      final result = await _analyticsService.getEventParticipationStats(
+      final response = await _analyticsService.getEventParticipationStats(
         eventId,
         startDate: _startDate,
         endDate: _endDate
       );
+      final result = EventParticipationStats.fromJson(response);
       _eventParticipationStats = result;
       _errorMessage = null;
       notifyListeners();
@@ -592,7 +614,8 @@ class AnalyticsProvider extends ChangeNotifier {
   Future<EventAttendanceComparison> compareEventAttendance(List<String> eventIds) async {
     _setLoading(true);
     try {
-      final result = await _analyticsService.compareEventAttendance(eventIds);
+      final response = await _analyticsService.compareEventAttendance(eventIds);
+      final result = EventAttendanceComparison.fromJson(response);
       _eventComparisonData = result;
       _errorMessage = null;
       notifyListeners();
@@ -611,10 +634,11 @@ class AnalyticsProvider extends ChangeNotifier {
   Future<MemberParticipationStats> fetchMemberParticipationStats() async {
     _setLoading(true);
     try {
-      final result = await _analyticsService.getMemberParticipationStats(
+      final response = await _analyticsService.getMemberParticipationStats(
         startDate: _startDate,
         endDate: _endDate
       );
+      final result = MemberParticipationStats.fromJson(response);
       _memberParticipationStats = result;
       _errorMessage = null;
       notifyListeners();
@@ -631,7 +655,8 @@ class AnalyticsProvider extends ChangeNotifier {
   Future<MemberRetentionStats> fetchMemberRetentionStats() async {
     _setLoading(true);
     try {
-      final result = await _analyticsService.getMemberRetentionStats();
+      final response = await _analyticsService.getMemberRetentionStats();
+      final result = MemberRetentionStats.fromJson(response);
       _memberRetentionStats = result;
       _errorMessage = null;
       notifyListeners();
@@ -650,7 +675,8 @@ class AnalyticsProvider extends ChangeNotifier {
   Future<DashboardSummary> fetchDashboardSummary() async {
     _setLoading(true);
     try {
-      final result = await _analyticsService.getDashboardSummary();
+      final response = await _analyticsService.getDashboardSummary();
+      final result = DashboardSummary.fromJson(response);
       _dashboardSummary = result;
       _errorMessage = null;
       notifyListeners();
@@ -669,7 +695,8 @@ class AnalyticsProvider extends ChangeNotifier {
   Future<ReportData> exportAttendanceReport() async {
     _setLoading(true);
     try {
-      final result = await _analyticsService.exportAttendanceReport();
+      final response = await _analyticsService.exportAttendanceReport();
+      final result = ReportData.fromJson(response);
       _customReportData = result;
       _exportUrl = result.downloadUrl;
       _errorMessage = null;
@@ -687,7 +714,8 @@ class AnalyticsProvider extends ChangeNotifier {
   Future<ReportData> exportMemberReport() async {
     _setLoading(true);
     try {
-      final result = await _analyticsService.exportMemberReport();
+      final response = await _analyticsService.exportMemberReport();
+      final result = ReportData.fromJson(response);
       _customReportData = result;
       _exportUrl = result.downloadUrl;
       _errorMessage = null;
@@ -705,7 +733,8 @@ class AnalyticsProvider extends ChangeNotifier {
   Future<ReportData> exportGroupReport(String groupId) async {
     _setLoading(true);
     try {
-      final result = await _analyticsService.exportGroupReport(groupId);
+      final response = await _analyticsService.exportGroupReport(groupId);
+      final result = ReportData.fromJson(response);
       _customReportData = result;
       _exportUrl = result.downloadUrl;
       _errorMessage = null;

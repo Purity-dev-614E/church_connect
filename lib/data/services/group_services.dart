@@ -329,13 +329,13 @@ class GroupServices {
       } else {
         // If the API fails, fall back to filtering all groups locally by region
         final allGroups = await fetchAllGroups();
-        return allGroups.where((group) => group.regionId == regionId).toList();
+        return allGroups.where((group) => group.region_id == regionId).toList();
       }
     } catch (e) {
       // Fall back to filtering all groups locally
       try {
         final allGroups = await fetchAllGroups();
-        return allGroups.where((group) => group.regionId == regionId).toList();
+        return allGroups.where((group) => group.region_id == regionId).toList();
       } catch (innerError) {
         throw Exception("Failed to fetch groups by region: $e, $innerError");
       }

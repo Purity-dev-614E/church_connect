@@ -23,6 +23,7 @@ import '../../data/providers/user_provider.dart';
 import '../../data/services/event_services.dart';
 import '../../data/services/analytics_services.dart';
 import '../../data/providers/auth_provider.dart';
+import '../../data/providers/dashboard_analytics_provider.dart';
 
 class SuperAdminDashboard extends StatefulWidget {
   const SuperAdminDashboard({Key? key}) : super(key: key);

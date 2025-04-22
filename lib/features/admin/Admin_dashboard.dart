@@ -67,20 +67,20 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
     start: DateTime.now().subtract(const Duration(days: 180)),
     end: DateTime.now(),
   );
-  
+
   // Theme settings
   bool _isDarkMode = false;
   Color _accentColor = AppColors.primaryColor;
-  
+
   // Animation controllers
   late AnimationController _refreshAnimationController;
-  
+
   // Settings
   bool _notificationsEnabled = true;
   bool _autoRefreshEnabled = false;
   int _autoRefreshInterval = 30; // minutes
   bool _analyticsExpanded = true;
-  
+
   // Export settings
   ExportFormat _selectedExportFormat = ExportFormat.pdf;
 
@@ -89,22 +89,22 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
     super.initState();
     _analyticsProvider = Provider.of<AnalyticsProvider>(context, listen: false);
     _loadAnalyticsData();
-    
+
     // Initialize animation controllers
     _refreshAnimationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1000),
     );
-    
+
     // Load settings from shared preferences
     _loadSettings();
-    
+
     // Set up auto-refresh if enabled
     if (_autoRefreshEnabled) {
       _setupAutoRefresh();
     }
   }
-  
+
   Future<void> _loadSettings() async {
     // In a real app, you would load these from SharedPreferences
     // For now, we'll just use default values
@@ -117,7 +117,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       _analyticsExpanded = true;
     });
   }
-  
+
   void _setupAutoRefresh() {
     // Set up a timer to refresh data at the specified interval
     Future.delayed(Duration(minutes: _autoRefreshInterval), () {
@@ -127,18 +127,18 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       }
     });
   }
-  
+
   Future<void> _refreshData() async {
     if (_isLoading) return;
-    
+
     // Start the refresh animation
     _refreshAnimationController.repeat();
-    
+
     try {
       await _loadAnalyticsData();
       await _loadGroupMembers();
       await _loadGroupEvents();
-      
+
       if (_notificationsEnabled) {
         _showInfo('Dashboard data refreshed');
       }
@@ -159,12 +159,13 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       _isLoading = true;
       _errorMessage = null;
     });
-    
+
     // List to track which analytics failed to load
     List<String> failedAnalytics = [];
-    
+
     // Define a helper function to load analytics with proper error handling
-    Future<void> loadAnalytic(String name, Future<dynamic> Function() loader) async {
+    Future<void> loadAnalytic(String name,
+        Future<dynamic> Function() loader) async {
       try {
         await loader();
         print('Successfully loaded $name');
@@ -173,30 +174,38 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         failedAnalytics.add(name);
       }
     }
-    
+
     try {
       // Load only the active analytics that are needed for the dashboard
       List<Future<void>> activeAnalytics = [
-        loadAnalytic('Group Demographics', () => _analyticsProvider.fetchGroupDemographics(widget.groupId)),
-        loadAnalytic('Group Attendance Stats', () => _analyticsProvider.fetchGroupAttendanceStats(widget.groupId)),
-        loadAnalytic('Member Participation Stats', () => _analyticsProvider.fetchMemberParticipationStats()),
-        loadAnalytic('Event Participation Stats', () => _analyticsProvider.fetchEventParticipationStats(widget.groupId)),
+        loadAnalytic('Group Demographics', () =>
+            _analyticsProvider.fetchGroupDemographics(widget.groupId)),
+        loadAnalytic('Group Attendance Stats', () =>
+            _analyticsProvider.fetchGroupAttendanceStats(widget.groupId)),
+        loadAnalytic('Member Participation Stats', () =>
+            _analyticsProvider.fetchMemberParticipationStats()),
+        loadAnalytic('Event Participation Stats', () =>
+            _analyticsProvider.fetchEventParticipationStats(widget.groupId)),
       ];
-      
+
       // Wait for all active analytics to complete
       await Future.wait(activeAnalytics);
-      
+
       // Set error message if any analytics failed to load
       if (failedAnalytics.isNotEmpty) {
-        _showInfo('Some analytics data could not be loaded. The dashboard may show incomplete information.');
-        
+        _showInfo(
+            'Some analytics data could not be loaded. The dashboard may show incomplete information.');
+
         setState(() {
-          _errorMessage = 'Some analytics data could not be loaded: ${failedAnalytics.join(', ')}';
+          _errorMessage =
+          'Some analytics data could not be loaded: ${failedAnalytics.join(
+              ', ')}';
         });
       }
     } catch (e) {
       print('Error in _loadAnalyticsData: $e');
-      setState(() => _errorMessage = 'Error loading analytics data: ${e.toString()}');
+      setState(() =>
+      _errorMessage = 'Error loading analytics data: ${e.toString()}');
       _showError('Failed to load analytics data: ${e.toString()}');
     } finally {
       setState(() => _isLoading = false);
@@ -231,23 +240,25 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         _isLoading = true;
         _errorMessage = null;
       });
-      
+
       // Convert date range to string format for analytics
       final timeframe = {
         'start_date': newRange.start.toIso8601String(),
         'end_date': newRange.end.toIso8601String(),
       };
-      
+
       // Format date range for display
       final startFormatted = DateFormat('MMM d, y').format(newRange.start);
       final endFormatted = DateFormat('MMM d, y').format(newRange.end);
-      _showInfo('Updating dashboard for date range: $startFormatted to $endFormatted');
+      _showInfo(
+          'Updating dashboard for date range: $startFormatted to $endFormatted');
 
       // List to track which analytics failed to load
       List<String> failedAnalytics = [];
-      
+
       // Define a helper function to load analytics with proper error handling
-      Future<void> loadAnalytic(String name, Future<dynamic> Function() loader) async {
+      Future<void> loadAnalytic(String name,
+          Future<dynamic> Function() loader) async {
         try {
           await loader();
           print('Successfully loaded $name for date range');
@@ -256,36 +267,46 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
           failedAnalytics.add(name);
         }
       }
-      
+
       try {
         // Notify the analytics provider about the date range change
         _analyticsProvider.setDateRange(newRange.start, newRange.end);
-        
+
         // Load only the active analytics with the new date range
         List<Future<void>> activeAnalytics = [
-          loadAnalytic('Group Demographics', () => _analyticsProvider.fetchGroupDemographics(widget.groupId)),
-          loadAnalytic('Group Attendance Stats', () => _analyticsProvider.fetchGroupAttendanceStats(widget.groupId)),
-          loadAnalytic('Member Participation Stats', () => _analyticsProvider.fetchMemberParticipationStats()),
-          loadAnalytic('Event Participation Stats', () => _analyticsProvider.fetchEventParticipationStats(widget.groupId)),
+          loadAnalytic('Group Demographics', () =>
+              _analyticsProvider.fetchGroupDemographics(widget.groupId)),
+          loadAnalytic('Group Attendance Stats', () =>
+              _analyticsProvider.fetchGroupAttendanceStats(widget.groupId)),
+          loadAnalytic('Member Participation Stats', () =>
+              _analyticsProvider.fetchMemberParticipationStats()),
+          loadAnalytic('Event Participation Stats', () =>
+              _analyticsProvider.fetchEventParticipationStats(widget.groupId)),
         ];
-        
+
         // Wait for all active analytics to complete
         await Future.wait(activeAnalytics);
-        
+
         // Set error message if any analytics failed to load
         if (failedAnalytics.isNotEmpty) {
-          _showInfo('Some analytics data could not be loaded for the selected date range. The dashboard may show incomplete information.');
-          
+          _showInfo(
+              'Some analytics data could not be loaded for the selected date range. The dashboard may show incomplete information.');
+
           setState(() {
-            _errorMessage = 'Some analytics data could not be loaded for the selected date range: ${failedAnalytics.join(', ')}';
+            _errorMessage =
+            'Some analytics data could not be loaded for the selected date range: ${failedAnalytics
+                .join(', ')}';
           });
         } else {
-          _showSuccess('Dashboard updated for date range: $startFormatted to $endFormatted');
+          _showSuccess(
+              'Dashboard updated for date range: $startFormatted to $endFormatted');
         }
       } catch (e) {
         print('Error in _updateDateRange: $e');
-        setState(() => _errorMessage = 'Error updating analytics for date range: ${e.toString()}');
-        _showError('Failed to update dashboard for selected date range: ${e.toString()}');
+        setState(() => _errorMessage =
+        'Error updating analytics for date range: ${e.toString()}');
+        _showError('Failed to update dashboard for selected date range: ${e
+            .toString()}');
       } finally {
         setState(() => _isLoading = false);
       }
@@ -306,7 +327,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
     try {
       final groupProvider = Provider.of<GroupProvider>(context, listen: false);
       final userProvider = Provider.of<UserProvider>(context, listen: false);
-      
+
       // Get members data
       dynamic membersData;
       try {
@@ -315,24 +336,29 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         print('Error in getGroupMembers: $e');
         throw e;
       }
-      
+
       // Handle different response formats
       List<dynamic> members = [];
-      
+
       if (membersData is List) {
         // If it's already a list, use it directly
         members = membersData;
       } else if (membersData is Map<String, dynamic>) {
         // Check for common response structures
-        if (membersData.containsKey('members') && membersData['members'] is List) {
+        if (membersData.containsKey('members') &&
+            membersData['members'] is List) {
           members = membersData['members'];
-        } else if (membersData.containsKey('data') && membersData['data'] is List) {
+        } else
+        if (membersData.containsKey('data') && membersData['data'] is List) {
           members = membersData['data'];
-        } else if (membersData.containsKey('users') && membersData['users'] is List) {
+        } else
+        if (membersData.containsKey('users') && membersData['users'] is List) {
           members = membersData['users'];
-        } else if (membersData.containsKey('items') && membersData['items'] is List) {
+        } else
+        if (membersData.containsKey('items') && membersData['items'] is List) {
           members = membersData['items'];
-        } else if (membersData.containsKey('results') && membersData['results'] is List) {
+        } else if (membersData.containsKey('results') &&
+            membersData['results'] is List) {
           members = membersData['results'];
         } else {
           // Try to find any list in the map
@@ -344,20 +370,20 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
           }
         }
       }
-      
+
       print('Processing ${members.length} group members');
 
       // Convert the dynamic list to UserModel list
       final List<UserModel> userMembers = [];
-      
+
       for (var member in members) {
         try {
           // Check if the member is already a UserModel
           if (member is UserModel) {
             userMembers.add(member);
             continue;
-          } 
-          
+          }
+
           // Check if it's a map with user data
           if (member is Map) {
             // Convert to Map<String, dynamic> if needed
@@ -370,16 +396,23 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                 memberMap[key.toString()] = value;
               });
             }
-            
+
             // Check if it has a user_id or uid field
             String? userId;
-            for (var idField in ['user_id', 'uid', 'id', '_id', 'userId', 'member_id']) {
+            for (var idField in [
+              'user_id',
+              'uid',
+              'id',
+              '_id',
+              'userId',
+              'member_id'
+            ]) {
               if (memberMap.containsKey(idField)) {
                 userId = memberMap[idField].toString();
                 break;
               }
             }
-            
+
             if (userId != null && userId.isNotEmpty) {
               // Try to fetch the complete user data
               try {
@@ -393,38 +426,42 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                 // Continue to create from map
               }
             }
-            
+
             // If we couldn't get the user by ID, try to create from the map
             try {
               userMembers.add(UserModel.fromJson(memberMap));
             } catch (e) {
               print('Error creating UserModel from map: $e');
               // Try to create a minimal user model with available data
-              String name = memberMap['full_name'] ?? 
-                           memberMap['fullName'] ?? 
-                           memberMap['name'] ?? 
-                           memberMap['username'] ?? 
-                           'Unknown User';
-                           
-              String email = memberMap['email'] ?? 
-                            memberMap['mail'] ?? 
-                            'unknown@example.com';
-                            
-              String role = memberMap['role'] ?? 
-                           memberMap['user_role'] ?? 
-                           'Member';
-                           
-              String gender = memberMap['gender'] ?? 
-                             memberMap['sex'] ?? 
-                             'Unknown';
-              
+              String name = memberMap['full_name'] ??
+                  memberMap['fullName'] ??
+                  memberMap['name'] ??
+                  memberMap['username'] ??
+                  'Unknown User';
+
+              String email = memberMap['email'] ??
+                  memberMap['mail'] ??
+                  'unknown@example.com';
+
+              String role = memberMap['role'] ??
+                  memberMap['user_role'] ??
+                  'Member';
+
+              String gender = memberMap['gender'] ??
+                  memberMap['sex'] ??
+                  'Unknown';
+
               userMembers.add(UserModel(
                 id: userId ?? 'unknown_${userMembers.length}',
                 fullName: name,
                 email: email,
-                contact: memberMap['contact'] ?? memberMap['phone'] ?? memberMap['phone_number'] ?? '',
-                nextOfKin: memberMap['next_of_kin'] ?? memberMap['nextOfKin'] ?? memberMap['emergency_contact_name'] ?? '',
-                nextOfKinContact: memberMap['next_of_kin_contact'] ?? memberMap['nextOfKinContact'] ?? memberMap['emergency_contact_number'] ?? '',
+                contact: memberMap['contact'] ?? memberMap['phone'] ??
+                    memberMap['phone_number'] ?? '',
+                nextOfKin: memberMap['next_of_kin'] ?? memberMap['nextOfKin'] ??
+                    memberMap['emergency_contact_name'] ?? '',
+                nextOfKinContact: memberMap['next_of_kin_contact'] ??
+                    memberMap['nextOfKinContact'] ??
+                    memberMap['emergency_contact_number'] ?? '',
                 role: role,
                 gender: gender,
               ));
@@ -447,7 +484,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       }
 
       print('Successfully processed ${userMembers.length} members');
-      
+
       setState(() {
         _cachedGroupMembers = userMembers;
         _isLoadingMembers = false;
@@ -472,27 +509,27 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
 
     try {
       final eventProvider = Provider.of<EventProvider>(context, listen: false);
-      
+
       // Set current group ID in the provider
       eventProvider.setCurrentGroup(widget.groupId);
-      
+
       // Load both upcoming and past events with error handling for each
       List<String> errors = [];
-      
+
       try {
         await eventProvider.fetchUpcomingEvents(widget.groupId);
       } catch (e) {
         print('Error fetching upcoming events: $e');
         errors.add('Upcoming events: $e');
       }
-      
+
       try {
         await eventProvider.fetchPastEvents(widget.groupId);
       } catch (e) {
         print('Error fetching past events: $e');
         errors.add('Past events: $e');
       }
-      
+
       // If both failed, show an error
       if (errors.length == 2) {
         _showError('Failed to load events: ${errors.join(', ')}');
@@ -568,23 +605,24 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
     try {
       final groupProvider = Provider.of<GroupProvider>(context, listen: false);
       final eventProvider = Provider.of<EventProvider>(context, listen: false);
-      final attendanceProvider = Provider.of<AttendanceProvider>(context, listen: false);
-      final analyticsProvider = Provider.of<AnalyticsProvider>(context, listen: false);
+      final attendanceProvider = Provider.of<AttendanceProvider>(
+          context, listen: false);
+      final analyticsProvider = Provider.of<AnalyticsProvider>(
+          context, listen: false);
 
       // Initialize with default values
       double totalMembers = 0.0;
       double activeMembers = 0.0;
       double averageAttendance = 0.0;
       double eventsThisMonth = 0.0;
-      
+
       // Try to get data from analytics provider first (more efficient)
       try {
         // Check if we have dashboard data from the analytics provider
-        if (analyticsProvider.dashboardTrends != null && 
+        if (analyticsProvider.dashboardTrends != null &&
             analyticsProvider.dashboardTrends!.isNotEmpty) {
-          
           final trends = analyticsProvider.dashboardTrends!;
-          
+
           // Extract values with fallbacks
           if (trends.containsKey('totalMembers')) {
             totalMembers = _parseDouble(trends['totalMembers']);
@@ -593,13 +631,13 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
           } else if (trends.containsKey('members')) {
             totalMembers = _parseDouble(trends['members']);
           }
-          
+
           if (trends.containsKey('activeMembers')) {
             activeMembers = _parseDouble(trends['activeMembers']);
           } else if (trends.containsKey('active_members')) {
             activeMembers = _parseDouble(trends['active_members']);
           }
-          
+
           if (trends.containsKey('averageAttendance')) {
             averageAttendance = _parseDouble(trends['averageAttendance']);
           } else if (trends.containsKey('average_attendance')) {
@@ -607,7 +645,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
           } else if (trends.containsKey('attendance_rate')) {
             averageAttendance = _parseDouble(trends['attendance_rate']);
           }
-          
+
           if (trends.containsKey('eventsThisMonth')) {
             eventsThisMonth = _parseDouble(trends['eventsThisMonth']);
           } else if (trends.containsKey('events_this_month')) {
@@ -615,9 +653,10 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
           } else if (trends.containsKey('monthly_events')) {
             eventsThisMonth = _parseDouble(trends['monthly_events']);
           }
-          
+
           // If we got all the data we need, return it
-          if (totalMembers > 0 && averageAttendance > 0 && eventsThisMonth > 0) {
+          if (totalMembers > 0 && averageAttendance > 0 &&
+              eventsThisMonth > 0) {
             return {
               'totalMembers': totalMembers,
               'activeMembers': activeMembers,
@@ -630,9 +669,9 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         print('Error getting analytics data from provider: $analyticsError');
         // Continue with manual calculation
       }
-      
+
       // If analytics provider didn't have the data, calculate it manually
-      
+
       // Get total members
       try {
         final members = await groupProvider.getGroupMembers(widget.groupId);
@@ -641,22 +680,22 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         print('Error getting group members: $e');
         totalMembers = 0.0;
       }
-      
+
       // Calculate active members (members who attended at least one event in the last 30 days)
       try {
         // Fetch past events
         final pastEvents = await eventProvider.fetchPastEvents(widget.groupId);
-        
+
         // Get events in the last 30 days
         final now = DateTime.now();
         final thirtyDaysAgo = now.subtract(const Duration(days: 30));
-        final recentEvents = pastEvents.where((event) => 
-          event.dateTime.isAfter(thirtyDaysAgo) && event.dateTime.isBefore(now)
+        final recentEvents = pastEvents.where((event) =>
+        event.dateTime.isAfter(thirtyDaysAgo) && event.dateTime.isBefore(now)
         ).toList();
-        
+
         // Track unique active members
         Set<String> activeUserIds = {};
-        
+
         // Calculate average attendance
         if (pastEvents.isNotEmpty) {
           double totalAttendanceRate = 0.0;
@@ -664,13 +703,17 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
 
           for (var event in pastEvents) {
             try {
-              final attendanceList = await attendanceProvider.fetchEventAttendance(event.id);
+              final attendanceList = await attendanceProvider
+                  .fetchEventAttendance(event.id);
               if (attendanceList.isNotEmpty) {
-                final presentCount = attendanceList.where((a) => a.isPresent).length;
-                final attendanceRate = (presentCount / attendanceList.length) * 100;
+                final presentCount = attendanceList
+                    .where((a) => a.isPresent)
+                    .length;
+                final attendanceRate = (presentCount / attendanceList.length) *
+                    100;
                 totalAttendanceRate += attendanceRate;
                 eventsWithAttendance++;
-                
+
                 // Add active users from recent events
                 if (recentEvents.any((e) => e.id == event.id)) {
                   for (var attendance in attendanceList) {
@@ -689,7 +732,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
           if (eventsWithAttendance > 0) {
             averageAttendance = totalAttendanceRate / eventsWithAttendance;
           }
-          
+
           // Set active members count
           activeMembers = activeUserIds.length.toDouble();
         }
@@ -708,10 +751,12 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         final pastEvents = await eventProvider.fetchPastEvents(widget.groupId);
         final upcomingEvents = eventProvider.upcomingEvents;
         final allEvents = [...pastEvents, ...upcomingEvents];
-        
+
         eventsThisMonth = allEvents.where((event) {
-          return event.dateTime.isAfter(firstDayOfMonth.subtract(const Duration(days: 1))) &&
-                 event.dateTime.isBefore(lastDayOfMonth.add(const Duration(days: 1)));
+          return event.dateTime.isAfter(
+              firstDayOfMonth.subtract(const Duration(days: 1))) &&
+              event.dateTime.isBefore(
+                  lastDayOfMonth.add(const Duration(days: 1)));
         }).length.toDouble();
       } catch (e) {
         print('Error calculating events this month: $e');
@@ -734,7 +779,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       };
     }
   }
-  
+
   // Helper method to parse various types to double
   double _parseDouble(dynamic value) {
     if (value == null) return 0.0;
@@ -811,75 +856,183 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
 
     showDialog(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(
-            'Add New Member',
-            style: TextStyles.heading2,
-          ),
-          content: Container(
-            width: double.maxFinite,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Search for members to add to your group',
-                  style: TextStyles.bodyText,
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: searchController,
-                        decoration: InputDecoration(
-                          hintText: 'Search by name or email',
-                          prefixIcon: const Icon(Icons.search),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+      builder: (dialogContext) =>
+          StatefulBuilder(
+            builder: (context, setDialogState) =>
+                AlertDialog(
+                  title: Text(
+                    'Add New Member',
+                    style: TextStyles.heading2,
+                  ),
+                  content: Container(
+                    width: double.maxFinite,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Search for members to add to your group',
+                          style: TextStyles.bodyText,
                         ),
-                        onChanged: (value) {
-                          // Clear selection when search query changes
-                          setDialogState(() {
-                            selectedUser = null;
-                          });
-                        },
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: searchController,
+                                decoration: InputDecoration(
+                                  hintText: 'Search by name or email',
+                                  prefixIcon: const Icon(Icons.search),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                onChanged: (value) {
+                                  // Clear selection when search query changes
+                                  setDialogState(() {
+                                    selectedUser = null;
+                                  });
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton(
+                              onPressed: () async {
+                                if (searchController.text.isEmpty) return;
+
+                                setDialogState(() {
+                                  isSearching = true;
+                                });
+
+                                try {
+                                  final userProvider = Provider.of<
+                                      UserProvider>(context, listen: false);
+                                  final results = await userProvider
+                                      .searchUsers(searchController.text);
+
+                                  setDialogState(() {
+                                    searchResults = results;
+                                    isSearching = false;
+                                  });
+                                } catch (e) {
+                                  print('Error searching users: $e');
+                                  setDialogState(() {
+                                    isSearching = false;
+                                  });
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primaryColor,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: Text(
+                                'Search',
+                                style: TextStyles.bodyText.copyWith(
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        if (isSearching)
+                          const Center(child: CircularProgressIndicator())
+                        else
+                          if (searchResults.isNotEmpty)
+                            Flexible(
+                              child: Container(
+                                constraints: BoxConstraints(maxHeight: 300),
+                                child: ListView.builder(
+                                  shrinkWrap: true,
+                                  itemCount: searchResults.length,
+                                  itemBuilder: (context, index) {
+                                    final user = searchResults[index];
+                                    final isSelected = selectedUser?.id ==
+                                        user.id;
+
+                                    return ListTile(
+                                      title: Text(user.fullName),
+                                      subtitle: Text(user.email),
+                                      selected: isSelected,
+                                      tileColor: isSelected ? AppColors
+                                          .primaryColor.withOpacity(0.1) : null,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        side: isSelected
+                                            ? BorderSide(
+                                            color: AppColors.primaryColor,
+                                            width: 1)
+                                            : BorderSide.none,
+                                      ),
+                                      onTap: () {
+                                        setDialogState(() {
+                                          selectedUser = user;
+                                        });
+                                      },
+                                    );
+                                  },
+                                ),
+                              ),
+                            )
+                          else
+                            if (searchController.text.isNotEmpty)
+                              Center(
+                                child: Text(
+                                  'No users found matching "${searchController
+                                      .text}"',
+                                  style: TextStyles.bodyText,
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                      ],
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                        searchController.dispose();
+                        Navigator.pop(context);
+                      },
+                      child: Text(
+                        'Cancel',
+                        style: TextStyles.bodyText.copyWith(
+                          color: AppColors.textColor,
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 8),
                     ElevatedButton(
-                      onPressed: () async {
-                        if (searchController.text.isEmpty) return;
-                        
-                        setDialogState(() {
-                          isSearching = true;
+                      onPressed: selectedUser == null ? null : () {
+                        final groupProvider = Provider.of<GroupProvider>(
+                            context, listen: false);
+
+                        groupProvider.addMemberToGroup(
+                            widget.groupId, selectedUser!.id).then((success) {
+                          if (success) {
+                            _showSuccess('${selectedUser!
+                                .fullName} added to group successfully');
+                            // Refresh the members list
+                            _loadGroupMembers();
+                          } else {
+                            _showError('Failed to add ${selectedUser!
+                                .fullName} to group');
+                          }
                         });
-                        
-                        try {
-                          final userProvider = Provider.of<UserProvider>(context, listen: false);
-                          final results = await userProvider.searchUsers(searchController.text);
-                          
-                          setDialogState(() {
-                            searchResults = results;
-                            isSearching = false;
-                          });
-                        } catch (e) {
-                          print('Error searching users: $e');
-                          setDialogState(() {
-                            isSearching = false;
-                          });
-                        }
+
+                        searchController.dispose();
+                        Navigator.pop(context);
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primaryColor,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
+                        disabledBackgroundColor: AppColors.primaryColor
+                            .withOpacity(0.5),
                       ),
                       child: Text(
-                        'Search',
+                        'Add',
                         style: TextStyles.bodyText.copyWith(
                           color: Colors.white,
                         ),
@@ -887,99 +1040,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                if (isSearching)
-                  const Center(child: CircularProgressIndicator())
-                else if (searchResults.isNotEmpty)
-                  Flexible(
-                    child: Container(
-                      constraints: BoxConstraints(maxHeight: 300),
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: searchResults.length,
-                        itemBuilder: (context, index) {
-                          final user = searchResults[index];
-                          final isSelected = selectedUser?.id == user.id;
-                          
-                          return ListTile(
-                            title: Text(user.fullName),
-                            subtitle: Text(user.email),
-                            selected: isSelected,
-                            tileColor: isSelected ? AppColors.primaryColor.withOpacity(0.1) : null,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              side: isSelected 
-                                ? BorderSide(color: AppColors.primaryColor, width: 1)
-                                : BorderSide.none,
-                            ),
-                            onTap: () {
-                              setDialogState(() {
-                                selectedUser = user;
-                              });
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                  )
-                else if (searchController.text.isNotEmpty)
-                  Center(
-                    child: Text(
-                      'No users found matching "${searchController.text}"',
-                      style: TextStyles.bodyText,
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-              ],
-            ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                searchController.dispose();
-                Navigator.pop(context);
-              },
-              child: Text(
-                'Cancel',
-                style: TextStyles.bodyText.copyWith(
-                  color: AppColors.textColor,
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: selectedUser == null ? null : () {
-                final groupProvider = Provider.of<GroupProvider>(context, listen: false);
-                
-                groupProvider.addMemberToGroup(widget.groupId, selectedUser!.id).then((success) {
-                  if (success) {
-                    _showSuccess('${selectedUser!.fullName} added to group successfully');
-                    // Refresh the members list
-                    _loadGroupMembers();
-                  } else {
-                    _showError('Failed to add ${selectedUser!.fullName} to group');
-                  }
-                });
-                
-                searchController.dispose();
-                Navigator.pop(context);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                disabledBackgroundColor: AppColors.primaryColor.withOpacity(0.5),
-              ),
-              child: Text(
-                'Add',
-                style: TextStyles.bodyText.copyWith(
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -988,420 +1049,446 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
     final TextEditingController titleController = TextEditingController();
     final TextEditingController descriptionController = TextEditingController();
     final TextEditingController locationController = TextEditingController();
-    
+
     // Use local copies of date and time
     DateTime selectedDate = _selectedDate;
     TimeOfDay selectedTime = _selectedTime;
 
     showDialog(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(
-            'Create New Event',
-            style: TextStyles.heading2,
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: titleController,
-                  decoration: InputDecoration(
-                    labelText: 'Event Title',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+      builder: (dialogContext) =>
+          StatefulBuilder(
+            builder: (context, setDialogState) =>
+                AlertDialog(
+                  title: Text(
+                    'Create New Event',
+                    style: TextStyles.heading2,
                   ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: descriptionController,
-                  maxLines: 3,
-                  decoration: InputDecoration(
-                    labelText: 'Description',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: locationController,
-                  decoration: InputDecoration(
-                    labelText: 'Location',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Date & Time',
-                  style: TextStyles.bodyText.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          final date = await showDatePicker(
-                            context: context,
-                            initialDate: selectedDate,
-                            firstDate: DateTime.now(),
-                            lastDate: DateTime.now().add(const Duration(days: 365)),
-                          );
-                          if (date != null) {
-                            setDialogState(() {
-                              selectedDate = date;
-                            });
-                            // Also update the parent state
-                            setState(() {
-                              _selectedDate = date;
-                            });
-                          }
-                        },
-                        icon: const Icon(Icons.calendar_today),
-                        label: Text(
-                          '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                  content: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        TextField(
+                          controller: titleController,
+                          decoration: InputDecoration(
+                            labelText: 'Event Title',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
                         ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.primaryColor,
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: descriptionController,
+                          maxLines: 3,
+                          decoration: InputDecoration(
+                            labelText: 'Description',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: locationController,
+                          decoration: InputDecoration(
+                            labelText: 'Location',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Date & Time',
+                          style: TextStyles.bodyText.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () async {
+                                  final date = await showDatePicker(
+                                    context: context,
+                                    initialDate: selectedDate,
+                                    firstDate: DateTime.now(),
+                                    lastDate: DateTime.now().add(
+                                        const Duration(days: 365)),
+                                  );
+                                  if (date != null) {
+                                    setDialogState(() {
+                                      selectedDate = date;
+                                    });
+                                    // Also update the parent state
+                                    setState(() {
+                                      _selectedDate = date;
+                                    });
+                                  }
+                                },
+                                icon: const Icon(Icons.calendar_today),
+                                label: Text(
+                                  '${selectedDate.day}/${selectedDate
+                                      .month}/${selectedDate.year}',
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.primaryColor,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () async {
+                                  final time = await showTimePicker(
+                                    context: context,
+                                    initialTime: selectedTime,
+                                  );
+                                  if (time != null) {
+                                    setDialogState(() {
+                                      selectedTime = time;
+                                    });
+                                    // Also update the parent state
+                                    setState(() {
+                                      _selectedTime = time;
+                                    });
+                                  }
+                                },
+                                icon: const Icon(Icons.access_time),
+                                label: Text(
+                                  '${selectedTime.hour}:${selectedTime.minute
+                                      .toString().padLeft(2, '0')}',
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.primaryColor,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                        // Just close the dialog, no need to clear controllers
+                        Navigator.pop(context);
+
+                        // Dispose controllers to prevent memory leaks
+                        titleController.dispose();
+                        descriptionController.dispose();
+                        locationController.dispose();
+                      },
+                      child: Text(
+                        'Cancel',
+                        style: TextStyles.bodyText.copyWith(
+                          color: AppColors.textColor,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          final time = await showTimePicker(
-                            context: context,
-                            initialTime: selectedTime,
-                          );
-                          if (time != null) {
-                            setDialogState(() {
-                              selectedTime = time;
-                            });
-                            // Also update the parent state
-                            setState(() {
-                              _selectedTime = time;
-                            });
-                          }
-                        },
-                        icon: const Icon(Icons.access_time),
-                        label: Text(
-                          '${selectedTime.hour}:${selectedTime.minute.toString().padLeft(2, '0')}',
+                    ElevatedButton(
+                      onPressed: () {
+                        // Create event using provider
+                        if (titleController.text.isEmpty ||
+                            descriptionController.text.isEmpty ||
+                            locationController.text.isEmpty) {
+                          _showError('Please fill all fields');
+                          return;
+                        }
+
+                        // Combine date and time
+                        final DateTime eventDateTime = DateTime(
+                          selectedDate.year,
+                          selectedDate.month,
+                          selectedDate.day,
+                          selectedTime.hour,
+                          selectedTime.minute,
+                        );
+
+                        // Create new event
+                        final eventProvider = Provider.of<EventProvider>(
+                            context, listen: false);
+                        eventProvider.createEvent(
+                          groupId: widget.groupId,
+                          title: titleController.text,
+                          description: descriptionController.text,
+                          dateTime: eventDateTime,
+                          location: locationController.text,
+                        );
+
+                        // Close the dialog
+                        Navigator.pop(context);
+
+                        // Show success message
+                        _showSuccess('Event created successfully');
+
+                        // Refresh UI in the parent widget
+                        setState(() {});
+
+                        // Dispose controllers to prevent memory leaks
+                        titleController.dispose();
+                        descriptionController.dispose();
+                        locationController.dispose();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryColor,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.primaryColor,
+                      ),
+                      child: Text(
+                        'Create',
+                        style: TextStyles.bodyText.copyWith(
+                          color: Colors.white,
                         ),
                       ),
                     ),
                   ],
                 ),
-              ],
-            ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                // Just close the dialog, no need to clear controllers
-                Navigator.pop(context);
-                
-                // Dispose controllers to prevent memory leaks
-                titleController.dispose();
-                descriptionController.dispose();
-                locationController.dispose();
-              },
-              child: Text(
-                'Cancel',
-                style: TextStyles.bodyText.copyWith(
-                  color: AppColors.textColor,
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                // Create event using provider
-                if (titleController.text.isEmpty ||
-                    descriptionController.text.isEmpty ||
-                    locationController.text.isEmpty) {
-                  _showError('Please fill all fields');
-                  return;
-                }
-
-                // Combine date and time
-                final DateTime eventDateTime = DateTime(
-                  selectedDate.year,
-                  selectedDate.month,
-                  selectedDate.day,
-                  selectedTime.hour,
-                  selectedTime.minute,
-                );
-
-                // Create new event
-                final eventProvider = Provider.of<EventProvider>(context, listen: false);
-                eventProvider.createEvent(
-                  groupId: widget.groupId,
-                  title: titleController.text,
-                  description: descriptionController.text,
-                  dateTime: eventDateTime,
-                  location: locationController.text,
-                );
-
-                // Close the dialog
-                Navigator.pop(context);
-                
-                // Show success message
-                _showSuccess('Event created successfully');
-
-                // Refresh UI in the parent widget
-                setState(() {});
-                
-                // Dispose controllers to prevent memory leaks
-                titleController.dispose();
-                descriptionController.dispose();
-                locationController.dispose();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: Text(
-                'Create',
-                style: TextStyles.bodyText.copyWith(
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
   void _showMemberOptionsDialog(UserModel member) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          member.fullName,
-          style: TextStyles.heading2,
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.visibility),
-              title: const Text('View Profile'),
-              onTap: () {
-                Navigator.pop(context);
-                // Navigate to member profile
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => MemberProfileScreen(
-                      userId: member.id,
-                      groupId: widget.groupId,
-                    ),
+      builder: (context) =>
+          AlertDialog(
+            title: Text(
+              member.fullName,
+              style: TextStyles.heading2,
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.visibility),
+                  title: const Text('View Profile'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    // Navigate to member profile
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            MemberProfileScreen(
+                              userId: member.id,
+                              groupId: widget.groupId,
+                            ),
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.bar_chart),
+                  title: const Text('View Attendance'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    // Navigate to member attendance screen
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            MemberAttendanceScreen(
+                              userId: member.id,
+                              groupId: widget.groupId,
+                            ),
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.person_remove, color: Colors.red),
+                  title: const Text('Remove from Group'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showRemoveMemberConfirmation(member);
+                  },
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  'Close',
+                  style: TextStyles.bodyText.copyWith(
+                    color: AppColors.primaryColor,
                   ),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.bar_chart),
-              title: const Text('View Attendance'),
-              onTap: () {
-                Navigator.pop(context);
-                // Navigate to member attendance screen
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => MemberAttendanceScreen(
-                      userId: member.id,
-                      groupId: widget.groupId,
-                    ),
-                  ),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.person_remove, color: Colors.red),
-              title: const Text('Remove from Group'),
-              onTap: () {
-                Navigator.pop(context);
-                _showRemoveMemberConfirmation(member);
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Close',
-              style: TextStyles.bodyText.copyWith(
-                color: AppColors.primaryColor,
+                ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
     );
   }
 
   void _showRemoveMemberConfirmation(UserModel member) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Remove Member'),
-        content: Text('Are you sure you want to remove ${member.fullName} from this group?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              // Remove member using provider
-              final groupProvider = Provider.of<GroupProvider>(context, listen: false);
-              groupProvider.removeMemberFromGroup(widget.groupId, member.id).then((success) {
-                if (success) {
-                  _showSuccess('${member.fullName} has been removed from the group');
-                  // Refresh UI
-                  setState(() {});
-                } else {
-                  _showError('Failed to remove ${member.fullName} from the group');
-                }
-              });
+      builder: (context) =>
+          AlertDialog(
+            title: const Text('Remove Member'),
+            content: Text('Are you sure you want to remove ${member
+                .fullName} from this group?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () {
+                  // Remove member using provider
+                  final groupProvider = Provider.of<GroupProvider>(
+                      context, listen: false);
+                  groupProvider.removeMemberFromGroup(widget.groupId, member.id)
+                      .then((success) {
+                    if (success) {
+                      _showSuccess(
+                          '${member.fullName} has been removed from the group');
+                      // Refresh UI
+                      setState(() {});
+                    } else {
+                      _showError(
+                          'Failed to remove ${member.fullName} from the group');
+                    }
+                  });
 
-              Navigator.pop(context);
-            },
-            child: const Text('Remove', style: TextStyle(color: Colors.red)),
+                  Navigator.pop(context);
+                },
+                child: const Text(
+                    'Remove', style: TextStyle(color: Colors.red)),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 
   void _showEventOptionsDialog(EventModel event) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          event.title,
-          style: TextStyles.heading2,
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-          ListTile(
-            leading: const Icon(
-              Icons.visibility,
-              color: AppColors.primaryColor, // App theme color
-            ),
+      builder: (context) =>
+          AlertDialog(
             title: Text(
-              'View Details',
-              style: TextStyles.bodyText.copyWith(
-                fontWeight: FontWeight.w600,
-                color: AppColors.textColor,
-              ),
+              event.title,
+              style: TextStyles.heading2,
             ),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => OverallEventDetailsScreen(
-                    eventId: event.id,
-                    eventTitle: event.title,
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(
+                    Icons.visibility,
+                    color: AppColors.primaryColor, // App theme color
+                  ),
+                  title: Text(
+                    'View Details',
+                    style: TextStyles.bodyText.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textColor,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            OverallEventDetailsScreen(
+                              eventId: event.id,
+                              eventTitle: event.title,
+                            ),
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.edit),
+                  title: const Text('Edit Event'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showEditEventDialog(event);
+                  },
+                ),
+
+                ListTile(
+                  leading: const Icon(Icons.delete, color: Colors.red),
+                  title: const Text('Delete Event'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showDeleteEventConfirmation(event);
+                  },
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  'Close',
+                  style: TextStyles.bodyText.copyWith(
+                    color: AppColors.primaryColor,
                   ),
                 ),
-              );
-            },
-          ),
-            ListTile(
-              leading: const Icon(Icons.edit),
-              title: const Text('Edit Event'),
-              onTap: () {
-                Navigator.pop(context);
-                _showEditEventDialog(event);
-              },
-            ),
-           
-            ListTile(
-              leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text('Delete Event'),
-              onTap: () {
-                Navigator.pop(context);
-                _showDeleteEventConfirmation(event);
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Close',
-              style: TextStyles.bodyText.copyWith(
-                color: AppColors.primaryColor,
               ),
-            ),
+            ],
           ),
-        ],
-      ),
     );
   }
 
   void _showDeleteEventConfirmation(EventModel event) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Event'),
-        content: Text('Are you sure you want to delete "${event.title}"? This action cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final eventProvider = Provider.of<EventProvider>(context, listen: false);
-              eventProvider.deleteEvent(event.id, widget.groupId).then((success) {
-                if (success) {
-                  _showSuccess('Event deleted successfully');
-                } else {
-                  _showError('Failed to delete event');
-                }
-              });
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryColor,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+      builder: (context) =>
+          AlertDialog(
+            title: const Text('Delete Event'),
+            content: Text('Are you sure you want to delete "${event
+                .title}"? This action cannot be undone.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
               ),
-            ),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+              ElevatedButton(
+                onPressed: () {
+                  final eventProvider = Provider.of<EventProvider>(
+                      context, listen: false);
+                  eventProvider.deleteEvent(event.id, widget.groupId).then((
+                      success) {
+                    if (success) {
+                      _showSuccess('Event deleted successfully');
+                    } else {
+                      _showError('Failed to delete event');
+                    }
+                  });
+                  Navigator.pop(context);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                    'Delete', style: TextStyle(color: Colors.red)),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 
   void _showEditEventDialog(EventModel event) {
     // Create controllers and initialize with existing event data
-    final TextEditingController titleController = TextEditingController(text: event.title);
-    final TextEditingController descriptionController = TextEditingController(text: event.description);
-    final TextEditingController locationController = TextEditingController(text: event.location);
-    
+    final TextEditingController titleController = TextEditingController(
+        text: event.title);
+    final TextEditingController descriptionController = TextEditingController(
+        text: event.description);
+    final TextEditingController locationController = TextEditingController(
+        text: event.location);
+
     // Use event's date and time
     DateTime selectedDate = event.dateTime;
     TimeOfDay selectedTime = TimeOfDay(
@@ -1411,198 +1498,226 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
 
     showDialog(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(
-            'Edit Event',
-            style: TextStyles.heading2,
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: titleController,
-                  decoration: InputDecoration(
-                    labelText: 'Event Title',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+      builder: (dialogContext) =>
+          StatefulBuilder(
+            builder: (context, setDialogState) =>
+                AlertDialog(
+                  title: Text(
+                    'Edit Event',
+                    style: TextStyles.heading2,
                   ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: descriptionController,
-                  maxLines: 3,
-                  decoration: InputDecoration(
-                    labelText: 'Description',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: locationController,
-                  decoration: InputDecoration(
-                    labelText: 'Location',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Date & Time',
-                  style: TextStyles.bodyText.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          final date = await showDatePicker(
-                            context: context,
-                            initialDate: selectedDate,
-                            firstDate: DateTime.now().subtract(const Duration(days: 365)),
-                            lastDate: DateTime.now().add(const Duration(days: 365)),
-                          );
-                          if (date != null) {
-                            setDialogState(() {
-                              selectedDate = date;
-                            });
-                          }
-                        },
-                        icon: const Icon(Icons.calendar_today),
-                        label: Text(
-                          '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                  content: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        TextField(
+                          controller: titleController,
+                          decoration: InputDecoration(
+                            labelText: 'Event Title',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
                         ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.primaryColor,
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: descriptionController,
+                          maxLines: 3,
+                          decoration: InputDecoration(
+                            labelText: 'Description',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: locationController,
+                          decoration: InputDecoration(
+                            labelText: 'Location',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Date & Time',
+                          style: TextStyles.bodyText.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () async {
+                                  final date = await showDatePicker(
+                                    context: context,
+                                    initialDate: selectedDate,
+                                    firstDate: DateTime.now().subtract(
+                                        const Duration(days: 365)),
+                                    lastDate: DateTime.now().add(
+                                        const Duration(days: 365)),
+                                  );
+                                  if (date != null) {
+                                    setDialogState(() {
+                                      selectedDate = date;
+                                    });
+                                  }
+                                },
+                                icon: const Icon(Icons.calendar_today),
+                                label: Text(
+                                  '${selectedDate.day}/${selectedDate
+                                      .month}/${selectedDate.year}',
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.primaryColor,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () async {
+                                  final time = await showTimePicker(
+                                    context: context,
+                                    initialTime: selectedTime,
+                                  );
+                                  if (time != null) {
+                                    setDialogState(() {
+                                      selectedTime = time;
+                                    });
+                                  }
+                                },
+                                icon: const Icon(Icons.access_time),
+                                label: Text(
+                                  '${selectedTime.hour}:${selectedTime.minute
+                                      .toString().padLeft(2, '0')}',
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.primaryColor,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                        // Just close the dialog
+                        Navigator.pop(context);
+
+                        // Dispose controllers to prevent memory leaks
+                        titleController.dispose();
+                        descriptionController.dispose();
+                        locationController.dispose();
+                      },
+                      child: Text(
+                        'Cancel',
+                        style: TextStyles.bodyText.copyWith(
+                          color: AppColors.textColor,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          final time = await showTimePicker(
-                            context: context,
-                            initialTime: selectedTime,
-                          );
-                          if (time != null) {
-                            setDialogState(() {
-                              selectedTime = time;
-                            });
+                    ElevatedButton(
+                      onPressed: () {
+                        // Update event using provider
+                        if (titleController.text.isEmpty ||
+                            descriptionController.text.isEmpty ||
+                            locationController.text.isEmpty) {
+                          _showError('Please fill all fields');
+                          return;
+                        }
+
+                        // Combine date and time
+                        final DateTime eventDateTime = DateTime(
+                          selectedDate.year,
+                          selectedDate.month,
+                          selectedDate.day,
+                          selectedTime.hour,
+                          selectedTime.minute,
+                        );
+
+                        // Update event
+                        final eventProvider = Provider.of<EventProvider>(
+                            context, listen: false);
+                        eventProvider.updateEvent(
+                          eventId: event.id,
+                          title: titleController.text,
+                          description: descriptionController.text,
+                          dateTime: eventDateTime,
+                          location: locationController.text,
+                          groupId: widget.groupId,
+                        ).then((updatedEvent) {
+                          if (updatedEvent != null) {
+                            // Close the dialog
+                            Navigator.pop(context);
+
+                            // Show success message
+                            _showSuccess('Event updated successfully');
+
+                            // Refresh UI in the parent widget
+                            setState(() {});
+                          } else {
+                            _showError('Failed to update event');
                           }
-                        },
-                        icon: const Icon(Icons.access_time),
-                        label: Text(
-                          '${selectedTime.hour}:${selectedTime.minute.toString().padLeft(2, '0')}',
+                        });
+
+                        // Dispose controllers to prevent memory leaks
+                        titleController.dispose();
+                        descriptionController.dispose();
+                        locationController.dispose();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryColor,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.primaryColor,
+                      ),
+                      child: Text(
+                        'Update',
+                        style: TextStyles.bodyText.copyWith(
+                          color: Colors.white,
                         ),
                       ),
                     ),
                   ],
                 ),
-              ],
-            ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                // Just close the dialog
-                Navigator.pop(context);
-                
-                // Dispose controllers to prevent memory leaks
-                titleController.dispose();
-                descriptionController.dispose();
-                locationController.dispose();
-              },
-              child: Text(
-                'Cancel',
-                style: TextStyles.bodyText.copyWith(
-                  color: AppColors.textColor,
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                // Update event using provider
-                if (titleController.text.isEmpty ||
-                    descriptionController.text.isEmpty ||
-                    locationController.text.isEmpty) {
-                  _showError('Please fill all fields');
-                  return;
-                }
-
-                // Combine date and time
-                final DateTime eventDateTime = DateTime(
-                  selectedDate.year,
-                  selectedDate.month,
-                  selectedDate.day,
-                  selectedTime.hour,
-                  selectedTime.minute,
-                );
-
-                // Update event
-                final eventProvider = Provider.of<EventProvider>(context, listen: false);
-                eventProvider.updateEvent(
-                  eventId: event.id,
-                  title: titleController.text,
-                  description: descriptionController.text,
-                  dateTime: eventDateTime,
-                  location: locationController.text,
-                  groupId: widget.groupId,
-                ).then((updatedEvent) {
-                  if (updatedEvent != null) {
-                    // Close the dialog
-                    Navigator.pop(context);
-                    
-                    // Show success message
-                    _showSuccess('Event updated successfully');
-
-                    // Refresh UI in the parent widget
-                    setState(() {});
-                  } else {
-                    _showError('Failed to update event');
-                  }
-                });
-                
-                // Dispose controllers to prevent memory leaks
-                titleController.dispose();
-                descriptionController.dispose();
-                locationController.dispose();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: Text(
-                'Update',
-                style: TextStyles.bodyText.copyWith(
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
   // Helper method to format date nicely
   String _formatEventDate(DateTime dateTime) {
-    final List<String> weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    final List<String> months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final List<String> weekdays = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday'
+    ];
+    final List<String> months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
 
     final String weekday = weekdays[dateTime.weekday - 1];
     final String month = months[dateTime.month - 1];
@@ -1756,7 +1871,8 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Manage your ${widget.groupName} group from this dashboard',
+                        'Manage your ${widget
+                            .groupName} group from this dashboard',
                         style: TextStyles.bodyText.copyWith(
                           color: Colors.white.withOpacity(0.9),
                         ),
@@ -1833,7 +1949,8 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
     );
   }
 
-  Widget _createQuickActionButton(String label, IconData icon, VoidCallback onTap) {
+  Widget _createQuickActionButton(String label, IconData icon,
+      VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -1885,10 +2002,18 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             children: [
-              _buildStatCard('Total Members', '${data['totalMembers']?.toInt()}', Icons.people, AppColors.primaryColor),
-              _buildStatCard('Active Members', '${data['activeMembers']?.toInt()}', Icons.person_outline, AppColors.secondaryColor),
-              _buildStatCard('Avg. Attendance', '${data['averageAttendance']?.toInt()}%', Icons.trending_up, AppColors.accentColor),
-              _buildStatCard('Events This Month', '${data['eventsThisMonth']?.toInt()}', Icons.event, AppColors.buttonColor),
+              _buildStatCard(
+                  'Total Members', '${data['totalMembers']?.toInt()}',
+                  Icons.people, AppColors.primaryColor),
+              _buildStatCard(
+                  'Active Members', '${data['activeMembers']?.toInt()}',
+                  Icons.person_outline, AppColors.secondaryColor),
+              _buildStatCard(
+                  'Avg. Attendance', '${data['averageAttendance']?.toInt()}%',
+                  Icons.trending_up, AppColors.accentColor),
+              _buildStatCard(
+                  'Events This Month', '${data['eventsThisMonth']?.toInt()}',
+                  Icons.event, AppColors.buttonColor),
             ],
           );
         }
@@ -1896,7 +2021,8 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+  Widget _buildStatCard(String title, String value, IconData icon,
+      Color color) {
     return Card(
       elevation: 3,
       shape: RoundedRectangleBorder(
@@ -1934,7 +2060,8 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
     );
   }
 
-  Widget _buildSectionHeader(String title, IconData icon, VoidCallback onSeeAll) {
+  Widget _buildSectionHeader(String title, IconData icon,
+      VoidCallback onSeeAll) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -2005,9 +2132,12 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                   DropdownButton<String>(
                     value: 'Last 6 Months',
                     items: const [
-                      DropdownMenuItem(value: 'Last 3 Months', child: Text('Last 3 Months')),
-                      DropdownMenuItem(value: 'Last 6 Months', child: Text('Last 6 Months')),
-                      DropdownMenuItem(value: 'Last Year', child: Text('Last Year')),
+                      DropdownMenuItem(
+                          value: 'Last 3 Months', child: Text('Last 3 Months')),
+                      DropdownMenuItem(
+                          value: 'Last 6 Months', child: Text('Last 6 Months')),
+                      DropdownMenuItem(
+                          value: 'Last Year', child: Text('Last Year')),
                     ],
                     onChanged: (value) {
                       // In a real app, this would update the chart data
@@ -2025,56 +2155,68 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
               Expanded(
                 child: Consumer<AnalyticsProvider>(
                   builder: (context, analyticsProvider, _) {
-                    final groupAttendanceTrends = analyticsProvider.groupAttendanceTrends;
-                    
+                    final groupAttendanceTrends = analyticsProvider
+                        .groupAttendanceTrends;
+
                     if (analyticsProvider.isLoading) {
                       return const Center(child: CircularProgressIndicator());
                     }
-                    
+
                     // Use real data if available, otherwise use sample data
                     List<BarChartGroupData> barGroups = [];
                     List<String> months = [];
-                    
+
                     if (groupAttendanceTrends != null) {
                       try {
                         // Try to extract attendance data
                         List<dynamic>? attendanceData;
-                        
-                        if (groupAttendanceTrends.containsKey('attendance') && groupAttendanceTrends['attendance'] is List) {
-                          attendanceData = groupAttendanceTrends['attendance'] as List;
-                        } else if (groupAttendanceTrends.containsKey('trends') && groupAttendanceTrends['trends'] is List) {
-                          attendanceData = groupAttendanceTrends['trends'] as List;
-                        } else if (groupAttendanceTrends.containsKey('monthly') && groupAttendanceTrends['monthly'] is List) {
-                          attendanceData = groupAttendanceTrends['monthly'] as List;
-                        } else if (groupAttendanceTrends.containsKey('data') && groupAttendanceTrends['data'] is List) {
-                          attendanceData = groupAttendanceTrends['data'] as List;
+
+                        if (groupAttendanceTrends.containsKey('attendance') &&
+                            groupAttendanceTrends['attendance'] is List) {
+                          attendanceData =
+                          groupAttendanceTrends['attendance'] as List;
+                        } else
+                        if (groupAttendanceTrends.containsKey('trends') &&
+                            groupAttendanceTrends['trends'] is List) {
+                          attendanceData =
+                          groupAttendanceTrends['trends'] as List;
+                        } else if (groupAttendanceTrends.containsKey(
+                            'monthly') &&
+                            groupAttendanceTrends['monthly'] is List) {
+                          attendanceData =
+                          groupAttendanceTrends['monthly'] as List;
+                        } else if (groupAttendanceTrends.containsKey('data') &&
+                            groupAttendanceTrends['data'] is List) {
+                          attendanceData =
+                          groupAttendanceTrends['data'] as List;
                         }
-                        
-                        if (attendanceData != null && attendanceData.isNotEmpty) {
+
+                        if (attendanceData != null &&
+                            attendanceData.isNotEmpty) {
                           // Process the data
                           for (int i = 0; i < attendanceData.length; i++) {
                             final item = attendanceData[i];
-                            
+
                             if (item is Map) {
                               // Extract month name
-                              String month = item['month'] ?? 
-                                           item['period'] ?? 
-                                           item['name'] ?? 
-                                           'Month ${i + 1}';
-                              
+                              String month = item['month'] ??
+                                  item['period'] ??
+                                  item['name'] ??
+                                  'Month ${i + 1}';
+
                               // Extract attendance rate
                               double rate = 0.0;
-                              final rateValue = item['rate'] ?? 
-                                              item['attendance'] ?? 
-                                              item['value'] ?? 
-                                              item['percentage'];
-                              
+                              final rateValue = item['rate'] ??
+                                  item['attendance'] ??
+                                  item['value'] ??
+                                  item['percentage'];
+
                               if (rateValue is num) {
                                 rate = rateValue.toDouble();
                               } else if (rateValue is String) {
                                 rate = double.tryParse(rateValue) ?? 0.0;
                               }
-                              
+
                               // Add to chart data
                               months.add(month);
                               barGroups.add(_buildBarGroup(i, rate));
@@ -2085,7 +2227,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                         print('Error processing attendance chart data: $e');
                       }
                     }
-                    
+
                     // If no data or error, use sample data
                     if (barGroups.isEmpty) {
                       months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
@@ -2098,7 +2240,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                         _buildBarGroup(5, 90),
                       ];
                     }
-                    
+
                     return BarChart(
                       BarChartData(
                         alignment: BarChartAlignment.spaceAround,
@@ -2127,7 +2269,8 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                                     months[index],
                                     style: TextStyles.bodyText.copyWith(
                                       fontSize: 12,
-                                      color: AppColors.textColor.withOpacity(0.7),
+                                      color: AppColors.textColor.withOpacity(
+                                          0.7),
                                     ),
                                   );
                                 }
@@ -2144,7 +2287,8 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                                     '${value.toInt()}%',
                                     style: TextStyles.bodyText.copyWith(
                                       fontSize: 12,
-                                      color: AppColors.textColor.withOpacity(0.7),
+                                      color: AppColors.textColor.withOpacity(
+                                          0.7),
                                     ),
                                   );
                                 }
@@ -2152,8 +2296,10 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                               },
                             ),
                           ),
-                          topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                          rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          topTitles: AxisTitles(
+                              sideTitles: SideTitles(showTitles: false)),
+                          rightTitles: AxisTitles(
+                              sideTitles: SideTitles(showTitles: false)),
                         ),
                         borderData: FlBorderData(show: false),
                         barGroups: barGroups,
@@ -2278,7 +2424,8 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
             borderRadius: BorderRadius.circular(12),
           ),
           child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16, vertical: 8),
             leading: CircleAvatar(
               backgroundColor: AppColors.primaryColor,
               child: Text(
@@ -2520,8 +2667,10 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                           onPressed: _updateDateRange,
                           icon: const Icon(Icons.calendar_today),
                           label: Text(
-                            '${DateFormat('MMM d, y').format(_selectedDateRange.start)} - '
-                            '${DateFormat('MMM d, y').format(_selectedDateRange.end)}',
+                            '${DateFormat('MMM d, y').format(
+                                _selectedDateRange.start)} - '
+                                '${DateFormat('MMM d, y').format(
+                                _selectedDateRange.end)}',
                           ),
                         ),
                       ],
@@ -2533,25 +2682,31 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
 
               // Group Demographics
               if (analyticsProvider.groupDemographics != null) ...[
-                _buildGroupDemographics(analyticsProvider.groupDemographics!),
+                _buildGroupDemographics(_convertGroupDemographicsToMap(
+                    analyticsProvider.groupDemographics!)),
                 const SizedBox(height: 16),
               ],
 
               // Group Attendance Stats
               if (analyticsProvider.groupAttendanceStats != null) ...[
-                _buildGroupAttendanceStats(_convertGroupAttendanceStatsToMap(analyticsProvider.groupAttendanceStats!)),
+                _buildGroupAttendanceStats(_convertGroupAttendanceStatsToMap(
+                    analyticsProvider.groupAttendanceStats!)),
                 const SizedBox(height: 16),
               ],
 
               // Member Participation Stats
               if (analyticsProvider.memberParticipationStats != null) ...[
-                _buildMemberParticipationStats(analyticsProvider.memberParticipationStats!),
+                _buildMemberParticipationStats(
+                    _convertMemberParticipationStatsToMap(
+                        analyticsProvider.memberParticipationStats!)),
                 const SizedBox(height: 16),
               ],
 
               // Event Participation Stats
               if (analyticsProvider.eventParticipationStats != null) ...[
-                _buildEventParticipationStats(analyticsProvider.eventParticipationStats!),
+                _buildEventParticipationStats(
+                    _convertEventParticipationStatsToMap(
+                            analyticsProvider.eventParticipationStats!)),
                 const SizedBox(height: 16),
               ],
 
@@ -2566,23 +2721,23 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
 
   Widget _buildGroupDemographics(Map<String, dynamic> demographics) {
     // Extract values with fallbacks for different field names
-    final totalMembers = demographics['totalMembers'] ?? 
-                         demographics['total_members'] ?? 
-                         demographics['members'] ?? 
-                         demographics['member_count'] ?? 0;
-                         
-    final maleCount = demographics['maleCount'] ?? 
-                      demographics['male_count'] ?? 
-                      demographics['males'] ?? 0;
-                         
-    final femaleCount = demographics['femaleCount'] ?? 
-                        demographics['female_count'] ?? 
-                        demographics['females'] ?? 0;
-    
-    final ageGroups = demographics['ageGroups'] ?? 
-                      demographics['age_groups'] ?? 
-                      demographics['age_distribution'] ?? {};
-    
+    final totalMembers = demographics['totalMembers'] ??
+        demographics['total_members'] ??
+        demographics['members'] ??
+        demographics['member_count'] ?? 0;
+
+    final maleCount = demographics['maleCount'] ??
+        demographics['male_count'] ??
+        demographics['males'] ?? 0;
+
+    final femaleCount = demographics['femaleCount'] ??
+        demographics['female_count'] ??
+        demographics['females'] ?? 0;
+
+    final ageGroups = demographics['ageGroups'] ??
+        demographics['age_groups'] ??
+        demographics['age_distribution'] ?? {};
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -2634,11 +2789,11 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       ),
     );
   }
-  
+
   Widget _buildAgeDistributionChart(Map<dynamic, dynamic> ageGroups) {
     // Convert age groups to a format suitable for a chart
     List<MapEntry<String, dynamic>> entries = [];
-    
+
     if (ageGroups is Map) {
       ageGroups.forEach((key, value) {
         if (key is String && (value is int || value is double)) {
@@ -2646,27 +2801,34 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         }
       });
     }
-    
+
     // Sort entries by age group
     entries.sort((a, b) {
       // Extract numbers from strings like "18-24", "25-34", etc.
-      final aNum = int.tryParse(a.key.split('-').first) ?? 0;
-      final bNum = int.tryParse(b.key.split('-').first) ?? 0;
+      final aNum = int.tryParse(a.key
+          .split('-')
+          .first) ?? 0;
+      final bNum = int.tryParse(b.key
+          .split('-')
+          .first) ?? 0;
       return aNum.compareTo(bNum);
     });
-    
+
     if (entries.isEmpty) {
       return const Center(
         child: Text('No age distribution data available'),
       );
     }
-    
+
     return SizedBox(
       height: 200,
       child: BarChart(
         BarChartData(
           alignment: BarChartAlignment.spaceAround,
-          maxY: entries.map((e) => e.value as num).reduce((a, b) => a > b ? a : b) * 1.2,
+          maxY: entries.map((e) => e.value as num).reduce((a, b) =>
+          a > b
+              ? a
+              : b) * 1.2,
           barTouchData: BarTouchData(
             enabled: true,
             touchTooltipData: BarTouchTooltipData(
@@ -2722,20 +2884,21 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
           borderData: FlBorderData(show: false),
           barGroups: List.generate(
             entries.length,
-            (index) => BarChartGroupData(
-              x: index,
-              barRods: [
-                BarChartRodData(
-                  toY: entries[index].value.toDouble(),
-                  color: AppColors.primaryColor,
-                  width: 16,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(6),
-                    topRight: Radius.circular(6),
-                  ),
+                (index) =>
+                BarChartGroupData(
+                  x: index,
+                  barRods: [
+                    BarChartRodData(
+                      toY: entries[index].value.toDouble(),
+                      color: AppColors.primaryColor,
+                      width: 16,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(6),
+                        topRight: Radius.circular(6),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
           ),
           gridData: FlGridData(
             show: true,
@@ -2752,25 +2915,25 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       ),
     );
   }
-  
+
   Widget _buildGroupAttendanceStats(Map<String, dynamic> stats) {
     // Extract values with fallbacks for different field names
-    final averageAttendance = stats['averageAttendance'] ?? 
-                             stats['average_attendance'] ?? 
-                             stats['avg_attendance'] ?? 0.0;
-                         
-    final totalAttendance = stats['totalAttendance'] ?? 
-                           stats['total_attendance'] ?? 
-                           stats['attendance_count'] ?? 0;
-                         
-    final attendanceRate = stats['attendanceRate'] ?? 
-                          stats['attendance_rate'] ?? 
-                          stats['rate'] ?? 0.0;
-    
-    final attendanceTrend = stats['attendanceTrend'] ?? 
-                           stats['attendance_trend'] ?? 
-                           stats['trend'] ?? [];
-    
+    final averageAttendance = stats['averageAttendance'] ??
+        stats['average_attendance'] ??
+        stats['avg_attendance'] ?? 0.0;
+
+    final totalAttendance = stats['totalAttendance'] ??
+        stats['total_attendance'] ??
+        stats['attendance_count'] ?? 0;
+
+    final attendanceRate = stats['attendanceRate'] ??
+        stats['attendance_rate'] ??
+        stats['rate'] ?? 0.0;
+
+    final attendanceTrend = stats['attendanceTrend'] ??
+        stats['attendance_trend'] ??
+        stats['trend'] ?? [];
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -2822,37 +2985,37 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       ),
     );
   }
-  
+
   Widget _buildAttendanceTrendChart(List<dynamic> trend) {
     // Convert trend data to a format suitable for a chart
     List<FlSpot> spots = [];
     List<String> labels = [];
-    
+
     for (int i = 0; i < trend.length; i++) {
       final item = trend[i];
       if (item is Map) {
-        final value = item['value'] ?? 
-                     item['attendance'] ?? 
-                     item['count'] ?? 0.0;
-        
-        final label = item['label'] ?? 
-                     item['date'] ?? 
-                     item['period'] ?? 
-                     'Period ${i + 1}';
-        
+        final value = item['value'] ??
+            item['attendance'] ??
+            item['count'] ?? 0.0;
+
+        final label = item['label'] ??
+            item['date'] ??
+            item['period'] ??
+            'Period ${i + 1}';
+
         if (value is num) {
           spots.add(FlSpot(i.toDouble(), value.toDouble()));
           labels.add(label.toString());
         }
       }
     }
-    
+
     if (spots.isEmpty) {
       return const Center(
         child: Text('No attendance trend data available'),
       );
     }
-    
+
     return SizedBox(
       height: 200,
       child: LineChart(
@@ -2864,7 +3027,9 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
               getTooltipItems: (touchedSpots) {
                 return touchedSpots.map((spot) {
                   final index = spot.x.toInt();
-                  final label = index >= 0 && index < labels.length ? labels[index] : '';
+                  final label = index >= 0 && index < labels.length
+                      ? labels[index]
+                      : '';
                   return LineTooltipItem(
                     '$label: ${spot.y.toInt()}',
                     const TextStyle(color: Colors.white),
@@ -2944,25 +3109,25 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       ),
     );
   }
-  
+
   Widget _buildMemberParticipationStats(Map<String, dynamic> stats) {
     // Extract values with fallbacks for different field names
-    final activeMembers = stats['activeMembers'] ?? 
-                         stats['active_members'] ?? 
-                         stats['active'] ?? 0;
-                         
-    final inactiveMembers = stats['inactiveMembers'] ?? 
-                           stats['inactive_members'] ?? 
-                           stats['inactive'] ?? 0;
-                         
-    final participationRate = stats['participationRate'] ?? 
-                             stats['participation_rate'] ?? 
-                             stats['rate'] ?? 0.0;
-    
-    final topMembers = stats['topMembers'] ?? 
-                      stats['top_members'] ?? 
-                      stats['most_active'] ?? [];
-    
+    final activeMembers = stats['activeMembers'] ??
+        stats['active_members'] ??
+        stats['active'] ?? 0;
+
+    final inactiveMembers = stats['inactiveMembers'] ??
+        stats['inactive_members'] ??
+        stats['inactive'] ?? 0;
+
+    final participationRate = stats['participationRate'] ??
+        stats['participation_rate'] ??
+        stats['rate'] ?? 0.0;
+
+    final topMembers = stats['topMembers'] ??
+        stats['top_members'] ??
+        stats['most_active'] ?? [];
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -3014,14 +3179,14 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       ),
     );
   }
-  
+
   Widget _buildTopMembersList(List<dynamic> members) {
     if (members.isEmpty) {
       return const Center(
         child: Text('No member data available'),
       );
     }
-    
+
     return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -3030,22 +3195,22 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         final member = members[index];
         String name = 'Unknown';
         String metric = '0';
-        
+
         if (member is Map) {
-          name = member['name'] ?? 
-                member['fullName'] ?? 
-                member['full_name'] ?? 
-                member['username'] ?? 
-                'Member ${index + 1}';
-          
-          final value = member['value'] ?? 
-                       member['attendance'] ?? 
-                       member['participation'] ?? 
-                       member['score'] ?? 0;
-          
+          name = member['name'] ??
+              member['fullName'] ??
+              member['full_name'] ??
+              member['username'] ??
+              'Member ${index + 1}';
+
+          final value = member['value'] ??
+              member['attendance'] ??
+              member['participation'] ??
+              member['score'] ?? 0;
+
           metric = value is num ? value.toString() : value.toString();
         }
-        
+
         return ListTile(
           leading: CircleAvatar(
             backgroundColor: AppColors.primaryColor,
@@ -3066,25 +3231,25 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       },
     );
   }
-  
+
   Widget _buildEventParticipationStats(Map<String, dynamic> stats) {
     // Extract values with fallbacks for different field names
-    final totalEvents = stats['totalEvents'] ?? 
-                       stats['total_events'] ?? 
-                       stats['events'] ?? 0;
-                         
-    final attendedEvents = stats['attendedEvents'] ?? 
-                          stats['attended_events'] ?? 
-                          stats['attended'] ?? 0;
-                         
-    final participationRate = stats['participationRate'] ?? 
-                             stats['participation_rate'] ?? 
-                             stats['rate'] ?? 0.0;
-    
-    final popularEvents = stats['popularEvents'] ?? 
-                         stats['popular_events'] ?? 
-                         stats['top_events'] ?? [];
-    
+    final totalEvents = stats['totalEvents'] ??
+        stats['total_events'] ??
+        stats['events'] ?? 0;
+
+    final attendedEvents = stats['attendedEvents'] ??
+        stats['attended_events'] ??
+        stats['attended'] ?? 0;
+
+    final participationRate = stats['participationRate'] ??
+        stats['participation_rate'] ??
+        stats['rate'] ?? 0.0;
+
+    final popularEvents = stats['popularEvents'] ??
+        stats['popular_events'] ??
+        stats['top_events'] ?? [];
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -3136,14 +3301,14 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       ),
     );
   }
-  
+
   Widget _buildPopularEventsList(List<dynamic> events) {
     if (events.isEmpty) {
       return const Center(
         child: Text('No event data available'),
       );
     }
-    
+
     return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -3153,25 +3318,25 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         String title = 'Unknown Event';
         String metric = '0';
         String date = '';
-        
+
         if (event is Map) {
-          title = event['title'] ?? 
-                event['name'] ?? 
-                event['event_name'] ?? 
-                'Event ${index + 1}';
-          
-          final value = event['value'] ?? 
-                       event['attendance'] ?? 
-                       event['participants'] ?? 
-                       event['count'] ?? 0;
-          
+          title = event['title'] ??
+              event['name'] ??
+              event['event_name'] ??
+              'Event ${index + 1}';
+
+          final value = event['value'] ??
+              event['attendance'] ??
+              event['participants'] ??
+              event['count'] ?? 0;
+
           metric = value is num ? value.toString() : value.toString();
-          
+
           // Try to extract date
-          final dateValue = event['date'] ?? 
-                          event['dateTime'] ?? 
-                          event['event_date'] ?? '';
-          
+          final dateValue = event['date'] ??
+              event['dateTime'] ??
+              event['event_date'] ?? '';
+
           if (dateValue is String && dateValue.isNotEmpty) {
             try {
               final parsedDate = DateTime.parse(dateValue);
@@ -3181,7 +3346,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
             }
           }
         }
-        
+
         return ListTile(
           leading: const Icon(Icons.event, color: AppColors.primaryColor),
           title: Text(title),
@@ -3200,26 +3365,31 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
 
   Widget _buildPerformanceMetrics(Map<String, dynamic> metrics) {
     // Extract values with fallbacks for different field names
-    final attendanceRate = metrics['attendanceRate'] ?? 
-                           metrics['attendance_rate'] ?? 
-                           metrics['attendance'] ?? 
-                           metrics['attendance_percentage'] ?? 0.0;
-                           
-    final memberGrowth = metrics['memberGrowth'] ?? 
-                         metrics['member_growth'] ?? 
-                         metrics['growth'] ?? 
-                         metrics['growth_rate'] ?? 0.0;
-                         
-    final eventParticipation = metrics['eventParticipation'] ?? 
-                              metrics['event_participation'] ?? 
-                              metrics['participation'] ?? 
-                              metrics['participation_rate'] ?? 0.0;
-    
+    final attendanceRate = metrics['attendanceRate'] ??
+        metrics['attendance_rate'] ??
+        metrics['attendance'] ??
+        metrics['attendance_percentage'] ?? 0.0;
+
+    final memberGrowth = metrics['memberGrowth'] ??
+        metrics['member_growth'] ??
+        metrics['growth'] ??
+        metrics['growth_rate'] ?? 0.0;
+
+    final eventParticipation = metrics['eventParticipation'] ??
+        metrics['event_participation'] ??
+        metrics['participation'] ??
+        metrics['participation_rate'] ?? 0.0;
+
     // Convert to double if needed
-    double attendanceRateDouble = attendanceRate is double ? attendanceRate : double.tryParse(attendanceRate.toString()) ?? 0.0;
-    double memberGrowthDouble = memberGrowth is double ? memberGrowth : double.tryParse(memberGrowth.toString()) ?? 0.0;
-    double eventParticipationDouble = eventParticipation is double ? eventParticipation : double.tryParse(eventParticipation.toString()) ?? 0.0;
-    
+    double attendanceRateDouble = attendanceRate is double
+        ? attendanceRate
+        : double.tryParse(attendanceRate.toString()) ?? 0.0;
+    double memberGrowthDouble = memberGrowth is double ? memberGrowth : double
+        .tryParse(memberGrowth.toString()) ?? 0.0;
+    double eventParticipationDouble = eventParticipation is double
+        ? eventParticipation
+        : double.tryParse(eventParticipation.toString()) ?? 0.0;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -3263,7 +3433,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
   Widget _buildPopularEvents(Map<String, dynamic> events) {
     // Handle different response formats
     List<dynamic> popularEventsList = [];
-    
+
     try {
       if (events.containsKey('events') && events['events'] is List) {
         popularEventsList = events['events'];
@@ -3273,7 +3443,8 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         popularEventsList = events['data'];
       } else if (events.containsKey('results') && events['results'] is List) {
         popularEventsList = events['results'];
-      } else if (events.containsKey('popular_events') && events['popular_events'] is List) {
+      } else if (events.containsKey('popular_events') &&
+          events['popular_events'] is List) {
         popularEventsList = events['popular_events'];
       } else {
         // Try to find any list in the map
@@ -3283,8 +3454,8 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
             // Check if the first item looks like an event
             if (value.first is Map) {
               final firstItem = value.first as Map;
-              if (firstItem.containsKey('name') || 
-                  firstItem.containsKey('title') || 
+              if (firstItem.containsKey('name') ||
+                  firstItem.containsKey('title') ||
                   firstItem.containsKey('event_name') ||
                   firstItem.containsKey('attendance') ||
                   firstItem.containsKey('participationRate')) {
@@ -3294,7 +3465,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
             }
           }
         }
-        
+
         // If still empty, try any list
         if (popularEventsList.isEmpty) {
           for (var key in events.keys) {
@@ -3309,7 +3480,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
     } catch (e) {
       print('Error extracting popular events list: $e');
     }
-    
+
     if (popularEventsList.isEmpty) {
       return Card(
         elevation: 2,
@@ -3341,7 +3512,8 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                     const SizedBox(height: 16),
                     Text(
                       'No popular events data available',
-                      style: TextStyles.bodyText.copyWith(color: Colors.grey[600]),
+                      style: TextStyles.bodyText.copyWith(
+                          color: Colors.grey[600]),
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -3360,7 +3532,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         ),
       );
     }
-    
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -3393,7 +3565,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                   if (event is! Map) {
                     return const SizedBox.shrink();
                   }
-                  
+
                   // Convert to Map<String, dynamic> if needed
                   Map<String, dynamic> eventMap;
                   if (event is Map<String, dynamic>) {
@@ -3404,26 +3576,26 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                       eventMap[key.toString()] = value;
                     });
                   }
-                  
+
                   // Handle different field names
-                  final name = eventMap['name'] ?? 
-                              eventMap['title'] ?? 
-                              eventMap['event_name'] ?? 
-                              eventMap['eventName'] ?? 
-                              'Event ${index + 1}';
-                              
-                  final attendance = _parseNumeric(eventMap['attendance']) ?? 
-                                    _parseNumeric(eventMap['attendees']) ?? 
-                                    _parseNumeric(eventMap['count']) ?? 
-                                    _parseNumeric(eventMap['participants']) ?? 
-                                    0;
-                                    
-                  final rate = _parseNumeric(eventMap['participationRate']) ?? 
-                              _parseNumeric(eventMap['rate']) ?? 
-                              _parseNumeric(eventMap['percentage']) ?? 
-                              _parseNumeric(eventMap['attendance_rate']) ?? 
-                              0.0;
-                  
+                  final name = eventMap['name'] ??
+                      eventMap['title'] ??
+                      eventMap['event_name'] ??
+                      eventMap['eventName'] ??
+                      'Event ${index + 1}';
+
+                  final attendance = _parseNumeric(eventMap['attendance']) ??
+                      _parseNumeric(eventMap['attendees']) ??
+                      _parseNumeric(eventMap['count']) ??
+                      _parseNumeric(eventMap['participants']) ??
+                      0;
+
+                  final rate = _parseNumeric(eventMap['participationRate']) ??
+                      _parseNumeric(eventMap['rate']) ??
+                      _parseNumeric(eventMap['percentage']) ??
+                      _parseNumeric(eventMap['attendance_rate']) ??
+                      0.0;
+
                   return Card(
                     elevation: 0,
                     color: index.isEven ? Colors.grey[50] : Colors.white,
@@ -3431,7 +3603,8 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 8.0, horizontal: 4.0),
                       child: ListTile(
                         leading: CircleAvatar(
                           backgroundColor: AppColors.primaryColor,
@@ -3442,20 +3615,24 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                         ),
                         title: Text(
                           name.toString(),
-                          style: TextStyles.bodyText.copyWith(fontWeight: FontWeight.bold),
+                          style: TextStyles.bodyText.copyWith(
+                              fontWeight: FontWeight.bold),
                         ),
                         subtitle: Text(
                           'Attendance: $attendance members',
                           style: TextStyles.bodyText.copyWith(fontSize: 12),
                         ),
                         trailing: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: AppColors.primaryColor.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
-                            '${rate is double ? rate.toStringAsFixed(1) : rate}%',
+                            '${rate is double
+                                ? rate.toStringAsFixed(1)
+                                : rate}%',
                             style: TextStyles.bodyText.copyWith(
                               color: AppColors.primaryColor,
                               fontWeight: FontWeight.bold,
@@ -3476,7 +3653,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       ),
     );
   }
-  
+
   // Helper method to parse numeric values from various formats
   dynamic _parseNumeric(dynamic value) {
     if (value == null) return null;
@@ -3498,17 +3675,21 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
   Widget _buildAttendanceByCategory(Map<String, dynamic> categories) {
     // Handle different response formats
     List<dynamic> categoryList = [];
-    
+
     try {
-      if (categories.containsKey('categories') && categories['categories'] is List) {
+      if (categories.containsKey('categories') &&
+          categories['categories'] is List) {
         categoryList = categories['categories'];
-      } else if (categories.containsKey('items') && categories['items'] is List) {
+      } else
+      if (categories.containsKey('items') && categories['items'] is List) {
         categoryList = categories['items'];
       } else if (categories.containsKey('data') && categories['data'] is List) {
         categoryList = categories['data'];
-      } else if (categories.containsKey('results') && categories['results'] is List) {
+      } else
+      if (categories.containsKey('results') && categories['results'] is List) {
         categoryList = categories['results'];
-      } else if (categories.containsKey('event_categories') && categories['event_categories'] is List) {
+      } else if (categories.containsKey('event_categories') &&
+          categories['event_categories'] is List) {
         categoryList = categories['event_categories'];
       } else {
         // Try to find any list in the map
@@ -3518,8 +3699,8 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
             // Check if the first item looks like a category
             if (value.first is Map) {
               final firstItem = value.first as Map;
-              if (firstItem.containsKey('name') || 
-                  firstItem.containsKey('category') || 
+              if (firstItem.containsKey('name') ||
+                  firstItem.containsKey('category') ||
                   firstItem.containsKey('type') ||
                   firstItem.containsKey('totalEvents') ||
                   firstItem.containsKey('attendanceRate')) {
@@ -3529,7 +3710,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
             }
           }
         }
-        
+
         // If still empty, try any list
         if (categoryList.isEmpty) {
           for (var key in categories.keys) {
@@ -3544,7 +3725,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
     } catch (e) {
       print('Error extracting category list: $e');
     }
-    
+
     if (categoryList.isEmpty) {
       return Card(
         elevation: 2,
@@ -3572,11 +3753,13 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.pie_chart_outline, size: 48, color: Colors.grey[400]),
+                    Icon(Icons.pie_chart_outline, size: 48,
+                        color: Colors.grey[400]),
                     const SizedBox(height: 16),
                     Text(
                       'No category data available',
-                      style: TextStyles.bodyText.copyWith(color: Colors.grey[600]),
+                      style: TextStyles.bodyText.copyWith(
+                          color: Colors.grey[600]),
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -3595,7 +3778,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         ),
       );
     }
-    
+
     // Define category colors
     final List<Color> categoryColors = [
       Colors.blue[400]!,
@@ -3607,7 +3790,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       Colors.amber[400]!,
       Colors.indigo[400]!,
     ];
-    
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -3640,7 +3823,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                   if (category is! Map) {
                     return const SizedBox.shrink();
                   }
-                  
+
                   // Convert to Map<String, dynamic> if needed
                   Map<String, dynamic> categoryMap;
                   if (category is Map<String, dynamic>) {
@@ -3651,28 +3834,29 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                       categoryMap[key.toString()] = value;
                     });
                   }
-                  
+
                   // Handle different field names
-                  final name = categoryMap['name'] ?? 
-                              categoryMap['category'] ?? 
-                              categoryMap['type'] ?? 
-                              categoryMap['categoryName'] ?? 
-                              'Category ${index + 1}';
-                              
-                  final totalEvents = _parseNumeric(categoryMap['totalEvents']) ?? 
-                                     _parseNumeric(categoryMap['events']) ?? 
-                                     _parseNumeric(categoryMap['count']) ?? 
-                                     _parseNumeric(categoryMap['event_count']) ?? 
-                                     0;
-                                     
-                  final rate = _parseNumeric(categoryMap['attendanceRate']) ?? 
-                              _parseNumeric(categoryMap['rate']) ?? 
-                              _parseNumeric(categoryMap['percentage']) ?? 
-                              _parseNumeric(categoryMap['attendance_rate']) ?? 
-                              0.0;
-                  
+                  final name = categoryMap['name'] ??
+                      categoryMap['category'] ??
+                      categoryMap['type'] ??
+                      categoryMap['categoryName'] ??
+                      'Category ${index + 1}';
+
+                  final totalEvents = _parseNumeric(
+                      categoryMap['totalEvents']) ??
+                      _parseNumeric(categoryMap['events']) ??
+                      _parseNumeric(categoryMap['count']) ??
+                      _parseNumeric(categoryMap['event_count']) ??
+                      0;
+
+                  final rate = _parseNumeric(categoryMap['attendanceRate']) ??
+                      _parseNumeric(categoryMap['rate']) ??
+                      _parseNumeric(categoryMap['percentage']) ??
+                      _parseNumeric(categoryMap['attendance_rate']) ??
+                      0.0;
+
                   final color = categoryColors[index % categoryColors.length];
-                  
+
                   return Card(
                     elevation: 0,
                     color: index.isEven ? Colors.grey[50] : Colors.white,
@@ -3680,7 +3864,8 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 8.0, horizontal: 4.0),
                       child: ListTile(
                         leading: CircleAvatar(
                           backgroundColor: color,
@@ -3692,20 +3877,24 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                         ),
                         title: Text(
                           name.toString(),
-                          style: TextStyles.bodyText.copyWith(fontWeight: FontWeight.bold),
+                          style: TextStyles.bodyText.copyWith(
+                              fontWeight: FontWeight.bold),
                         ),
                         subtitle: Text(
                           'Total Events: $totalEvents',
                           style: TextStyles.bodyText.copyWith(fontSize: 12),
                         ),
                         trailing: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: color.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
-                            '${rate is double ? rate.toStringAsFixed(1) : rate}%',
+                            '${rate is double
+                                ? rate.toStringAsFixed(1)
+                                : rate}%',
                             style: TextStyles.bodyText.copyWith(
                               color: color,
                               fontWeight: FontWeight.bold,
@@ -3726,14 +3915,15 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       ),
     );
   }
-  
+
   // Helper method to get an icon for a category based on its name
   IconData _getCategoryIcon(String categoryName) {
     final name = categoryName.toLowerCase();
-    
+
     if (name.contains('worship') || name.contains('prayer')) {
       return Icons.music_note;
-    } else if (name.contains('study') || name.contains('bible') || name.contains('class')) {
+    } else if (name.contains('study') || name.contains('bible') ||
+        name.contains('class')) {
       return Icons.book;
     } else if (name.contains('meeting') || name.contains('conference')) {
       return Icons.people;
@@ -3749,9 +3939,10 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       return Icons.event;
     }
   }
-  
+
   // Helper method to convert GroupAttendanceStats to Map<String, dynamic>
-  Map<String, dynamic> _convertGroupAttendanceStatsToMap(GroupAttendanceStats stats) {
+  Map<String, dynamic> _convertGroupAttendanceStatsToMap(
+      GroupAttendanceStats stats) {
     return {
       'averageAttendance': stats.averageAttendance,
       'attendanceTrend': stats.attendanceTrend,
@@ -3764,19 +3955,23 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
   Widget _buildMemberEngagement(Map<String, dynamic> engagement) {
     // Handle different response formats
     List<dynamic> engagementList = [];
-    
+
     try {
       if (engagement.containsKey('scores') && engagement['scores'] is List) {
         engagementList = engagement['scores'];
-      } else if (engagement.containsKey('items') && engagement['items'] is List) {
+      } else
+      if (engagement.containsKey('items') && engagement['items'] is List) {
         engagementList = engagement['items'];
-      } else if (engagement.containsKey('members') && engagement['members'] is List) {
+      } else
+      if (engagement.containsKey('members') && engagement['members'] is List) {
         engagementList = engagement['members'];
       } else if (engagement.containsKey('data') && engagement['data'] is List) {
         engagementList = engagement['data'];
-      } else if (engagement.containsKey('results') && engagement['results'] is List) {
+      } else
+      if (engagement.containsKey('results') && engagement['results'] is List) {
         engagementList = engagement['results'];
-      } else if (engagement.containsKey('engagement_scores') && engagement['engagement_scores'] is List) {
+      } else if (engagement.containsKey('engagement_scores') &&
+          engagement['engagement_scores'] is List) {
         engagementList = engagement['engagement_scores'];
       } else {
         // Try to find any list in the map
@@ -3786,8 +3981,8 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
             // Check if the first item looks like a member engagement score
             if (value.first is Map) {
               final firstItem = value.first as Map;
-              if (firstItem.containsKey('memberName') || 
-                  firstItem.containsKey('name') || 
+              if (firstItem.containsKey('memberName') ||
+                  firstItem.containsKey('name') ||
                   firstItem.containsKey('full_name') ||
                   firstItem.containsKey('engagementScore') ||
                   firstItem.containsKey('score')) {
@@ -3797,7 +3992,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
             }
           }
         }
-        
+
         // If still empty, try any list
         if (engagementList.isEmpty) {
           for (var key in engagement.keys) {
@@ -3812,7 +4007,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
     } catch (e) {
       print('Error extracting member engagement list: $e');
     }
-    
+
     if (engagementList.isEmpty) {
       return Card(
         elevation: 2,
@@ -3840,11 +4035,13 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.analytics_outlined, size: 48, color: Colors.grey[400]),
+                    Icon(Icons.analytics_outlined, size: 48,
+                        color: Colors.grey[400]),
                     const SizedBox(height: 16),
                     Text(
                       'No member engagement data available',
-                      style: TextStyles.bodyText.copyWith(color: Colors.grey[600]),
+                      style: TextStyles.bodyText.copyWith(
+                          color: Colors.grey[600]),
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -3863,7 +4060,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         ),
       );
     }
-    
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -3896,7 +4093,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                   if (score is! Map) {
                     return const SizedBox.shrink();
                   }
-                  
+
                   // Convert to Map<String, dynamic> if needed
                   Map<String, dynamic> scoreMap;
                   if (score is Map<String, dynamic>) {
@@ -3907,27 +4104,28 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                       scoreMap[key.toString()] = value;
                     });
                   }
-                  
+
                   // Handle different field names
-                  final memberName = scoreMap['memberName'] ?? 
-                                    scoreMap['name'] ?? 
-                                    scoreMap['full_name'] ?? 
-                                    scoreMap['user_name'] ?? 
-                                    scoreMap['member'] ?? 
-                                    'Member ${index + 1}';
-                                    
-                  final groupName = scoreMap['groupName'] ?? 
-                                   scoreMap['group'] ?? 
-                                   scoreMap['group_name'] ?? 
-                                   widget.groupName;
-                                   
-                  final engagementScore = _parseNumeric(scoreMap['engagementScore']) ?? 
-                                         _parseNumeric(scoreMap['score']) ?? 
-                                         _parseNumeric(scoreMap['engagement']) ?? 
-                                         _parseNumeric(scoreMap['value']) ?? 
-                                         _parseNumeric(scoreMap['engagement_score']) ?? 
-                                         0.0;
-                  
+                  final memberName = scoreMap['memberName'] ??
+                      scoreMap['name'] ??
+                      scoreMap['full_name'] ??
+                      scoreMap['user_name'] ??
+                      scoreMap['member'] ??
+                      'Member ${index + 1}';
+
+                  final groupName = scoreMap['groupName'] ??
+                      scoreMap['group'] ??
+                      scoreMap['group_name'] ??
+                      widget.groupName;
+
+                  final engagementScore = _parseNumeric(
+                      scoreMap['engagementScore']) ??
+                      _parseNumeric(scoreMap['score']) ??
+                      _parseNumeric(scoreMap['engagement']) ??
+                      _parseNumeric(scoreMap['value']) ??
+                      _parseNumeric(scoreMap['engagement_score']) ??
+                      0.0;
+
                   // Calculate a color based on the score
                   Color scoreColor;
                   if (engagementScore >= 80) {
@@ -3939,7 +4137,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                   } else {
                     scoreColor = Colors.red;
                   }
-                  
+
                   return Card(
                     elevation: 0,
                     color: index.isEven ? Colors.grey[50] : Colors.white,
@@ -3947,10 +4145,12 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 8.0, horizontal: 4.0),
                       child: ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: AppColors.primaryColor.withOpacity(0.1),
+                          backgroundColor: AppColors.primaryColor.withOpacity(
+                              0.1),
                           child: Text(
                             memberName.toString().substring(0, 1).toUpperCase(),
                             style: TextStyle(
@@ -3961,20 +4161,24 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                         ),
                         title: Text(
                           memberName.toString(),
-                          style: TextStyles.bodyText.copyWith(fontWeight: FontWeight.bold),
+                          style: TextStyles.bodyText.copyWith(
+                              fontWeight: FontWeight.bold),
                         ),
                         subtitle: Text(
                           'Group: $groupName',
                           style: TextStyles.bodyText.copyWith(fontSize: 12),
                         ),
                         trailing: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: scoreColor.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
-                            'Score: ${engagementScore is double ? engagementScore.toStringAsFixed(1) : engagementScore}',
+                            'Score: ${engagementScore is double
+                                ? engagementScore.toStringAsFixed(1)
+                                : engagementScore}',
                             style: TextStyles.bodyText.copyWith(
                               color: scoreColor,
                               fontWeight: FontWeight.bold,
@@ -3985,7 +4189,8 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                     ),
                   );
                 } catch (e) {
-                  print('Error rendering member engagement at index $index: $e');
+                  print(
+                      'Error rendering member engagement at index $index: $e');
                   return const SizedBox.shrink();
                 }
               },
@@ -3999,12 +4204,13 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
   Widget _buildMemberActivityLevels(Map<String, dynamic> activity) {
     // Handle different response formats
     List<dynamic> activityList = [];
-    
+
     if (activity.containsKey('levels') && activity['levels'] is List) {
       activityList = activity['levels'];
     } else if (activity.containsKey('items') && activity['items'] is List) {
       activityList = activity['items'];
-    } else if (activity.containsKey('activity') && activity['activity'] is List) {
+    } else
+    if (activity.containsKey('activity') && activity['activity'] is List) {
       activityList = activity['activity'];
     } else {
       // Try to find any list in the map
@@ -4015,7 +4221,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         }
       }
     }
-    
+
     if (activityList.isEmpty) {
       return Card(
         child: Padding(
@@ -4039,7 +4245,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         ),
       );
     }
-    
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -4061,14 +4267,19 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
               itemBuilder: (context, index) {
                 final level = activityList[index];
                 // Handle different field names
-                final levelName = level['level'] ?? level['name'] ?? level['activity_level'] ?? 'Level ${index + 1}';
-                final memberCount = level['memberCount'] ?? level['count'] ?? level['members'] ?? 0;
-                final percentage = level['percentage'] ?? level['rate'] ?? level['percent'] ?? 0.0;
-                
+                final levelName = level['level'] ?? level['name'] ??
+                    level['activity_level'] ?? 'Level ${index + 1}';
+                final memberCount = level['memberCount'] ?? level['count'] ??
+                    level['members'] ?? 0;
+                final percentage = level['percentage'] ?? level['rate'] ??
+                    level['percent'] ?? 0.0;
+
                 return ListTile(
                   title: Text(levelName),
                   subtitle: Text('Members: $memberCount'),
-                  trailing: Text('${percentage is double ? percentage.toStringAsFixed(1) : percentage}%'),
+                  trailing: Text('${percentage is double
+                      ? percentage.toStringAsFixed(1)
+                      : percentage}%'),
                 );
               },
             ),
@@ -4081,12 +4292,14 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
   Widget _buildAttendanceCorrelation(Map<String, dynamic> correlation) {
     // Handle different response formats
     List<dynamic> factorsList = [];
-    
+
     if (correlation.containsKey('factors') && correlation['factors'] is List) {
       factorsList = correlation['factors'];
-    } else if (correlation.containsKey('items') && correlation['items'] is List) {
+    } else
+    if (correlation.containsKey('items') && correlation['items'] is List) {
       factorsList = correlation['items'];
-    } else if (correlation.containsKey('correlations') && correlation['correlations'] is List) {
+    } else if (correlation.containsKey('correlations') &&
+        correlation['correlations'] is List) {
       factorsList = correlation['correlations'];
     } else {
       // Try to find any list in the map
@@ -4097,7 +4310,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         }
       }
     }
-    
+
     if (factorsList.isEmpty) {
       return Card(
         child: Padding(
@@ -4121,7 +4334,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         ),
       );
     }
-    
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -4143,14 +4356,19 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
               itemBuilder: (context, index) {
                 final factor = factorsList[index];
                 // Handle different field names
-                final factorName = factor['factor'] ?? factor['name'] ?? factor['type'] ?? 'Factor ${index + 1}';
-                final impact = factor['impact'] ?? factor['effect'] ?? factor['significance'] ?? 'Medium';
-                final correlationValue = factor['correlation'] ?? factor['value'] ?? factor['coefficient'] ?? 0.0;
-                
+                final factorName = factor['factor'] ?? factor['name'] ??
+                    factor['type'] ?? 'Factor ${index + 1}';
+                final impact = factor['impact'] ?? factor['effect'] ??
+                    factor['significance'] ?? 'Medium';
+                final correlationValue = factor['correlation'] ??
+                    factor['value'] ?? factor['coefficient'] ?? 0.0;
+
                 return ListTile(
                   title: Text(factorName),
                   subtitle: Text('Impact: $impact'),
-                  trailing: Text('${correlationValue is double ? correlationValue.toStringAsFixed(2) : correlationValue}'),
+                  trailing: Text(
+                      '${correlationValue is double ? correlationValue
+                          .toStringAsFixed(2) : correlationValue}'),
                 );
               },
             ),
@@ -4231,19 +4449,22 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                   label: 'PDF',
                   icon: Icons.picture_as_pdf,
                   isSelected: _selectedExportFormat == ExportFormat.pdf,
-                  onTap: () => setState(() => _selectedExportFormat = ExportFormat.pdf),
+                  onTap: () =>
+                      setState(() => _selectedExportFormat = ExportFormat.pdf),
                 ),
                 _buildFormatOption(
                   label: 'CSV',
                   icon: Icons.table_chart,
                   isSelected: _selectedExportFormat == ExportFormat.csv,
-                  onTap: () => setState(() => _selectedExportFormat = ExportFormat.csv),
+                  onTap: () =>
+                      setState(() => _selectedExportFormat = ExportFormat.csv),
                 ),
                 _buildFormatOption(
                   label: 'Excel',
                   icon: Icons.table_view,
                   isSelected: _selectedExportFormat == ExportFormat.excel,
-                  onTap: () => setState(() => _selectedExportFormat = ExportFormat.excel),
+                  onTap: () => setState(() =>
+                  _selectedExportFormat = ExportFormat.excel),
                 ),
               ],
             ),
@@ -4252,7 +4473,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       ),
     );
   }
-  
+
   Widget _buildExportButton({
     required String label,
     required IconData icon,
@@ -4278,7 +4499,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       ),
     );
   }
-  
+
   Widget _buildFormatOption({
     required String label,
     required IconData icon,
@@ -4291,10 +4512,12 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primaryColor.withOpacity(0.1) : Colors.transparent,
+          color: isSelected ? AppColors.primaryColor.withOpacity(0.1) : Colors
+              .transparent,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected ? AppColors.primaryColor : Colors.grey.withOpacity(0.3),
+            color: isSelected ? AppColors.primaryColor : Colors.grey
+                .withOpacity(0.3),
             width: 1,
           ),
         ),
@@ -4320,13 +4543,13 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       ),
     );
   }
-  
 
-  
+
   // Export methods
-  Future<void> _exportAttendanceReport(AnalyticsProvider analyticsProvider) async {
+  Future<void> _exportAttendanceReport(
+      AnalyticsProvider analyticsProvider) async {
     setState(() => _isLoading = true);
-    
+
     try {
       // Request storage permission
       if (Platform.isAndroid) {
@@ -4337,38 +4560,42 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
           return;
         }
       }
-      
+
       // Get attendance data
-      final attendanceStats = await analyticsProvider.fetchGroupAttendanceStats(widget.groupId);
-      
+      final attendanceStats = await analyticsProvider.fetchGroupAttendanceStats(
+          widget.groupId);
+
       if (attendanceStats == null) {
         _showError('No attendance data available to export');
         setState(() => _isLoading = false);
         return;
       }
-      
+
       // Convert GroupAttendanceStats to Map<String, dynamic>
       final attendanceData = _convertGroupAttendanceStatsToMap(attendanceStats);
-      
+
       // Generate file based on selected format
       late String filePath;
-      String fileName = 'attendance_report_${DateFormat('yyyyMMdd').format(DateTime.now())}';
-      
+      String fileName = 'attendance_report_${DateFormat('yyyyMMdd').format(
+          DateTime.now())}';
+
       switch (_selectedExportFormat) {
         case ExportFormat.pdf:
-          filePath = await _generatePdfReport(attendanceData, fileName, 'Attendance Report');
+          filePath = await _generatePdfReport(
+              attendanceData, fileName, 'Attendance Report');
           break;
         case ExportFormat.csv:
           filePath = await _generateCsvReport(attendanceData, fileName);
           break;
         case ExportFormat.excel:
-          filePath = await _generateCsvReport(attendanceData, fileName, isExcel: true);
+          filePath =
+          await _generateCsvReport(attendanceData, fileName, isExcel: true);
           break;
       }
-      
+
       // Share the file
       await Share.shareXFiles([XFile(filePath)], text: 'Attendance Report');
-      
+
       _showSuccess('Attendance report exported successfully');
     } catch (e) {
       print('Error exporting attendance report: $e');
@@ -4377,10 +4604,10 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       setState(() => _isLoading = false);
     }
   }
-  
+
   Future<void> _exportMemberReport(AnalyticsProvider analyticsProvider) async {
     setState(() => _isLoading = true);
-    
+
     try {
       // Request storage permission
       if (Platform.isAndroid) {
@@ -4391,35 +4618,39 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
           return;
         }
       }
-      
+
       // Get member data
-      final memberData = await analyticsProvider.fetchMemberParticipationStats();
-      
+      final memberData = await analyticsProvider
+          .fetchMemberParticipationStats();
+
       if (memberData == null || memberData.isEmpty) {
         _showError('No member data available to export');
         setState(() => _isLoading = false);
         return;
       }
-      
+
       // Generate file based on selected format
       late String filePath;
-      String fileName = 'member_report_${DateFormat('yyyyMMdd').format(DateTime.now())}';
-      
+      String fileName = 'member_report_${DateFormat('yyyyMMdd').format(
+          DateTime.now())}';
+
       switch (_selectedExportFormat) {
         case ExportFormat.pdf:
-          filePath = await _generatePdfReport(memberData, fileName, 'Member Report');
+          filePath =
+          await _generatePdfReport(memberData, fileName, 'Member Report');
           break;
         case ExportFormat.csv:
           filePath = await _generateCsvReport(memberData, fileName);
           break;
         case ExportFormat.excel:
-          filePath = await _generateCsvReport(memberData, fileName, isExcel: true);
+          filePath =
+          await _generateCsvReport(memberData, fileName, isExcel: true);
           break;
       }
-      
+
       // Share the file
       await Share.shareXFiles([XFile(filePath)], text: 'Member Report');
-      
+
       _showSuccess('Member report exported successfully');
     } catch (e) {
       print('Error exporting member report: $e');
@@ -4428,10 +4659,10 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       setState(() => _isLoading = false);
     }
   }
-  
+
   Future<void> _exportGroupReport(AnalyticsProvider analyticsProvider) async {
     setState(() => _isLoading = true);
-    
+
     try {
       // Request storage permission
       if (Platform.isAndroid) {
@@ -4442,35 +4673,39 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
           return;
         }
       }
-      
+
       // Get group data
-      final groupData = await analyticsProvider.fetchGroupDemographics(widget.groupId);
-      
+      final groupData = await analyticsProvider.fetchGroupDemographics(
+          widget.groupId);
+
       if (groupData == null || groupData.isEmpty) {
         _showError('No group data available to export');
         setState(() => _isLoading = false);
         return;
       }
-      
+
       // Generate file based on selected format
       late String filePath;
-      String fileName = 'group_report_${DateFormat('yyyyMMdd').format(DateTime.now())}';
-      
+      String fileName = 'group_report_${DateFormat('yyyyMMdd').format(
+          DateTime.now())}';
+
       switch (_selectedExportFormat) {
         case ExportFormat.pdf:
-          filePath = await _generatePdfReport(groupData, fileName, 'Group Report');
+          filePath =
+          await _generatePdfReport(groupData, fileName, 'Group Report');
           break;
         case ExportFormat.csv:
           filePath = await _generateCsvReport(groupData, fileName);
           break;
         case ExportFormat.excel:
-          filePath = await _generateCsvReport(groupData, fileName, isExcel: true);
+          filePath =
+          await _generateCsvReport(groupData, fileName, isExcel: true);
           break;
       }
-      
+
       // Share the file
       await Share.shareXFiles([XFile(filePath)], text: 'Group Report');
-      
+
       _showSuccess('Group report exported successfully');
     } catch (e) {
       print('Error exporting group report: $e');
@@ -4479,10 +4714,11 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       setState(() => _isLoading = false);
     }
   }
-  
-  Future<void> _exportAnalyticsDashboard(AnalyticsProvider analyticsProvider) async {
+
+  Future<void> _exportAnalyticsDashboard(
+      AnalyticsProvider analyticsProvider) async {
     setState(() => _isLoading = true);
-    
+
     try {
       // Request storage permission
       if (Platform.isAndroid) {
@@ -4493,19 +4729,19 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
           return;
         }
       }
-      
+
       // Collect all analytics data
       final dashboardData = analyticsProvider.dashboardTrends;
       final performanceData = analyticsProvider.performanceMetrics;
       final attendanceData = analyticsProvider.attendanceByEventCategory;
       final popularEventsData = analyticsProvider.popularEvents;
-      
+
       if (dashboardData == null || dashboardData.isEmpty) {
         _showError('No analytics data available to export');
         setState(() => _isLoading = false);
         return;
       }
-      
+
       // Combine all data
       final combinedData = {
         'dashboardTrends': dashboardData,
@@ -4513,26 +4749,30 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         'attendanceByCategory': attendanceData,
         'popularEvents': popularEventsData,
       };
-      
+
       // Generate file based on selected format
       late String filePath;
-      String fileName = 'analytics_dashboard_${DateFormat('yyyyMMdd').format(DateTime.now())}';
-      
+      String fileName = 'analytics_dashboard_${DateFormat('yyyyMMdd').format(
+          DateTime.now())}';
+
       switch (_selectedExportFormat) {
         case ExportFormat.pdf:
-          filePath = await _generatePdfReport(combinedData, fileName, 'Analytics Dashboard');
+          filePath = await _generatePdfReport(
+              combinedData, fileName, 'Analytics Dashboard');
           break;
         case ExportFormat.csv:
           filePath = await _generateCsvReport(combinedData, fileName);
           break;
         case ExportFormat.excel:
-          filePath = await _generateCsvReport(combinedData, fileName, isExcel: true);
+          filePath =
+          await _generateCsvReport(combinedData, fileName, isExcel: true);
           break;
       }
-      
+
       // Share the file
-      await Share.shareXFiles([XFile(filePath)], text: 'Analytics Dashboard Report');
-      
+      await Share.shareXFiles(
+          [XFile(filePath)], text: 'Analytics Dashboard Report');
+
       _showSuccess('Analytics dashboard exported successfully');
     } catch (e) {
       print('Error exporting analytics dashboard: $e');
@@ -4541,11 +4781,12 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       setState(() => _isLoading = false);
     }
   }
-  
+
   // Helper methods for generating reports
-  Future<String> _generatePdfReport(Map<String, dynamic> data, String fileName, String title) async {
+  Future<String> _generatePdfReport(dynamic data, String fileName,
+      String title) async {
     final pdf = pw.Document();
-    
+
     // Add title page
     pdf.addPage(
       pw.Page(
@@ -4563,7 +4804,8 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                 ),
                 pw.SizedBox(height: 20),
                 pw.Text(
-                  'Generated on ${DateFormat('MMMM d, y').format(DateTime.now())}',
+                  'Generated on ${DateFormat('MMMM d, y').format(
+                      DateTime.now())}',
                   style: const pw.TextStyle(
                     fontSize: 14,
                   ),
@@ -4581,7 +4823,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         },
       ),
     );
-    
+
     // Add data pages
     pdf.addPage(
       pw.Page(
@@ -4606,18 +4848,18 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         },
       ),
     );
-    
+
     // Save the PDF file
     final output = await getTemporaryDirectory();
     final file = File('${output.path}/$fileName.pdf');
     await file.writeAsBytes(await pdf.save());
-    
+
     return file.path;
   }
-  
+
   List<pw.TableRow> _buildPdfTableRows(Map<String, dynamic> data) {
     final List<pw.TableRow> rows = [];
-    
+
     // Add header row
     rows.add(
       pw.TableRow(
@@ -4642,7 +4884,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         ],
       ),
     );
-    
+
     // Add data rows
     data.forEach((key, value) {
       if (value is Map) {
@@ -4697,16 +4939,17 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         );
       }
     });
-    
+
     return rows;
   }
-  
-  Future<String> _generateCsvReport(Map<String, dynamic> data, String fileName, {bool isExcel = false}) async {
+
+  Future<String> _generateCsvReport(dynamic data, String fileName,
+      {bool isExcel = false}) async {
     final List<List<dynamic>> csvData = [];
-    
+
     // Add header row
     csvData.add(['Key', 'Value']);
-    
+
     // Add data rows
     data.forEach((key, value) {
       if (value is Map) {
@@ -4717,7 +4960,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       } else if (value is List) {
         // For lists, add a summary row
         csvData.add([key, '${value.length} items']);
-        
+
         // Then add individual items if they are maps
         if (value.isNotEmpty && value.first is Map) {
           for (int i = 0; i < value.length; i++) {
@@ -4734,16 +4977,16 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         csvData.add([key, value.toString()]);
       }
     });
-    
+
     // Convert to CSV
     final String csv = const ListToCsvConverter().convert(csvData);
-    
+
     // Save the CSV file
     final output = await getTemporaryDirectory();
     final extension = isExcel ? 'xlsx' : 'csv';
     final file = File('${output.path}/$fileName.$extension');
     await file.writeAsString(csv);
-    
+
     return file.path;
   }
 
@@ -4785,7 +5028,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       ),
     );
   }
-  
+
   // SETTINGS TAB
   Widget _buildSettingsTab() {
     return SingleChildScrollView(
@@ -4827,7 +5070,8 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
             children: [
               SwitchListTile(
                 title: const Text('Auto-Refresh Data'),
-                subtitle: Text('Automatically refresh data every $_autoRefreshInterval minutes'),
+                subtitle: Text(
+                    'Automatically refresh data every $_autoRefreshInterval minutes'),
                 value: _autoRefreshEnabled,
                 onChanged: (value) {
                   setState(() {
@@ -4867,7 +5111,8 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                 title: const Text('Refresh All Data Now'),
                 subtitle: const Text('Update all dashboard information'),
                 trailing: RotationTransition(
-                  turns: Tween(begin: 0.0, end: 1.0).animate(_refreshAnimationController),
+                  turns: Tween(begin: 0.0, end: 1.0).animate(
+                      _refreshAnimationController),
                   child: IconButton(
                     icon: const Icon(Icons.refresh),
                     onPressed: _refreshData,
@@ -4880,7 +5125,8 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                 subtitle: const Text('Create a backup of your group data'),
                 trailing: const Icon(Icons.backup),
                 onTap: () {
-                  _showInfo('Backup feature will be available in the next update');
+                  _showInfo(
+                      'Backup feature will be available in the next update');
                 },
               ),
               ListTile(
@@ -4888,7 +5134,8 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                 subtitle: const Text('Restore from a previous backup'),
                 trailing: const Icon(Icons.restore),
                 onTap: () {
-                  _showInfo('Restore feature will be available in the next update');
+                  _showInfo(
+                      'Restore feature will be available in the next update');
                 },
               ),
             ],
@@ -4916,26 +5163,29 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                 onTap: () {
                   showDialog(
                     context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('Clear Analytics Cache'),
-                      content: const Text('Are you sure you want to clear all cached analytics data? This will not affect your actual group data.'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('Cancel'),
+                    builder: (context) =>
+                        AlertDialog(
+                          title: const Text('Clear Analytics Cache'),
+                          content: const Text(
+                              'Are you sure you want to clear all cached analytics data? This will not affect your actual group data.'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Cancel'),
+                            ),
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                _showSuccess('Analytics cache cleared');
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                              ),
+                              child: const Text('Clear',
+                                  style: TextStyle(color: Colors.white)),
+                            ),
+                          ],
                         ),
-                        ElevatedButton(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            _showSuccess('Analytics cache cleared');
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                          ),
-                          child: const Text('Clear', style: TextStyle(color: Colors.white)),
-                        ),
-                      ],
-                    ),
                   );
                 },
               ),
@@ -4955,14 +5205,16 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                 title: const Text('Terms of Service'),
                 trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                 onTap: () {
-                  _showInfo('Terms of Service will be available in the next update');
+                  _showInfo(
+                      'Terms of Service will be available in the next update');
                 },
               ),
               ListTile(
                 title: const Text('Privacy Policy'),
                 trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                 onTap: () {
-                  _showInfo('Privacy Policy will be available in the next update');
+                  _showInfo(
+                      'Privacy Policy will be available in the next update');
                 },
               ),
             ],
@@ -4971,7 +5223,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       ),
     );
   }
-  
+
   Widget _buildSettingsSection({
     required String title,
     required IconData icon,
@@ -5005,7 +5257,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       ),
     );
   }
-  
+
   Widget _buildThemeSelector() {
     return Row(
       children: [
@@ -5036,7 +5288,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       ],
     );
   }
-  
+
   Widget _buildAccentColorSelector() {
     final List<Color> colorOptions = [
       AppColors.primaryColor,
@@ -5047,7 +5299,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       Colors.orange,
       Colors.red,
     ];
-    
+
     return Row(
       children: [
         const Text('Accent Color:'),
@@ -5077,19 +5329,19 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                       ),
                       boxShadow: isSelected
                           ? [
-                              BoxShadow(
-                                color: color.withOpacity(0.5),
-                                spreadRadius: 2,
-                                blurRadius: 5,
-                              ),
-                            ]
+                        BoxShadow(
+                          color: color.withOpacity(0.5),
+                          spreadRadius: 2,
+                          blurRadius: 5,
+                        ),
+                      ]
                           : null,
                     ),
                     child: isSelected
                         ? const Icon(
-                            Icons.check,
-                            color: Colors.white,
-                          )
+                      Icons.check,
+                      color: Colors.white,
+                    )
                         : null,
                   ),
                 );
@@ -5100,7 +5352,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       ],
     );
   }
-  
+
   Widget _buildFloatingActionButton() {
     if (_selectedIndex == 1) {
       // Members tab
@@ -5128,7 +5380,8 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         onPressed: _refreshData,
         backgroundColor: _accentColor,
         child: RotationTransition(
-          turns: Tween(begin: 0.0, end: 1.0).animate(_refreshAnimationController),
+          turns: Tween(begin: 0.0, end: 1.0).animate(
+              _refreshAnimationController),
           child: const Icon(
             Icons.refresh,
             color: Colors.white,
@@ -5136,7 +5389,99 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         ),
       );
     }
-    
+
     return Container(); // No FAB for settings tab
   }
+
+  // Conversion methods for analytics models
+
+  /// Convert GroupDemographics to Map<String, dynamic>
+  Map<String, dynamic> _convertGroupDemographicsToMap(
+      GroupDemographics demographics) {
+    return {
+      'ageDistribution': demographics.ageDistribution,
+      'genderDistribution': demographics.genderDistribution,
+      'locationDistribution': demographics.locationDistribution,
+      'additionalMetrics': demographics.additionalMetrics,
+      // Add common field names for compatibility with the UI
+      'age_distribution': demographics.ageDistribution,
+      'gender_distribution': demographics.genderDistribution,
+      'location_distribution': demographics.locationDistribution,
+      'totalMembers': demographics.ageDistribution.values.fold(
+          0, (sum, value) => sum + value),
+      'maleCount': demographics.genderDistribution['male'] ?? 0,
+      'femaleCount': demographics.genderDistribution['female'] ?? 0,
+      'ageGroups': demographics.ageDistribution,
+      'isEmpty': demographics.isEmpty,
+      // Use the isEmpty property from the model
+    };
+  }
+
+  // /// Convert GroupAttendanceStats to Map<String, dynamic>
+  // Map<String, dynamic> _convertGroupAttendanceStatsToMap(GroupAttendanceStats stats) {
+  //   return {
+  //     'averageAttendance': stats.averageAttendance,
+  //     'attendanceTrend': stats.attendanceTrend,
+  //     'attendanceByDayOfWeek': stats.attendanceByDayOfWeek,
+  //     'totalSessions': stats.totalSessions,
+  //     'growthRate': stats.growthRate,
+  //     // Add common field names for compatibility with the UI
+  //     'average_attendance_rate': stats.averageAttendance,
+  //     'attendance_by_month': stats.attendanceTrend,
+  //     'total_events': stats.totalSessions,
+  //     'totalAttendance': stats.attendanceByDayOfWeek.values.fold(0, (sum, value) => sum + value),
+  //     'attendanceRate': stats.averageAttendance / 100,
+  //     'isEmpty': stats.isEmpty, // Use the isEmpty property from the model
+  //   };
+  // }
+  //
+  /// Convert MemberParticipationStats to Map<String, dynamic>
+  Map<String, dynamic> _convertMemberParticipationStatsToMap(
+      MemberParticipationStats stats) {
+    // Calculate active and inactive members from top participants
+    final activeMembers = stats.topParticipants.length;
+    final inactiveMembers = stats
+        .participationByDemographic['inactive_count'] ?? 0;
+
+    return {
+      'topParticipants': stats.topParticipants,
+      'participationByDemographic': stats.participationByDemographic,
+      'participationTrend': stats.participationTrend,
+      'engagementMetrics': stats.engagementMetrics,
+      // Add common field names for compatibility with the UI
+      'top_members': stats.topParticipants,
+      'participation_by_demographic': stats.participationByDemographic,
+      'participation_trend': stats.participationTrend,
+      'engagement_metrics': stats.engagementMetrics,
+      'activeMembers': activeMembers,
+      'inactiveMembers': inactiveMembers,
+      'participationRate': stats.engagementMetrics['overall_rate'] ?? 0.75,
+      'topMembers': stats.topParticipants,
+      'isEmpty': stats.isEmpty, // Use the isEmpty property from the model
+    };
+  }
+
+  /// Convert EventParticipationStats to Map<String, dynamic>
+  Map<String, dynamic> _convertEventParticipationStatsToMap(
+      EventParticipationStats stats) {
+    return {
+      'totalParticipants': stats.totalParticipants,
+      'participationRate': stats.participationRate,
+      'participantDemographics': stats.participantDemographics,
+      'participationTrend': stats.participationTrend,
+      'feedback': stats.feedback,
+      // Add common field names for compatibility with the UI
+      'total_participants': stats.totalParticipants,
+      'participation_rate': stats.participationRate,
+      'participant_demographics': stats.participantDemographics,
+      'participation_trend': stats.participationTrend,
+      'totalEvents': stats.participationTrend.length,
+      'attendedEvents': stats.totalParticipants,
+      'popularEvents': stats.feedback['popular_events'] ?? [],
+      'isEmpty': stats.isEmpty, // Use the isEmpty property from the model
+    };
+  }
+
+
+
 }

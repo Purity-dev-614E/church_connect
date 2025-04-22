@@ -5,6 +5,7 @@ class EventModel {
   DateTime dateTime;
   String location;
   String groupId;
+  String regionId;
 
   EventModel({
     required this.id,
@@ -12,7 +13,8 @@ class EventModel {
     required this.description,
     required this.dateTime,
     required this.location,
-    required this.groupId
+    required this.groupId,
+    this.regionId = '',
   });
 
   EventModel.fromJson(Map<String, dynamic> json)
@@ -21,7 +23,8 @@ class EventModel {
         description = json['description'] ?? '',
         dateTime = json['date'] != null ? DateTime.parse(json['date']) : DateTime.now(),
         location = json['location'] ?? '',
-        groupId = json['group_id'] ?? '';
+        groupId = json['group_id'] ?? '',
+        regionId = json['region_id'] ?? '';
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -30,6 +33,7 @@ class EventModel {
         'date_time': dateTime.toIso8601String(),
         'location': location,
         'group_id': groupId,
+        'region_id': regionId,
       };
 
 }

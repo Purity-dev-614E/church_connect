@@ -3,8 +3,8 @@ class GroupModel{
   final String name;
   final String description;
   final String group_admin;
-  final String? regionId;
-  final String? regionName;
+  final String? region_id;
+
   final List<dynamic>? members;
 
   GroupModel({
@@ -12,9 +12,8 @@ class GroupModel{
     required this.name,
     this.description = '',
     required this.group_admin,
-    this.regionId,
-    this.regionName,
     this.members,
+    required this.region_id,
   });
 
   factory GroupModel.fromJson(Map<String, dynamic> json) {
@@ -23,8 +22,7 @@ class GroupModel{
       name: json['name'] ?? '',
       description: json['description'] ?? '',
       group_admin: json['group_admin_id'] ?? '',
-      regionId: json['region_id'],
-      regionName: json['region_name'],
+      region_id: json['region_id'],
       members: json['members'],
     );
   }
@@ -35,7 +33,7 @@ class GroupModel{
       'name': name,
       'description': description,
       'group_admin_id': group_admin,
-      'region_id': regionId,
+      'region_id': region_id,
     };
   }
 }

@@ -23,6 +23,11 @@ class GroupDemographics {
       additionalMetrics: json['additionalMetrics'] ?? {},
     );
   }
+  
+  // Add isEmpty property for compatibility with UI
+  bool get isEmpty => ageDistribution.isEmpty && 
+                      genderDistribution.isEmpty && 
+                      locationDistribution.isEmpty;
 }
 
 class GroupAttendanceStats {
@@ -49,6 +54,11 @@ class GroupAttendanceStats {
       growthRate: json['growthRate']?.toDouble() ?? 0.0,
     );
   }
+  
+  // Add isEmpty property for compatibility with UI
+  bool get isEmpty => attendanceTrend.isEmpty && 
+                      attendanceByDayOfWeek.isEmpty && 
+                      totalSessions == 0;
 }
 
 class GroupGrowthAnalytics {
@@ -200,6 +210,11 @@ class EventParticipationStats {
       feedback: json['feedback'] ?? {},
     );
   }
+  
+  // Add isEmpty property for compatibility with UI
+  bool get isEmpty => participantDemographics.isEmpty && 
+                      participationTrend.isEmpty && 
+                      totalParticipants == 0;
 }
 
 class EventAttendanceComparison {
@@ -248,6 +263,11 @@ class MemberParticipationStats {
       engagementMetrics: json['engagementMetrics'] ?? {},
     );
   }
+  
+  // Add isEmpty property for compatibility with UI
+  bool get isEmpty => topParticipants.isEmpty && 
+                      participationByDemographic.isEmpty && 
+                      participationTrend.isEmpty;
 }
 
 class MemberRetentionStats {

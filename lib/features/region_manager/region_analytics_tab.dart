@@ -290,9 +290,8 @@ class _RegionAnalyticsTabState extends State<RegionAnalyticsTab> {
         ),
         const SizedBox(width: 16),
         CustomButton(
-          text: 'Export',
+          label: 'Export',
           onPressed: () => _showExportDialog(),
-          backgroundColor: AppColors.primaryColor,
           icon: Icons.download,
         ),
       ],
@@ -361,9 +360,8 @@ class _RegionAnalyticsTabState extends State<RegionAnalyticsTab> {
           ),
           const SizedBox(height: 24),
           CustomButton(
-            text: 'Retry',
+            label: 'Retry',
             onPressed: _loadAnalyticsData,
-            backgroundColor: AppColors.primaryColor,
             icon: Icons.refresh,
           ),
         ],

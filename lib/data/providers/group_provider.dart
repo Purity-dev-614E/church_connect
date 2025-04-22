@@ -69,7 +69,7 @@ class GroupProvider extends ChangeNotifier {
         updatedGroup.name,
         updatedGroup.description,
         updatedGroup.group_admin,
-        updatedGroup.regionId ?? '',
+        updatedGroup.region_id ?? '',
       );
       
       if (success) {
@@ -223,6 +223,29 @@ class GroupProvider extends ChangeNotifier {
     } catch (error) {
       _handleError('removing group from region', error);
       return false;
+    }
+  }
+  
+  Future<Map<String, dynamic>> getGroupStats(String groupId) async {
+    try {
+      // Get member count
+      final members = await getGroupMembers(groupId);
+      final memberCount = members.length;
+      
+      // Get event count (this would typically come from an event service)
+      // For now, we'll return a placeholder value
+      const eventCount = 0;
+      
+      return {
+        'memberCount': memberCount,
+        'eventCount': eventCount,
+      };
+    } catch (error) {
+      _handleError('getting group stats', error);
+      return {
+        'memberCount': 0,
+        'eventCount': 0,
+      };
     }
   }
 }

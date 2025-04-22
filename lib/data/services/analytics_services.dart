@@ -955,4 +955,48 @@ class AnalyticsServices {
       };
     }
   }
+  
+  /// Export analytics data with various parameters
+  Future<String> exportAnalyticsData({
+    required String dataType,
+    required String format,
+    Map<String, dynamic>? parameters,
+  }) async {
+    try {
+      // Build the request body
+      final Map<String, dynamic> requestBody = {
+        'data_type': dataType,
+        'format': format,
+      };
+      
+      // Add parameters if provided
+      if (parameters != null) {
+        requestBody['parameters'] = parameters;
+      }
+      
+      // Make the API call
+      final response = await _httpClient.post(
+        ApiEndpoints.exportAnalyticsData,
+        body: jsonEncode(requestBody),
+      );
+      
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        
+        // Return the download URL
+        if (responseData.containsKey('download_url')) {
+          return responseData['download_url'] as String;
+        } else {
+          print('Export successful but no download URL provided');
+          return '';
+        }
+      } else {
+        print('Failed to export analytics data: ${response.statusCode}');
+        return '';
+      }
+    } catch (e) {
+      print('Error exporting analytics data: $e');
+      return '';
+    }
+  }
 }

@@ -64,10 +64,13 @@ class EventServices {
         final groupAdminId = groupData['group_admin_id'];
 
         if (groupAdminId != userId) {
-          throw Exception('User is not authorized to manage events for this group');
+          throw Exception(
+              'User is not authorized to manage events for this group');
         }
       } else {
-        throw Exception('Failed to check group permissions: HTTP status ${response.statusCode}');
+        throw Exception(
+            'Failed to check group permissions: HTTP status ${response
+                .statusCode}');
       }
     } catch (e) {
       throw Exception('Failed to check group permissions: $e');
@@ -104,7 +107,8 @@ class EventServices {
       if (response.statusCode == 201 || response.statusCode == 200) {
         return EventModel.fromJson(jsonDecode(response.body));
       } else {
-        throw Exception('Failed to create event: HTTP status ${response.statusCode}');
+        throw Exception(
+            'Failed to create event: HTTP status ${response.statusCode}');
       }
     } catch (e) {
       throw Exception('Failed to create event: $e');
@@ -125,7 +129,8 @@ class EventServices {
         final List<dynamic> data = jsonDecode(response.body);
         return data.map((event) => EventModel.fromJson(event)).toList();
       } else {
-        throw Exception('Failed to fetch group events: HTTP status ${response.statusCode}');
+        throw Exception(
+            'Failed to fetch group events: HTTP status ${response.statusCode}');
       }
     } catch (e) {
       throw Exception('Failed to fetch group events: $e');
@@ -146,7 +151,8 @@ class EventServices {
       if (response.statusCode == 200) {
         return EventModel.fromJson(jsonDecode(response.body));
       } else {
-        throw Exception('Failed to fetch event: HTTP status ${response.statusCode}');
+        throw Exception(
+            'Failed to fetch event: HTTP status ${response.statusCode}');
       }
     } catch (e) {
       throw Exception('Failed to fetch event: $e');
@@ -182,7 +188,8 @@ class EventServices {
       if (response.statusCode == 200) {
         return EventModel.fromJson(jsonDecode(response.body));
       } else {
-        throw Exception('Failed to update event: HTTP status ${response.statusCode}');
+        throw Exception(
+            'Failed to update event: HTTP status ${response.statusCode}');
       }
     } catch (e) {
       throw Exception('Failed to update event: $e');
@@ -204,7 +211,8 @@ class EventServices {
       if (response.statusCode == 200) {
         return true;
       } else {
-        throw Exception('Failed to delete event: HTTP status ${response.statusCode}');
+        throw Exception(
+            'Failed to delete event: HTTP status ${response.statusCode}');
       }
     } catch (e) {
       throw Exception('Failed to delete event: $e');
@@ -244,17 +252,15 @@ class EventServices {
   /// Get events for a specific date range
   ///
   /// Returns a list of [EventModel] objects within the specified date range
-  Future<List<EventModel>> getEventsByDateRange(
-    String groupId,
-    DateTime startDate,
-    DateTime endDate
-  ) async {
+  Future<List<EventModel>> getEventsByDateRange(String groupId,
+      DateTime startDate,
+      DateTime endDate) async {
     try {
       final allEvents = await getEventsByGroup(groupId);
 
       return allEvents.where((event) =>
-        event.dateTime.isAfter(startDate) &&
-        event.dateTime.isBefore(endDate)
+      event.dateTime.isAfter(startDate) &&
+          event.dateTime.isBefore(endDate)
       ).toList();
     } catch (e) {
       throw Exception('Failed to fetch events by date range: $e');
@@ -267,10 +273,8 @@ class EventServices {
   ///
   /// Takes an event ID and a list of member IDs who attended
   /// Returns true if attendance was successfully recorded
-  Future<bool> createEventAttendance(
-    String eventId,
-    List<String> attendedMemberIds
-  ) async {
+  Future<bool> createEventAttendance(String eventId,
+      List<String> attendedMemberIds) async {
     try {
       final event = await getEventById(eventId);
       await _checkGroupPermission(event.groupId);
@@ -287,7 +291,8 @@ class EventServices {
       if (response.statusCode == 201 || response.statusCode == 200) {
         return true;
       } else {
-        throw Exception('Failed to create attendance: HTTP status ${response.statusCode}');
+        throw Exception(
+            'Failed to create attendance: HTTP status ${response.statusCode}');
       }
     } catch (e) {
       throw Exception('Failed to create attendance: $e');
@@ -308,7 +313,9 @@ class EventServices {
         final List<dynamic> data = jsonDecode(response.body);
         return data.map((user) => UserModel.fromJson(user)).toList();
       } else {
-        throw Exception('Failed to fetch attended members: HTTP status ${response.statusCode}');
+        throw Exception(
+            'Failed to fetch attended members: HTTP status ${response
+                .statusCode}');
       }
     } catch (e) {
       throw Exception('Failed to fetch attended members: $e');
@@ -329,7 +336,9 @@ class EventServices {
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else {
-        throw Exception('Failed to fetch event attendance: HTTP status ${response.statusCode}');
+        throw Exception(
+            'Failed to fetch event attendance: HTTP status ${response
+                .statusCode}');
       }
     } catch (e) {
       throw Exception('Failed to fetch event attendance: $e');
@@ -349,7 +358,9 @@ class EventServices {
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else {
-        throw Exception('Failed to fetch group attendance: HTTP status ${response.statusCode}');
+        throw Exception(
+            'Failed to fetch group attendance: HTTP status ${response
+                .statusCode}');
       }
     } catch (e) {
       throw Exception('Failed to fetch group attendance: $e');
@@ -359,12 +370,10 @@ class EventServices {
   /// Mark attendance for an individual member
   ///
   /// Records attendance for a single user with optional details
-  Future<bool> markAttendance(
-    String eventId,
-    String userId,
-    bool present,
-    {String? topic, String? aob, String? apology}
-  ) async {
+  Future<bool> markAttendance(String eventId,
+      String userId,
+      bool present,
+      {String? topic, String? aob, String? apology}) async {
     try {
       final body = {
         'user_id': userId,
@@ -387,17 +396,19 @@ class EventServices {
       if (response.statusCode == 200) {
         return true;
       } else {
-        throw Exception('Failed to mark attendance: HTTP status ${response.statusCode}');
+        throw Exception(
+            'Failed to mark attendance: HTTP status ${response.statusCode}');
       }
     } catch (e) {
       throw Exception('Failed to mark attendance: $e');
     }
   }
-  
+
   /// Get attendance records for a specific user
   ///
   /// Returns a list of attendance records with event details for the specified user
-  Future<List<Map<String, dynamic>>> getUserAttendanceRecords(String userId) async {
+  Future<List<Map<String, dynamic>>> getUserAttendanceRecords(
+      String userId) async {
     try {
       final response = await http.get(
         Uri.parse(ApiEndpoints.getAttendanceByUser(userId)),
@@ -406,10 +417,10 @@ class EventServices {
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
-        
+
         // Fetch event details for each attendance record
         List<Map<String, dynamic>> attendanceWithEvents = [];
-        
+
         for (var record in data) {
           try {
             final eventId = record['event_Id'] ?? '';
@@ -433,16 +444,18 @@ class EventServices {
             });
           }
         }
-        
+
         return attendanceWithEvents;
       } else {
-        throw Exception('Failed to fetch user attendance records: HTTP status ${response.statusCode}');
+        throw Exception(
+            'Failed to fetch user attendance records: HTTP status ${response
+                .statusCode}');
       }
     } catch (e) {
       throw Exception('Failed to fetch user attendance records: $e');
     }
   }
-  
+
   /// Get events by region
   Future<List<EventModel>> getEventsByRegion(String regionId) async {
     try {
@@ -458,18 +471,39 @@ class EventServices {
         // No events found for this region
         return [];
       } else {
-        throw Exception('Failed to fetch region events: HTTP status ${response.statusCode}');
+        throw Exception('Failed to fetch region events: HTTP status ${response
+            .statusCode}');
       }
     } catch (e) {
       print('Error fetching events by region: $e');
-      
+
       // Fallback: Try to get all events and filter by region
       try {
         final allEvents = await getAllEvents();
         return allEvents.where((event) => event.regionId == regionId).toList();
       } catch (fallbackError) {
-        throw Exception('Failed to fetch region events: $e, Fallback error: $fallbackError');
+        throw Exception(
+            'Failed to fetch region events: $e, Fallback error: $fallbackError');
       }
+    }
+  }
+
+  //get all events
+  Future<List<EventModel>> getAllEvents() async {
+    try {
+      final response = await http.get(
+        Uri.parse(ApiEndpoints.events),
+        headers: await _getHeaders(),
+      );
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((event) => EventModel.fromJson(event)).toList();
+      } else {
+        throw Exception(
+            'Failed to fetch all events: HTTP status ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Failed to fetch all events: $e');
     }
   }
 }

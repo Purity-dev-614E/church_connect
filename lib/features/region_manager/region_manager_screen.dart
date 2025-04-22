@@ -3,6 +3,7 @@ import 'package:group_management_church_app/core/constants/colors.dart';
 import 'package:group_management_church_app/data/models/region_model.dart';
 import 'package:group_management_church_app/data/providers/auth_provider.dart';
 import 'package:group_management_church_app/data/providers/region_provider.dart';
+import 'package:group_management_church_app/data/services/auth_services.dart';
 import 'package:group_management_church_app/features/region_manager/region_dashboard.dart';
 import 'package:group_management_church_app/widgets/custom_app_bar.dart';
 import 'package:group_management_church_app/widgets/custom_button.dart';
@@ -36,7 +37,8 @@ class _RegionManagerScreenState extends State<RegionManagerScreen> {
     try {
       // Get the current user ID
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final userId = authProvider.user?.id;
+      final authServices = AuthServices();
+      final userId = authServices.getUserId();
 
       if (userId == null) {
         throw Exception('User ID is null');
@@ -76,7 +78,7 @@ class _RegionManagerScreenState extends State<RegionManagerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const CustomAppBar(
+      appBar: CustomAppBar(
         title: 'Region Management',
         showBackButton: true,
       ),
@@ -105,7 +107,7 @@ class _RegionManagerScreenState extends State<RegionManagerScreen> {
             const SizedBox(height: 16),
             Text(
               'Error Loading Regions',
-              style: Theme.of(context).textTheme.headline6,
+              style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
             Text(
@@ -114,9 +116,8 @@ class _RegionManagerScreenState extends State<RegionManagerScreen> {
             ),
             const SizedBox(height: 24),
             CustomButton(
-              text: 'Retry',
+              label: 'Retry',
               onPressed: _loadManagedRegions,
-              backgroundColor: AppColors.primaryColor,
             ),
           ],
         ),
@@ -139,7 +140,7 @@ class _RegionManagerScreenState extends State<RegionManagerScreen> {
             const SizedBox(height: 16),
             Text(
               'No Regions Assigned',
-              style: Theme.of(context).textTheme.headline6,
+              style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
             const Text(
@@ -148,9 +149,8 @@ class _RegionManagerScreenState extends State<RegionManagerScreen> {
             ),
             const SizedBox(height: 24),
             CustomButton(
-              text: 'Refresh',
+              label: 'Refresh',
               onPressed: _loadManagedRegions,
-              backgroundColor: AppColors.primaryColor,
             ),
           ],
         ),
@@ -166,7 +166,7 @@ class _RegionManagerScreenState extends State<RegionManagerScreen> {
         children: [
           Text(
             'Your Managed Regions',
-            style: Theme.of(context).textTheme.headline6,
+            style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: 16),
           Expanded(

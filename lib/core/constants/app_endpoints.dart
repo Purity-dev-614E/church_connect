@@ -113,4 +113,5 @@ class ApiEndpoints {
   static String exportGroupReport(String groupId) => '$analytics/export/group-report/$groupId';
   static String exportCustomReport(String reportType) => '$analytics/export/custom/$reportType';
   static String exportRegionReport(String regionId) => '$analytics/export/region-report/$regionId';
+  static const String exportAnalyticsData = '$analytics/export/analytics-data';
 }
