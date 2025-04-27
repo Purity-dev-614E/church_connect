@@ -12,7 +12,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback? onProfileTap;
   final List<Widget>? actions;
 
-  CustomAppBar({
+  const CustomAppBar({super.key, 
     required this.title,
     this.showBackButton = false,
     this.showProfileAvatar = false,
@@ -32,6 +32,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
       title: Text(
         title,
         style: TextStyles.heading2,
+
       ),
       backgroundColor: AppColors.primaryColor,
       centerTitle: true,

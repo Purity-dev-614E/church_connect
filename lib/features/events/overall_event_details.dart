@@ -18,10 +18,10 @@ class OverallEventDetailsScreen extends StatefulWidget {
   final String eventTitle;
 
   const OverallEventDetailsScreen({
-    Key? key,
+    super.key,
     required this.eventId,
     required this.eventTitle,
-  }) : super(key: key);
+  });
 
   @override
   State<OverallEventDetailsScreen> createState() => _OverallEventDetailsScreenState();
@@ -312,22 +312,22 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
       appBar: AppBar(
         title: Text(widget.eventTitle),
         backgroundColor: AppColors.primaryColor,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.share),
-            onPressed: () {
-              // Share event details functionality
-              _showInfo('Sharing event details...');
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.download),
-            onPressed: () {
-              // Export attendance list functionality
-              _showInfo('Exporting attendance list...');
-            },
-          ),
-        ],
+        // actions: [
+        //   IconButton(
+        //     icon: const Icon(Icons.share),
+        //     onPressed: () {
+        //       // Share event details functionality
+        //       _showInfo('Sharing event details...');
+        //     },
+        //   ),
+        //   IconButton(
+        //     icon: const Icon(Icons.download),
+        //     onPressed: () {
+        //       // Export attendance list functionality
+        //       _showInfo('Exporting attendance list...');
+        //     },
+        //   ),
+        // ],
       ),
       body: FutureBuilder<Map<String, dynamic>>(
         future: _eventDataFuture,

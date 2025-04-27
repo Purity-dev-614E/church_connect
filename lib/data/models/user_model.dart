@@ -7,8 +7,9 @@ class UserModel{
   final String nextOfKinContact;
   final String role;
   final String gender;
-  final String? regionId;
+  final String regionId;
   final String? regionName;
+  final String? createdAt;
 
   UserModel({
     required this.id,
@@ -19,37 +20,55 @@ class UserModel{
     required this.nextOfKinContact,
     required this.role,
     required this.gender,
-    this.regionId,
+    required this.regionId,
     this.regionName,
+    this.createdAt,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
+    // Debug logging
+    print('Creating UserModel from JSON:');
+    print('Raw JSON: $json');
+    
+    // Get the user ID from various possible fields
+    String userId = '';
+    if (json['uid'] != null) {
+      userId = json['uid'].toString();
+    } else if (json['id'] != null) {
+      userId = json['id'].toString();
+    } else if (json['_id'] != null) {
+      userId = json['_id'].toString();
+    }
+    
+    print('Extracted user ID: $userId');
+
     // Normalize role to lowercase for consistent comparison
     String role = (json['role'] ?? 'user').toString().toLowerCase();
-    
+
     // Map role values to expected format
     if (role == 'super_admin' || role == 'superadmin' || role == 'super admin') {
       role = 'super_admin';
     } else if (role == 'admin') {
       role = 'admin';
-    } else if (role == 'region_manager') {
-      role = 'region_manager';
+    } else if (role == 'regional_manager' || role == 'regionalmanager' || role == 'regional manager') {
+      role = 'regional manager';
     } else {
       // Default to 'user' for any other role
       role = 'user';
     }
-    
+
     return UserModel(
-      id: json['uid'] ?? '',
-      fullName: json['full_name'] ?? '',
-      contact: json['phone_number'] ?? '',
-      nextOfKin: json['next_of_kin_name'] ?? '',
-      nextOfKinContact: json['next_of_kin_contact'] ?? '',
+      id: userId,
+      fullName: json['full_name'] ?? json['fullName'] ?? '',
+      contact: json['phone_number'] ?? json['contact'] ?? '',
+      nextOfKin: json['next_of_kin_name'] ?? json['nextOfKin'] ?? '',
+      nextOfKinContact: json['next_of_kin_contact'] ?? json['nextOfKinContact'] ?? '',
       role: role,
       email: json['email'] ?? '',
       gender: json['gender'] ?? '',
-      regionId: json['region_id'],
-      regionName: json['region_name'],
+      regionId: json['region_id'] ?? json['regionId'] ?? '',
+      regionName: json['location'] ?? json['regionName'] ?? '',
+      createdAt: json['created_at'] ?? json['createdAt'],
     );
   }
 
@@ -64,6 +83,7 @@ class UserModel{
       'email': email,
       'gender': gender,
       'region_id': regionId,
+      'location': regionName,
     };
   }
 }

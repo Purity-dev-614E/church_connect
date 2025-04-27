@@ -15,7 +15,7 @@ import '../admin/Admin_dashboard.dart';
 
 
 class GroupAdministrationTab extends StatefulWidget {
-  const GroupAdministrationTab({Key? key}) : super(key: key);
+  const GroupAdministrationTab({super.key});
 
   @override
   State<GroupAdministrationTab> createState() => _GroupAdministrationTabState();
@@ -116,12 +116,11 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: () {
-                _showCreateGroupDialog(context).then((created) {
-                  if (created) {
-                    _loadGroups();
-                  }
-                });
+              onPressed: () async {
+                final created = await _showCreateGroupDialog(context);
+                if (created) {
+                  await _loadGroups();
+                }
               },
               icon: const Icon(Icons.add),
               label: const Text('Create New Group'),
@@ -197,12 +196,11 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
           ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
-            onPressed: () {
-              _showCreateGroupDialog(context).then((created) {
-                if (created) {
-                  _loadGroups();
-                }
-              });
+            onPressed: () async {
+              final created = await _showCreateGroupDialog(context);
+              if (created) {
+                await _loadGroups();
+              }
             },
             icon: const Icon(Icons.add),
             label: const Text('Create Group'),
@@ -439,6 +437,7 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
   
   Future<bool> _showCreateGroupDialog(BuildContext context) async {
     final nameController = TextEditingController();
+    final descriptionController = TextEditingController();
     final formKey = GlobalKey<FormState>();
     final completer = Completer<bool>();
     
@@ -464,6 +463,15 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
                   return null;
                 },
               ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: descriptionController,
+                decoration: const InputDecoration(
+                  labelText: 'Description (Optional)',
+                  hintText: 'Enter group description',
+                ),
+                maxLines: 2,
+              ),
             ],
           ),
         ),
@@ -479,18 +487,38 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
             onPressed: () async {
               if (formKey.currentState!.validate()) {
                 try {
+                  // Show loading indicator
+                  setState(() {
+                    _isLoading = true;
+                  });
+                  
                   final groupProvider = Provider.of<GroupProvider>(context, listen: false);
                   final name = nameController.text.trim();
-                  final description = ''; // Default empty description
+                  final description = descriptionController.text.trim();
                   final adminId = ''; // Default empty admin ID
                   final regionId = ''; // Default empty region ID
                   
-                  await groupProvider.createGroup(name, description, adminId, regionId);
+                  print('Creating group with name: $name, description: $description');
                   
-                  Navigator.pop(dialogContext);
-                  _showSuccess('Group "${nameController.text}" created successfully');
-                  completer.complete(true); // Group created successfully
+                  final success = await groupProvider.createGroup(name, description, adminId, regionId);
+                  
+                  setState(() {
+                    _isLoading = false;
+                  });
+                  
+                  if (success) {
+                    Navigator.pop(dialogContext);
+                    _showSuccess('Group "$name" created successfully');
+                    await _loadGroups(); // Reload groups after successful creation
+                    completer.complete(true); // Group created successfully
+                  } else {
+                    _showError('Failed to create group. Please try again.');
+                    completer.complete(false); // Failed to create group
+                  }
                 } catch (e) {
+                  setState(() {
+                    _isLoading = false;
+                  });
                   _showError('Failed to create group: $e');
                   completer.complete(false); // Failed to create group
                 }

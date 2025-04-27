@@ -18,14 +18,14 @@ class CustomNotification extends StatefulWidget {
   final bool showProgress;
 
   const CustomNotification({
-    Key? key,
+    super.key,
     required this.message,
     this.type = NotificationType.info,
     this.duration = const Duration(seconds: 3),
     this.onDismissed,
     this.showIcon = true,
     this.showProgress = true,
-  }) : super(key: key);
+  });
 
   static void show({
     required BuildContext context,

@@ -11,7 +11,7 @@ import 'package:group_management_church_app/data/providers/auth_provider.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
-  const ResetPasswordScreen({Key? key}) : super(key: key);
+  const ResetPasswordScreen({super.key});
 
   @override
   State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
@@ -526,9 +526,9 @@ class VerificationCodeScreen extends StatefulWidget {
   final String email;
 
   const VerificationCodeScreen({
-    Key? key,
+    super.key,
     required this.email,
-  }) : super(key: key);
+  });
 
   @override
   State<VerificationCodeScreen> createState() => _VerificationCodeScreenState();
@@ -700,7 +700,7 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
 
 // New password screen after verification
 class NewPasswordScreen extends StatefulWidget {
-  const NewPasswordScreen({Key? key}) : super(key: key);
+  const NewPasswordScreen({super.key});
 
   @override
   State<NewPasswordScreen> createState() => _NewPasswordScreenState();

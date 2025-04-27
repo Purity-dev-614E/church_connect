@@ -13,10 +13,10 @@ class EventDetailsScreen extends StatefulWidget {
   final String groupId;
 
   const EventDetailsScreen({
-    Key? key,
+    super.key,
     required this.event,
     required this.groupId,
-  }) : super(key: key);
+  });
 
   @override
   State<EventDetailsScreen> createState() => _EventDetailsScreenState();

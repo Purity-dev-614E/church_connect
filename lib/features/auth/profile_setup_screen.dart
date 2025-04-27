@@ -18,10 +18,10 @@ class ProfileSetupScreen extends StatefulWidget {
   final String email;
   
   const ProfileSetupScreen({
-    Key? key,
+    super.key,
     required this.userId,
     required this.email,
-  }) : super(key: key);
+  });
 
   @override
   State<ProfileSetupScreen> createState() => _ProfileSetupScreenState();
@@ -104,6 +104,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       type: NotificationType.info,
     );
   }
+
   
   Future<void> _loadUserData() async {
     // Check if we're in edit mode
@@ -134,10 +135,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             }
             
             // Set region if available
-            if (currentUser.regionId != null) {
-              _selectedRegionId = currentUser.regionId;
-            }
-          });
+            _selectedRegionId = currentUser.regionId;
+                    });
         }
       } catch (e) {
         _showError('Error loading user data: $e');
@@ -188,32 +187,38 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     return null;
   }
 
-  // Submit form
+  //Submit Form
   Future<void> _submitForm() async {
     if (_formKey.currentState!.validate()) {
-      // Validate region selection
       if (_selectedRegionId == null || _selectedRegionId!.isEmpty) {
         _showError('Please select your region');
         return;
       }
-      
+
       setState(() {
         _isLoading = true;
       });
-      
+
       try {
-        // Get the current user to preserve the role
         final userProvider = Provider.of<UserProvider>(context, listen: false);
         final authProvider = Provider.of<AuthProvider>(context, listen: false);
-        
-        // Try to get the current user to preserve their role
+
         await userProvider.loadUser(widget.userId);
         final currentUser = userProvider.currentUser;
-        
-        // Use existing role if available, otherwise default to 'user'
+
         final role = currentUser?.role ?? _userRole;
-        
-        // Create user model with updated information
+
+        String selectedRegionName = 'your region';
+        if (_selectedRegionId != null) {
+          final selectedRegion = _regions.firstWhere(
+            (region) => region.id == _selectedRegionId,
+            orElse: () => RegionModel(id: '', name: ''),
+          );
+          if (selectedRegion.name.isNotEmpty) {
+            selectedRegionName = selectedRegion.name;
+          }
+        }
+
         final userModel = UserModel(
           id: widget.userId,
           fullName: _fullNameController.text.trim(),
@@ -221,28 +226,25 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           contact: _contactController.text.trim(),
           nextOfKin: _nextOfKinController.text.trim(),
           nextOfKinContact: _nextOfKinContactController.text.trim(),
-          role: role, // Preserve existing role
+          role: role,
           gender: _selectedGender,
-          regionId: _selectedRegionId,
+          regionId: _selectedRegionId ?? '',
+          regionName: selectedRegionName != 'your region' ? selectedRegionName : null,
         );
-        
-        // Update user profile
+
+        // Debugging: Log the user model
+        print('UserModel: ${userModel.toJson()}');
+
         final success = await authProvider.updateProfile(userModel);
-        
+
         if (success) {
-          // Update user in UserProvider
           await userProvider.loadUser(widget.userId);
-          
-          // Check if we're coming from ProfileScreen (edit mode)
+          _showSuccess('Profile updated successfully! You are now part of $selectedRegionName region.');
+
           final isEditMode = ModalRoute.of(context)?.settings.arguments == 'edit_mode';
-          
           if (isEditMode) {
-            // Return to ProfileScreen with success result
-            if (mounted) {
-              Navigator.of(context).pop(true);
-            }
+            if (mounted) Navigator.of(context).pop(true);
           } else {
-            // First-time setup - navigate to AuthWrapper
             if (mounted) {
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(builder: (context) => const AuthWrapper()),
@@ -250,15 +252,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             }
           }
         } else {
-          if (mounted) {
-            _showError('Failed to update profile. Please try again.');
-          }
+          _showError('Failed to update profile. Please try again.');
         }
       } catch (e) {
-        // Show error message
-        if (mounted) {
-          _showError('Error: ${e.toString()}');
-        }
+        _showError('Error: ${e.toString()}');
       } finally {
         if (mounted) {
           setState(() {
@@ -268,7 +265,6 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       }
     }
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -577,33 +573,93 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   Widget _buildRegionDropdown() {
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: AppColors.primaryColor.withOpacity(0.5)),
-        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.primaryColor.withOpacity(0.7)),
+        borderRadius: BorderRadius.circular(12),
+        color: AppColors.primaryColor.withOpacity(0.05),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(
-                Icons.location_on,
-                color: AppColors.primaryColor,
-                size: 24,
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.location_on,
+                  color: AppColors.primaryColor,
+                  size: 24,
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Your Region',
-                      style: TextStyles.bodyText.copyWith(
-                        color: AppColors.textColor.withOpacity(0.7),
-                        fontSize: 14,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              'Your Region',
+                              style: TextStyles.bodyText.copyWith(
+                                color: AppColors.textColor,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.star,
+                              color: AppColors.secondaryColor,
+                              size: 16,
+                            ),
+                          ],
+                        ),
+                        // View all regions button
+                        TextButton(
+                          onPressed: () => _showAllRegions(),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'View All',
+                                style: TextStyles.bodyText.copyWith(
+                                  color: AppColors.primaryColor,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(width: 2),
+                              const Icon(
+                                Icons.info_outline,
+                                color: AppColors.primaryColor,
+                                size: 14,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 4),
+                    Text(
+                      'Select the region you belong to for group assignments',
+                      style: TextStyles.bodyText.copyWith(
+                        fontSize: 12,
+                        color: AppColors.textColor.withOpacity(0.7),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
                     if (_isLoadingRegions)
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 8.0),
@@ -618,40 +674,92 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                         ),
                       )
                     else if (_regions.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8.0),
-                        child: Text(
-                          'No regions available. Please contact an administrator.',
-                          style: TextStyles.bodyText.copyWith(
-                            color: AppColors.errorColor,
-                            fontSize: 14,
-                          ),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.errorColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.errorColor.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.error_outline,
+                              color: AppColors.errorColor,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'No regions available. Please contact an administrator.',
+                                style: TextStyles.bodyText.copyWith(
+                                  color: AppColors.errorColor,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       )
                     else
-                      DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _selectedRegionId,
-                          isExpanded: true,
-                          hint: Text(
-                            'Select your region',
-                            style: TextStyles.bodyText.copyWith(
-                              color: AppColors.textColor.withOpacity(0.5),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.primaryColor.withOpacity(0.3)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
                             ),
+                          ],
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _selectedRegionId,
+                            isExpanded: true,
+                            hint: Text(
+                              'Select your region',
+                              style: TextStyles.bodyText.copyWith(
+                                color: AppColors.textColor.withOpacity(0.5),
+                              ),
+                            ),
+                            icon: const Icon(Icons.arrow_drop_down, color: AppColors.primaryColor),
+                            style: TextStyles.bodyText.copyWith(
+                              fontWeight: FontWeight.w500,
+                            ),
+                            onChanged: (String? newValue) {
+                              if (newValue != null) {
+                                // Find the selected region
+                                final selectedRegion = _regions.firstWhere(
+                                  (region) => region.id == newValue,
+                                  orElse: () => RegionModel(id: '', name: ''),
+                                );
+
+                                if (selectedRegion.id.isNotEmpty) {
+                                  // Debugging: Print selected region details
+                                  print('Selected Region ID: ${selectedRegion.id}');
+                                  print('Selected Region Name: ${selectedRegion.name}');
+
+                                  // Update the selected region ID
+                                  setState(() {
+                                    _selectedRegionId = selectedRegion.id;
+                                  });
+
+                                  // Optionally show region info
+                                  _showRegionInfo(selectedRegion);
+                                }
+                              }
+                            },
+                            items: _regions.map<DropdownMenuItem<String>>((RegionModel region) {
+                              return DropdownMenuItem<String>(
+                                value: region.id,
+                                child: Text(region.name),
+                              );
+                            }).toList(),
                           ),
-                          icon: const Icon(Icons.arrow_drop_down, color: AppColors.primaryColor),
-                          style: TextStyles.bodyText,
-                          onChanged: (String? newValue) {
-                            setState(() {
-                              _selectedRegionId = newValue;
-                            });
-                          },
-                          items: _regions.map<DropdownMenuItem<String>>((RegionModel region) {
-                            return DropdownMenuItem<String>(
-                              value: region.id,
-                              child: Text(region.name),
-                            );
-                          }).toList(),
                         ),
                       ),
                   ],
@@ -659,18 +767,224 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               ),
             ],
           ),
-          if (!_isLoadingRegions && _regions.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(left: 40.0, bottom: 8.0),
+          if (!_isLoadingRegions && _regions.isNotEmpty && _selectedRegionId == null)
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.secondaryColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.secondaryColor.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    color: AppColors.secondaryColor,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Please select your region to continue',
+                      style: TextStyles.bodyText.copyWith(
+                        fontSize: 12,
+                        color: AppColors.secondaryColor,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+  
+  // Show region information dialog
+  void _showRegionInfo(RegionModel region) {
+    // Only show dialog if there's a description
+    if (region.description == null || region.description!.isEmpty) {
+      return;
+    }
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(
+              Icons.location_on,
+              color: AppColors.primaryColor,
+              size: 24,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
               child: Text(
-                'Please select the region you belong to',
-                style: TextStyles.bodyText.copyWith(
-                  fontSize: 12,
-                  color: AppColors.textColor.withOpacity(0.6),
-                  fontStyle: FontStyle.italic,
+                region.name,
+                style: TextStyles.heading2.copyWith(
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Region Information',
+              style: TextStyles.bodyText.copyWith(
+                fontWeight: FontWeight.bold,
+                color: AppColors.secondaryColor,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              region.description ?? 'No description available',
+              style: TextStyles.bodyText,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // Show all available regions in a dialog
+  void _showAllRegions() {
+    if (_regions.isEmpty) {
+      _showInfo('No regions available');
+      return;
+    }
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(
+              Icons.map,
+              color: AppColors.primaryColor,
+              size: 24,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Available Regions',
+              style: TextStyles.heading2.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        content: Container(
+          width: double.maxFinite,
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.5,
+          ),
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: _regions.length,
+            itemBuilder: (context, index) {
+              final region = _regions[index];
+              final isSelected = _selectedRegionId == region.id;
+              
+              return Card(
+                elevation: isSelected ? 2 : 0,
+                color: isSelected 
+                  ? AppColors.primaryColor.withOpacity(0.1) 
+                  : Colors.white,
+                margin: const EdgeInsets.only(bottom: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  side: BorderSide(
+                    color: isSelected 
+                      ? AppColors.primaryColor 
+                      : Colors.grey.withOpacity(0.3),
+                    width: isSelected ? 2 : 1,
+                  ),
+                ),
+                child: InkWell(
+                  onTap: () {
+                    setState(() {
+                      _selectedRegionId = region.id;
+                    });
+                    Navigator.of(context).pop();
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.location_on,
+                              color: isSelected 
+                                ? AppColors.primaryColor 
+                                : AppColors.secondaryColor,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                region.name,
+                                style: TextStyles.bodyText.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: isSelected 
+                                    ? AppColors.primaryColor 
+                                    : AppColors.textColor,
+                                ),
+                              ),
+                            ),
+                            if (isSelected)
+                              Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryColor,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.check,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
+                              ),
+                          ],
+                        ),
+                        if (region.description != null && region.description!.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            region.description!,
+                            style: TextStyles.bodyText.copyWith(
+                              fontSize: 14,
+                              color: AppColors.textColor.withOpacity(0.7),
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
         ],
       ),
     );

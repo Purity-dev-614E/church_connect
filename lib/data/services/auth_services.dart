@@ -1,14 +1,14 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/app_endpoints.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
-
 import '../models/user_model.dart';
+import 'http_client.dart';
 
 class AuthServices {
   // Use a single instance of FlutterSecureStorage
   final FlutterSecureStorage secureStorage = const FlutterSecureStorage();
+  final HttpClient _httpClient = HttpClient();
 
   // Token keys
   static const String accessTokenKey = 'accessToken';
@@ -26,18 +26,18 @@ class AuthServices {
         };
       }
 
-      // Try both JSON and form-encoded formats
-      final response = await http.post(
-        Uri.parse(ApiEndpoints.login),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: json.encode({
+      print('Attempting login with email: $email');
+      
+      final response = await _httpClient.post(
+        ApiEndpoints.login,
+        body: {
           'email': email,
           'password': password
-        })
+        }
       );
+
+      print('Login response status code: ${response.statusCode}');
+      print('Login response body: ${response.body}');
 
       // Parse response
       Map<String, dynamic> responseData;
@@ -52,44 +52,54 @@ class AuthServices {
         };
       }
 
-      print('Login response: $responseData');
+      print('Parsed login response: $responseData');
 
       if (response.statusCode == 200) {
-        try {
-          // Store tokens securely
-          await secureStorage.write(
-            key: accessTokenKey, 
-            value: responseData['session']['access_token']
-          );
-          await secureStorage.write(
-            key: refreshTokenKey, 
-            value: responseData['session']['refresh_token']
-          );
+        // Check if the response has the expected structure
+        if (responseData['success'] == true && responseData['data'] != null) {
+          final data = responseData['data'];
+          
+          // Store tokens and user data
+          final accessToken = data['accessToken'];
+          final refreshToken = data['refreshToken'];
+          final userId = data['user']['id'];
+          final userData = data['user'];
 
-          // Store user_id in SharedPreferences for easier access
+          print('Login successful. Storing tokens and user data...');
+          print('User ID: $userId');
+          print('User Data: $userData');
+
+          // Store tokens in secure storage
+          await secureStorage.write(key: accessTokenKey, value: accessToken);
+          await secureStorage.write(key: refreshTokenKey, value: refreshToken);
+          await secureStorage.write(key: userIdKey, value: userId);
+
+          // Store user data in SharedPreferences
           final prefs = await SharedPreferences.getInstance();
-          await prefs.setString(
-            userIdKey, 
-            responseData['user']['id'].toString()
-          );
+          await prefs.setString('user_data', json.encode(userData));
+          await prefs.setString('user_id', userId);
 
-          print('Login successful: ${responseData['message']}');
+          // Set tokens in HttpClient
+          await _httpClient.setTokens(accessToken, refreshToken);
+
+          print('Tokens and user data stored successfully');
+
           return {
             'success': true,
-            'message': responseData['message'] ?? 'Login successful'
+            'message': 'Login successful',
+            'user': userData
           };
-        } catch (e) {
-          print('Error storing auth data: $e');
+        } else {
+          final errorMessage = responseData['message'] ?? 'Login failed';
+          print('Login failed: $errorMessage');
           return {
             'success': false,
-            'message': 'Error processing login response: $e'
+            'message': errorMessage
           };
         }
       } else {
-        final errorMessage = responseData['message'] ?? 
-                            responseData['error'] ?? 
-                            'Unknown error occurred';
-        print('Login failed: $errorMessage');
+        final errorMessage = responseData['message'] ?? 'Login failed';
+        print('Login failed with status ${response.statusCode}: $errorMessage');
         return {
           'success': false,
           'message': errorMessage
@@ -99,54 +109,29 @@ class AuthServices {
       print('Login error: $e');
       return {
         'success': false,
-        'message': 'Network or server error: $e'
+        'message': 'An error occurred during login: $e'
       };
-    }
-  }
-
-  // Get the current user ID
-  Future<String?> getUserId() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(userIdKey);
-  }
-
-
-
-  // Get access token
-  Future<String?> getAccessToken() async {
-    return await secureStorage.read(key: accessTokenKey);
-  }
-
-  // Get refresh token
-  Future<String?> getRefreshToken() async {
-    return await secureStorage.read(key: refreshTokenKey);
-  }
-
-  // Check if user is logged in
-  Future<bool> isLoggedIn() async {
-    try {
-      final token = await getAccessToken();
-      final userId = await getUserId();
-      
-      // Check both token and userId
-      return token != null && token.isNotEmpty && userId != null && userId.isNotEmpty;
-    } catch (e) {
-      print('Error checking login status: $e');
-      return false;
     }
   }
 
   // Logout method
   Future<void> logout() async {
-    // Clear stored tokens from secure storage
-    await secureStorage.delete(key: accessTokenKey);
-    await secureStorage.delete(key: refreshTokenKey);
+    try {
+      // Clear tokens from FlutterSecureStorage
+      await secureStorage.delete(key: accessTokenKey);
+      await secureStorage.delete(key: refreshTokenKey);
+      await secureStorage.delete(key: userIdKey);
 
-    // Clear user ID from SharedPreferences
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(userIdKey);
+      // Clear tokens from SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('auth_token');
+      await prefs.remove('refresh_token');
+      await prefs.remove(userIdKey);
 
-    print('Logout successful');
+      print('Logout successful');
+    } catch (e) {
+      print('Error during logout: $e');
+    }
   }
 
   // Signup method with proper error handling
@@ -154,17 +139,12 @@ class AuthServices {
     try {
       print("Attempting signup with email: $email");
       
-      // Use JSON format for the request body, similar to login
-      final response = await http.post(
-        Uri.parse(ApiEndpoints.signup),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: json.encode({
+      final response = await _httpClient.post(
+        ApiEndpoints.signup,
+        body: {
           "email": email,
           "password": password
-        })
+        }
       );
 
       print("Signup response status code: ${response.statusCode}");
@@ -200,8 +180,8 @@ class AuthServices {
   // Reset password method
   Future<bool> resetPassword(String email) async {
     try {
-      final response = await http.post(
-        Uri.parse(ApiEndpoints.forgotPassword),
+      final response = await _httpClient.post(
+        ApiEndpoints.forgotPassword,
         body: {
           "email": email
         }
@@ -222,37 +202,21 @@ class AuthServices {
   }
 
   // Update user profile
- Future<bool> updateProfile(UserModel user) async {
-        try {
-          // Get the user ID
-          final userId = await getUserId();
-          if (userId == null) {
-            print("Cannot update profile: User ID not found");
-            return false;
-          }
-
-          // Get the access token for authorization
-          final token = await getAccessToken();
-          if (token == null) {
-            print("Cannot update profile: Not authenticated");
-            return false;
-          }
-
-          final response = await http.put(
-            Uri.parse(ApiEndpoints.updateUser(userId)),
-            headers: {
-              'Authorization': 'Bearer $token',
-              'Content-Type': 'application/json',
-            },
-            body: json.encode({
-              "full_name": user.fullName,
-              "phone_number": user.contact,
-              "gender": user.gender,
-              "next_of_kin_name": user.nextOfKin,
-              "next_of_kin_contact": user.nextOfKinContact,
-              "role": user.role
-            })
-          );
+  Future<bool> updateProfile(UserModel user) async {
+    try {
+      final response = await _httpClient.put(
+        ApiEndpoints.updateUser(user.id),
+        body: {
+          "full_name": user.fullName,
+          "phone_number": user.contact,
+          "gender": user.gender,
+          "next_of_kin_name": user.nextOfKin,
+          "next_of_kin_contact": user.nextOfKinContact,
+          "role": user.role,
+          "location": user.regionName,
+          "region_id": user.regionId,
+        }
+      );
 
       if (response.statusCode == 200) {
         print("Profile Updated Successfully");
@@ -277,57 +241,129 @@ class AuthServices {
         return false;
       }
 
-      final response = await http.post(
-        Uri.parse(ApiEndpoints.refreshToken),
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-        },
-        body: json.encode({
+      final response = await _httpClient.post(
+        ApiEndpoints.refreshToken,
+        body: {
           "refresh_token": refreshToken
-        })
+        }
       );
 
       if (response.statusCode == 200) {
         try {
           final data = json.decode(response.body);
           
-          // Store the new access token
+          // Get the new tokens
+          String? newAccessToken;
+          String? newRefreshToken;
+          
           if (data.containsKey('access_token')) {
-            await secureStorage.write(key: accessTokenKey, value: data['access_token']);
+            newAccessToken = data['access_token'];
           } else if (data.containsKey('session') && data['session'].containsKey('access_token')) {
-            await secureStorage.write(key: accessTokenKey, value: data['session']['access_token']);
-          } else {
+            newAccessToken = data['session']['access_token'];
+          }
+          
+          if (data.containsKey('refresh_token')) {
+            newRefreshToken = data['refresh_token'];
+          } else if (data.containsKey('session') && data['session'].containsKey('refresh_token')) {
+            newRefreshToken = data['session']['refresh_token'];
+          }
+          
+          if (newAccessToken == null) {
             print("Invalid refresh token response format");
             return false;
           }
           
-          // Store the new refresh token if provided
-          if (data.containsKey('refresh_token')) {
-            await secureStorage.write(key: refreshTokenKey, value: data['refresh_token']);
-          } else if (data.containsKey('session') && data['session'].containsKey('refresh_token')) {
-            await secureStorage.write(key: refreshTokenKey, value: data['session']['refresh_token']);
+          // Store the new tokens in both FlutterSecureStorage and SharedPreferences
+          await secureStorage.write(key: accessTokenKey, value: newAccessToken);
+          if (newRefreshToken != null) {
+            await secureStorage.write(key: refreshTokenKey, value: newRefreshToken);
           }
           
-          print("Token refreshed successfully");
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('auth_token', newAccessToken);
+          if (newRefreshToken != null) {
+            await prefs.setString('refresh_token', newRefreshToken);
+          }
+          
           return true;
         } catch (e) {
-          print("Error processing refresh token response: $e");
+          print("Error parsing refresh token response: $e");
           return false;
         }
       } else {
-        print("Failed to refresh token: ${response.statusCode}");
-        print("Response body: ${response.body}");
-        
-        // If refresh token is invalid or expired, clear tokens to force re-login
-        if (response.statusCode == 401 || response.statusCode == 403) {
-          await logout();
-        }
-        
+        print("Refresh token failed with status: ${response.statusCode}");
         return false;
       }
     } catch (e) {
-      print("Token Refresh Error: $e");
+      print("Refresh token error: $e");
+      return false;
+    }
+  }
+
+  // Get access token
+  Future<String?> getAccessToken() async {
+    try {
+      // Try to get from FlutterSecureStorage first
+      String? token = await secureStorage.read(key: accessTokenKey);
+      
+      // If not found, try SharedPreferences
+      if (token == null) {
+        final prefs = await SharedPreferences.getInstance();
+        token = prefs.getString('auth_token');
+      }
+      
+      return token;
+    } catch (e) {
+      print("Error getting access token: $e");
+      return null;
+    }
+  }
+
+  // Get refresh token
+  Future<String?> getRefreshToken() async {
+    try {
+      // Try to get from FlutterSecureStorage first
+      String? token = await secureStorage.read(key: refreshTokenKey);
+      
+      // If not found, try SharedPreferences
+      if (token == null) {
+        final prefs = await SharedPreferences.getInstance();
+        token = prefs.getString('refresh_token');
+      }
+      
+      return token;
+    } catch (e) {
+      print("Error getting refresh token: $e");
+      return null;
+    }
+  }
+
+  // Get user ID
+  Future<String?> getUserId() async {
+    try {
+      // Try to get from FlutterSecureStorage first
+      String? userId = await secureStorage.read(key: userIdKey);
+      
+      // If not found, try SharedPreferences
+      if (userId == null) {
+        final prefs = await SharedPreferences.getInstance();
+        userId = prefs.getString(userIdKey);
+      }
+      
+      return userId;
+    } catch (e) {
+      print("Error getting user ID: $e");
+      return null;
+    }
+  }
+
+  // Check if user is logged in
+  Future<bool> isLoggedIn() async {
+    try {
+      final token = await getAccessToken();
+      return token != null && token.isNotEmpty;
+    } catch (e) {
+      print("Error checking login status: $e");
       return false;
     }
   }

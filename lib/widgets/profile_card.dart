@@ -11,7 +11,7 @@ class ProfileCard extends StatelessWidget {
   final String nextOfKinNumber;
   final VoidCallback? onUpdateTap;  // Callback for the update button
 
-  ProfileCard({
+  const ProfileCard({super.key, 
     required this.avatarUrl,
     required this.fullName,
     required this.contact,

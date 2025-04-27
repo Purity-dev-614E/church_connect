@@ -6,7 +6,7 @@ import 'package:group_management_church_app/features/auth/login.dart';
 import 'package:provider/provider.dart';
 
 class NoGroupScreen extends StatelessWidget {
-  const NoGroupScreen({Key? key}) : super(key: key);
+  const NoGroupScreen({super.key});
 
   @override
   Widget build(BuildContext context) {

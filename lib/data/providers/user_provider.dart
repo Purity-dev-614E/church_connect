@@ -19,13 +19,32 @@ class UserProvider with ChangeNotifier {
     }
   }
   
-  Future<void> updateUser(UserModel updatedUser) async{
+  Future<bool> updateUser(UserModel updatedUser) async {
     try {
-      await _authService.updateProfile(updatedUser);
-      _currentUser = updatedUser;
-      notifyListeners();
+      // Validate user ID
+      if (updatedUser.id.isEmpty) {
+        print('Error: Empty user ID provided to updateUser');
+        return false;
+      }
+
+      // Log the update attempt
+      print('Updating user: ${updatedUser.fullName} (ID: ${updatedUser.id})');
+      print('New role: ${updatedUser.role}');
+      
+      // Update the user profile
+      final success = await _authService.updateProfile(updatedUser);
+      
+      if (success) {
+        _currentUser = updatedUser;
+        notifyListeners();
+        return true;
+      } else {
+        print('Failed to update user profile');
+        return false;
+      }
     } catch (error) {
       print('Error updating user: $error');
+      return false;
     }
   }
   
@@ -61,12 +80,8 @@ class UserProvider with ChangeNotifier {
       final user = await _userService.fetchCurrentUser(userId);
       
       // Log the result for debugging
-      if (user != null) {
-        print('UserProvider: Successfully retrieved user: ${user.fullName} (ID: ${user.id})');
-      } else {
-        print('UserProvider: User not found for ID: $userId');
-      }
-      
+      print('UserProvider: Successfully retrieved user: ${user.fullName} (ID: ${user.id})');
+          
       return user;
     } catch (error) {
       print('Error fetching user by ID: $error');
@@ -96,7 +111,24 @@ class UserProvider with ChangeNotifier {
   
   Future<bool> assignUserToRegion(String userId, String regionId) async {
     try {
-      return await _userService.assignUserToRegion(userId, regionId);
+      // Validate inputs
+      if (userId.isEmpty || regionId.isEmpty) {
+        print('Error: Empty userId or regionId provided to assignUserToRegion');
+        return false;
+      }
+
+      print('Assigning user $userId to region $regionId');
+      final success = await _userService.assignUserToRegion(userId, regionId);
+      
+      if (success) {
+        // Reload the current user if it's the same user
+        if (_currentUser?.id == userId) {
+          await loadUser(userId);
+        }
+        notifyListeners();
+      }
+      
+      return success;
     } catch (error) {
       print('Error assigning user to region: $error');
       return false;

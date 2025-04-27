@@ -29,7 +29,7 @@ class AnimatedLoadingIndicator extends StatefulWidget {
   final bool withFading;
 
   const AnimatedLoadingIndicator({
-    Key? key,
+    super.key,
     this.type = LoadingAnimationType.circularPulse,
     this.primaryColor = Colors.blue,
     this.secondaryColor = Colors.lightBlueAccent,
@@ -37,7 +37,7 @@ class AnimatedLoadingIndicator extends StatefulWidget {
     this.speedFactor = 1.0,
     this.loadingText,
     this.withFading = true,
-  }) : super(key: key);
+  });
 
   @override
   State<AnimatedLoadingIndicator> createState() => _AnimatedLoadingIndicatorState();

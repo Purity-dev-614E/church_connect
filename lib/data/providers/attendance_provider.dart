@@ -116,98 +116,97 @@ class AttendanceProvider extends ChangeNotifier {
              throw Exception('Invalid attendance item format');
            }
          }).where((model) => model != null).toList();
-       } else if (attendanceData is Map) {
-         // Check for common response structures
-         if (attendanceData.containsKey('attendance') && attendanceData['attendance'] is List) {
-           // Format: { "attendance": [...] }
-           attendanceList = (attendanceData['attendance'] as List).map((item) {
-             if (item is Map<String, dynamic>) {
-               return AttendanceModel.fromJson(item);
-             } else {
-               throw Exception('Invalid attendance item format');
-             }
-           }).where((model) => model != null).toList();
-         } else if (attendanceData.containsKey('records') && attendanceData['records'] is List) {
-           // Format: { "records": [...] }
-           attendanceList = (attendanceData['records'] as List).map((item) {
-             if (item is Map<String, dynamic>) {
-               return AttendanceModel.fromJson(item);
-             } else {
-               throw Exception('Invalid attendance item format');
-             }
-           }).where((model) => model != null).toList();
-         } else if (attendanceData.containsKey('data') && attendanceData['data'] is List) {
-           // Format: { "data": [...] }
-           attendanceList = (attendanceData['data'] as List).map((item) {
-             if (item is Map<String, dynamic>) {
-               return AttendanceModel.fromJson(item);
-             } else {
-               throw Exception('Invalid attendance item format');
-             }
-           }).where((model) => model != null).toList();
-         } else if (attendanceData.containsKey('items') && attendanceData['items'] is List) {
-           // Format: { "items": [...] }
-           attendanceList = (attendanceData['items'] as List).map((item) {
-             if (item is Map<String, dynamic>) {
-               return AttendanceModel.fromJson(item);
-             } else {
-               throw Exception('Invalid attendance item format');
-             }
-           }).where((model) => model != null).toList();
-         } else if (attendanceData.containsKey('results') && attendanceData['results'] is List) {
-           // Format: { "results": [...] }
-           attendanceList = (attendanceData['results'] as List).map((item) {
-             if (item is Map<String, dynamic>) {
-               return AttendanceModel.fromJson(item);
-             } else {
-               throw Exception('Invalid attendance item format');
-             }
-           }).where((model) => model != null).toList();
-         } else {
-           // Try to find any list in the map
-           bool foundList = false;
-           for (var key in attendanceData.keys) {
-             if (attendanceData[key] is List && (attendanceData[key] as List).isNotEmpty) {
-               attendanceList = (attendanceData[key] as List).map((item) {
-                 if (item is Map<String, dynamic>) {
-                   return AttendanceModel.fromJson(item);
-                 } else {
-                   return null;
-                 }
-               }).where((model) => model != null).cast<AttendanceModel>().toList();
-               foundList = true;
-               break;
-             }
+       } else       // Check for common response structures
+       if (attendanceData.containsKey('attendance') && attendanceData['attendance'] is List) {
+         // Format: { "attendance": [...] }
+         attendanceList = (attendanceData['attendance'] as List).map((item) {
+           if (item is Map<String, dynamic>) {
+             return AttendanceModel.fromJson(item);
+           } else {
+             throw Exception('Invalid attendance item format');
            }
-           
-           // If no list was found, try to convert each entry in the map
-           if (!foundList) {
-             attendanceList = attendanceData.entries.map((entry) {
-               if (entry.value is Map<String, dynamic>) {
-                 try {
-                   Map<String, dynamic> attendanceMap = entry.value as Map<String, dynamic>;
-                   // Add the key as id if not present
-                   if (!attendanceMap.containsKey('id')) {
-                     attendanceMap['id'] = entry.key;
-                   }
-                   return AttendanceModel.fromMap(attendanceMap);
-                 } catch (e) {
-                   print('Error parsing attendance entry: $e');
-                   return null;
-                 }
+         }).where((model) => model != null).toList();
+       } else if (attendanceData.containsKey('records') && attendanceData['records'] is List) {
+         // Format: { "records": [...] }
+         attendanceList = (attendanceData['records'] as List).map((item) {
+           if (item is Map<String, dynamic>) {
+             return AttendanceModel.fromJson(item);
+           } else {
+             throw Exception('Invalid attendance item format');
+           }
+         }).where((model) => model != null).toList();
+       } else if (attendanceData.containsKey('data') && attendanceData['data'] is List) {
+         // Format: { "data": [...] }
+         attendanceList = (attendanceData['data'] as List).map((item) {
+           if (item is Map<String, dynamic>) {
+             return AttendanceModel.fromJson(item);
+           } else {
+             throw Exception('Invalid attendance item format');
+           }
+         }).where((model) => model != null).toList();
+       } else if (attendanceData.containsKey('items') && attendanceData['items'] is List) {
+         // Format: { "items": [...] }
+         attendanceList = (attendanceData['items'] as List).map((item) {
+           if (item is Map<String, dynamic>) {
+             return AttendanceModel.fromJson(item);
+           } else {
+             throw Exception('Invalid attendance item format');
+           }
+         }).where((model) => model != null).toList();
+       } else if (attendanceData.containsKey('results') && attendanceData['results'] is List) {
+         // Format: { "results": [...] }
+         attendanceList = (attendanceData['results'] as List).map((item) {
+           if (item is Map<String, dynamic>) {
+             return AttendanceModel.fromJson(item);
+           } else {
+             throw Exception('Invalid attendance item format');
+           }
+         }).where((model) => model != null).toList();
+       } else {
+         // Try to find any list in the map
+         bool foundList = false;
+         for (var key in attendanceData.keys) {
+           if (attendanceData[key] is List && (attendanceData[key] as List).isNotEmpty) {
+             attendanceList = (attendanceData[key] as List).map((item) {
+               if (item is Map<String, dynamic>) {
+                 return AttendanceModel.fromJson(item);
                } else {
-                 // Create a default model if the structure is unexpected
-                 return AttendanceModel(
-                   id: entry.key,
-                   userId: '',
-                   eventId: eventId,
-                   isPresent: false
-                 );
+                 return null;
                }
              }).where((model) => model != null).cast<AttendanceModel>().toList();
+             foundList = true;
+             break;
            }
          }
+         
+         // If no list was found, try to convert each entry in the map
+         if (!foundList) {
+           attendanceList = attendanceData.entries.map((entry) {
+             if (entry.value is Map<String, dynamic>) {
+               try {
+                 Map<String, dynamic> attendanceMap = entry.value as Map<String, dynamic>;
+                 // Add the key as id if not present
+                 if (!attendanceMap.containsKey('id')) {
+                   attendanceMap['id'] = entry.key;
+                 }
+                 return AttendanceModel.fromMap(attendanceMap);
+               } catch (e) {
+                 print('Error parsing attendance entry: $e');
+                 return null;
+               }
+             } else {
+               // Create a default model if the structure is unexpected
+               return AttendanceModel(
+                 id: entry.key,
+                 userId: '',
+                 eventId: eventId,
+                 isPresent: false
+               );
+             }
+           }).where((model) => model != null).cast<AttendanceModel>().toList();
+         }
        }
+     
      } catch (e) {
        print('Error processing attendance data: $e');
        // Return empty list on parsing error

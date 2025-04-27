@@ -1,17 +1,17 @@
 import 'dart:convert';
 
 import 'package:group_management_church_app/core/constants/app_endpoints.dart';
-import 'package:group_management_church_app/data/models/attendance_model.dart';
 import 'package:group_management_church_app/data/models/event_model.dart';
 import 'package:group_management_church_app/data/models/user_model.dart';
 import 'package:group_management_church_app/data/services/auth_services.dart';
 import 'package:group_management_church_app/data/services/user_services.dart';
-import 'package:http/http.dart' as http;
+import 'package:group_management_church_app/data/services/http_client.dart';
 
 /// Service class for managing group-specific events and attendance
 class EventServices {
   final AuthServices _authServices = AuthServices();
   final UserServices _userServices = UserServices();
+  final HttpClient _httpClient = HttpClient();
 
   // SECTION: Authentication and Authorization
 
@@ -54,26 +54,18 @@ class EventServices {
 
     // For regular admins, check if they are the admin of this group
     try {
-      final response = await http.get(
-        Uri.parse(ApiEndpoints.getGroupById(groupId)),
-        headers: await _getHeaders(),
-      );
+      final response = await _httpClient.get(ApiEndpoints.getGroupById(groupId));
 
       if (response.statusCode == 200) {
         final groupData = jsonDecode(response.body);
-        final groupAdminId = groupData['group_admin_id'];
-
-        if (groupAdminId != userId) {
-          throw Exception(
-              'User is not authorized to manage events for this group');
+        if (groupData['admin_id'] != userId) {
+          throw Exception('You do not have permission to manage events for this group');
         }
       } else {
-        throw Exception(
-            'Failed to check group permissions: HTTP status ${response
-                .statusCode}');
+        throw Exception('Failed to verify group permissions');
       }
     } catch (e) {
-      throw Exception('Failed to check group permissions: $e');
+      throw Exception('Failed to verify group permissions: $e');
     }
   }
 
@@ -92,16 +84,15 @@ class EventServices {
     try {
       await _checkGroupPermission(groupId);
 
-      final response = await http.post(
-        Uri.parse(ApiEndpoints.createGroupEvent(groupId)),
-        headers: await _getHeaders(),
-        body: jsonEncode({
+      final response = await _httpClient.post(
+        ApiEndpoints.createGroupEvent(groupId),
+        body: {
           'title': title,
           'description': description,
           'date': dateTime.toIso8601String(),
           'location': location,
           'group_id': groupId,
-        }),
+        },
       );
 
       if (response.statusCode == 201 || response.statusCode == 200) {
@@ -120,22 +111,17 @@ class EventServices {
   /// Returns a list of [EventModel] objects for the specified group
   Future<List<EventModel>> getEventsByGroup(String groupId) async {
     try {
-      final response = await http.get(
-        Uri.parse(ApiEndpoints.getEventsByGroup(groupId)),
-        headers: await _getHeaders(),
-      );
+      final response = await _httpClient.get(ApiEndpoints.getEventsByGroup(groupId));
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         return data.map((event) => EventModel.fromJson(event)).toList();
       } else {
-        throw Exception(
-            'Failed to fetch group events: HTTP status ${response.statusCode}');
+        throw Exception('Failed to fetch group events: HTTP status ${response.statusCode}');
       }
     } catch (e) {
       throw Exception('Failed to fetch group events: $e');
     }
-    return [];
   }
 
   /// Get a specific event by ID
@@ -143,16 +129,12 @@ class EventServices {
   /// Returns the [EventModel] for the specified event ID
   Future<EventModel> getEventById(String eventId) async {
     try {
-      final response = await http.get(
-        Uri.parse(ApiEndpoints.getEventById(eventId)),
-        headers: await _getHeaders(),
-      );
+      final response = await _httpClient.get(ApiEndpoints.getEventById(eventId));
 
       if (response.statusCode == 200) {
         return EventModel.fromJson(jsonDecode(response.body));
       } else {
-        throw Exception(
-            'Failed to fetch event: HTTP status ${response.statusCode}');
+        throw Exception('Failed to fetch event: HTTP status ${response.statusCode}');
       }
     } catch (e) {
       throw Exception('Failed to fetch event: $e');
@@ -173,23 +155,21 @@ class EventServices {
     try {
       await _checkGroupPermission(groupId);
 
-      final response = await http.put(
-        Uri.parse(ApiEndpoints.updateEvent(eventId)),
-        headers: await _getHeaders(),
-        body: jsonEncode({
+      final response = await _httpClient.put(
+        ApiEndpoints.updateEvent(eventId),
+        body: {
           'title': title,
           'description': description,
           'date': dateTime.toIso8601String(),
           'location': location,
           'group_id': groupId,
-        }),
+        },
       );
 
       if (response.statusCode == 200) {
         return EventModel.fromJson(jsonDecode(response.body));
       } else {
-        throw Exception(
-            'Failed to update event: HTTP status ${response.statusCode}');
+        throw Exception('Failed to update event: HTTP status ${response.statusCode}');
       }
     } catch (e) {
       throw Exception('Failed to update event: $e');
@@ -203,16 +183,12 @@ class EventServices {
     try {
       await _checkGroupPermission(groupId);
 
-      final response = await http.delete(
-        Uri.parse(ApiEndpoints.deleteEvent(eventId)),
-        headers: await _getHeaders(),
-      );
+      final response = await _httpClient.delete(ApiEndpoints.deleteEvent(eventId));
 
       if (response.statusCode == 200) {
         return true;
       } else {
-        throw Exception(
-            'Failed to delete event: HTTP status ${response.statusCode}');
+        throw Exception('Failed to delete event: HTTP status ${response.statusCode}');
       }
     } catch (e) {
       throw Exception('Failed to delete event: $e');
@@ -267,6 +243,22 @@ class EventServices {
     }
   }
 
+  //getall events
+  Future<List<EventModel>> getAllEvents(String groupId) async {
+    try {
+      final response = await _httpClient.get(ApiEndpoints.events);
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((event) => EventModel.fromJson(event)).toList();
+      } else {
+        throw Exception(
+            'Failed to fetch all events: HTTP status ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Failed to fetch all events: $e');
+    }
+  }
+
   // SECTION: Attendance Management
 
   /// Create attendance records for an event
@@ -279,13 +271,12 @@ class EventServices {
       final event = await getEventById(eventId);
       await _checkGroupPermission(event.groupId);
 
-      final response = await http.post(
-        Uri.parse(ApiEndpoints.createEventAttendance(eventId)),
-        headers: await _getHeaders(),
-        body: jsonEncode({
+      final response = await _httpClient.post(
+        ApiEndpoints.createEventAttendance(eventId),
+        body: {
           'event_id': eventId,
           'attended_members': attendedMemberIds,
-        }),
+        },
       );
 
       if (response.statusCode == 201 || response.statusCode == 200) {
@@ -304,10 +295,7 @@ class EventServices {
   /// Returns a list of user data for members who attended the event
   Future<List<UserModel>> getAttendedMembers(String eventId) async {
     try {
-      final response = await http.get(
-        Uri.parse(ApiEndpoints.getAttendedMembers(eventId)),
-        headers: await _getHeaders(),
-      );
+      final response = await _httpClient.get(ApiEndpoints.getAttendedMembers(eventId));
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
@@ -328,10 +316,7 @@ class EventServices {
   /// Returns attendance statistics and details for the specified event
   Future<Map<String, dynamic>> getEventAttendance(String eventId) async {
     try {
-      final response = await http.get(
-        Uri.parse(ApiEndpoints.getAttendanceByEvent(eventId)),
-        headers: await _getHeaders(),
-      );
+      final response = await _httpClient.get(ApiEndpoints.getAttendanceByEvent(eventId));
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
@@ -350,10 +335,7 @@ class EventServices {
   /// Returns overall attendance statistics for all events in the group
   Future<Map<String, dynamic>> getGroupAttendance(String groupId) async {
     try {
-      final response = await http.get(
-        Uri.parse(ApiEndpoints.getGroupAttendance(groupId)),
-        headers: await _getHeaders(),
-      );
+      final response = await _httpClient.get(ApiEndpoints.getGroupAttendance(groupId));
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
@@ -387,9 +369,8 @@ class EventServices {
         if (apology != null) body['apology'] = apology;
       }
 
-      final response = await http.post(
-        Uri.parse(ApiEndpoints.createEventAttendance(eventId)),
-        headers: await _getHeaders(),
+      final response = await _httpClient.post(
+        ApiEndpoints.createEventAttendance(eventId),
         body: jsonEncode(body),
       );
 
@@ -410,10 +391,7 @@ class EventServices {
   Future<List<Map<String, dynamic>>> getUserAttendanceRecords(
       String userId) async {
     try {
-      final response = await http.get(
-        Uri.parse(ApiEndpoints.getAttendanceByUser(userId)),
-        headers: await _getHeaders(),
-      );
+      final response = await _httpClient.get(ApiEndpoints.getAttendanceByUser(userId));
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
@@ -459,10 +437,7 @@ class EventServices {
   /// Get events by region
   Future<List<EventModel>> getEventsByRegion(String regionId) async {
     try {
-      final response = await http.get(
-        Uri.parse(ApiEndpoints.getEventsByRegion(regionId)),
-        headers: await _getHeaders(),
-      );
+      final response = await _httpClient.get(ApiEndpoints.getEventsByRegion(regionId));
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
@@ -471,36 +446,31 @@ class EventServices {
         // No events found for this region
         return [];
       } else {
-        throw Exception('Failed to fetch region events: HTTP status ${response
-            .statusCode}');
+        throw Exception('Failed to fetch region events: HTTP status ${response.statusCode}');
       }
     } catch (e) {
       print('Error fetching events by region: $e');
 
       // Fallback: Try to get all events and filter by region
       try {
-        final allEvents = await getAllEvents();
+        final allEvents = await getOverallEvents();
         return allEvents.where((event) => event.regionId == regionId).toList();
       } catch (fallbackError) {
-        throw Exception(
-            'Failed to fetch region events: $e, Fallback error: $fallbackError');
+        throw Exception('Failed to fetch region events: $e, Fallback error: $fallbackError');
       }
     }
   }
 
-  //get all events
-  Future<List<EventModel>> getAllEvents() async {
+  /// Get all events
+  Future<List<EventModel>> getOverallEvents() async {
     try {
-      final response = await http.get(
-        Uri.parse(ApiEndpoints.events),
-        headers: await _getHeaders(),
-      );
+      final response = await _httpClient.get(ApiEndpoints.events);
+      
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         return data.map((event) => EventModel.fromJson(event)).toList();
       } else {
-        throw Exception(
-            'Failed to fetch all events: HTTP status ${response.statusCode}');
+        throw Exception('Failed to fetch all events: HTTP status ${response.statusCode}');
       }
     } catch (e) {
       throw Exception('Failed to fetch all events: $e');

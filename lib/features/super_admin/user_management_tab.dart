@@ -8,6 +8,8 @@ import 'package:provider/provider.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
 
 class UserManagementTab extends StatefulWidget {
+  const UserManagementTab({super.key});
+
   @override
   _UserManagementTabState createState() => _UserManagementTabState();
 }
@@ -251,6 +253,10 @@ class _UserManagementTabState extends State<UserManagementTab> {
       case 'admin':
         roleDisplay = 'Group Leader';
         roleColor = AppColors.secondaryColor;
+        break;
+      case 'regional manager':
+        roleDisplay = 'Regional Manager';
+        roleColor = AppColors.accentColor;
         break;
       case 'user':
         roleDisplay = 'Member';

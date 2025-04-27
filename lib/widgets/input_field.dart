@@ -113,7 +113,7 @@ class EnhancedInputField extends StatefulWidget {
   final Duration animationDuration;
 
   const EnhancedInputField({
-    Key? key,
+    super.key,
     required this.controller,
     required this.label,
     this.hintText,
@@ -148,7 +148,7 @@ class EnhancedInputField extends StatefulWidget {
     this.enableSuggestions = true,
     this.showClearButton = true,
     this.animationDuration = const Duration(milliseconds: 200),
-  }) : super(key: key);
+  });
 
   @override
   State<EnhancedInputField> createState() => _EnhancedInputFieldState();

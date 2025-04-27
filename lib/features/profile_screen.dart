@@ -14,7 +14,7 @@ import 'package:provider/provider.dart';
 import '../data/providers/user_provider.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({Key? key}) : super(key: key);
+  const ProfileScreen({super.key});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -197,6 +197,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         nextOfKinContact: currentUser.nextOfKinContact,
         role: currentUser.role,
         gender: currentUser.gender,
+        regionId: currentUser.regionId
       );
 
       // Update user profile
@@ -454,12 +455,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Personal Information',
-              style: TextStyles.heading2.copyWith(
-                color: AppColors.primaryColor,
-                fontWeight: FontWeight.bold,
-              ),
+            Row(
+              children: [
+                Icon(
+                  Icons.person_outline,
+                  color: AppColors.primaryColor,
+                  size: 24,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Personal Information',
+                  style: TextStyles.heading2.copyWith(
+                    color: AppColors.primaryColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             _buildInfoRow(Icons.email, 'Email', user.email),
@@ -467,6 +478,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _buildInfoRow(Icons.phone, 'Phone', user.contact),
             const Divider(),
             _buildInfoRow(Icons.person, 'Gender', user.gender),
+            const Divider(),
+            _buildInfoRow(
+              Icons.location_on, 
+              'Region', 
+              user.regionName ?? (user.regionId != null ? 'Region ID: ${user.regionId}' : 'Not assigned'),
+              user.regionId != null ? AppColors.primaryColor : AppColors.errorColor.withOpacity(0.7),
+            ),
           ],
         ),
       ),
@@ -501,36 +519,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String label, String value) {
+  Widget _buildInfoRow(IconData icon, String label, String value, [Color? iconColor]) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
         children: [
           Icon(
             icon,
-            color: AppColors.secondaryColor,
+            color: iconColor ?? AppColors.secondaryColor,
             size: 24,
           ),
           const SizedBox(width: 16),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyles.bodyText.copyWith(
-                  color: AppColors.textColor.withOpacity(0.6),
-                  fontSize: 14,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyles.bodyText.copyWith(
+                    color: AppColors.textColor.withOpacity(0.6),
+                    fontSize: 14,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                value,
-                style: TextStyles.bodyText.copyWith(
-                  fontWeight: FontWeight.w500,
-                  fontSize: 16,
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: TextStyles.bodyText.copyWith(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 16,
+                    color: label == 'Region' && value == 'Not assigned' 
+                        ? AppColors.errorColor.withOpacity(0.7)
+                        : AppColors.textColor,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),

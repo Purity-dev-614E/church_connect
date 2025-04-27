@@ -101,7 +101,12 @@ class AuthProvider extends ChangeNotifier {
       final String message = result['message'] ?? 'Unknown error';
       
       if (success) {
-        await _loadUserData();
+        // Set the current user from the login response
+        if (result['user'] != null) {
+          _currentUser = UserModel.fromJson(result['user']);
+          print('Current user set: ${_currentUser?.fullName}');
+        }
+        
         _status = AuthStatus.authenticated;
         notifyListeners();
         return AuthResult(

@@ -6,9 +6,10 @@ import 'package:group_management_church_app/data/providers/event_provider.dart';
 import 'package:group_management_church_app/data/providers/group_provider.dart';
 import 'package:group_management_church_app/data/providers/region_provider.dart';
 import 'package:group_management_church_app/data/providers/user_provider.dart';
-import 'package:group_management_church_app/data/providers/analytics_provider.dart';
 import 'package:group_management_church_app/data/providers/attendance_provider.dart';
-import 'package:group_management_church_app/data/providers/dashboard_analytics_provider.dart';
+import 'package:group_management_church_app/data/providers/analytics_providers/admin_analytics_provider.dart';
+import 'package:group_management_church_app/data/providers/analytics_providers/regional_manager_analytics_provider.dart';
+import 'package:group_management_church_app/data/providers/analytics_providers/super_admin_analytics_provider.dart';
 import 'package:group_management_church_app/features/auth/login.dart';
 import 'package:group_management_church_app/features/auth/reset_password.dart';
 import 'package:group_management_church_app/features/auth/signup.dart';
@@ -77,10 +78,11 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => GroupProvider()),
         ChangeNotifierProvider(create: (_) => EventProvider()),
-        ChangeNotifierProvider(create: (_) => AnalyticsProvider()),
         ChangeNotifierProvider(create: (_) => AttendanceProvider()),
         ChangeNotifierProvider(create: (_) => RegionProvider()),
-        ChangeNotifierProvider(create: (_) => DashboardAnalyticsProvider()),
+        ChangeNotifierProvider(create: (_) => AdminAnalyticsProvider()),
+        ChangeNotifierProvider(create: (_) => RegionalManagerAnalyticsProvider()),
+        ChangeNotifierProvider(create: (_) => SuperAdminAnalyticsProvider()),
       ],
       child: MaterialApp(
         title: 'Church Connect',

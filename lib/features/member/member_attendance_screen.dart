@@ -14,10 +14,10 @@ class MemberAttendanceScreen extends StatefulWidget {
   final String? groupId; // Optional: to filter attendance by group
 
   const MemberAttendanceScreen({
-    Key? key,
+    super.key,
     required this.userId,
     this.groupId,
-  }) : super(key: key);
+  });
 
   @override
   State<MemberAttendanceScreen> createState() => _MemberAttendanceScreenState();

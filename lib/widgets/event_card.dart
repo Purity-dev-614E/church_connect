@@ -10,7 +10,7 @@ class EventCard extends StatelessWidget {
   final String eventLocation;
   final VoidCallback onTap;
 
-  EventCard({
+  const EventCard({super.key, 
     required this.eventTitle,
     required this.eventDate,
     required this.eventLocation,

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:group_management_church_app/core/constants/colors.dart';
 import 'package:group_management_church_app/core/constants/text_styles.dart';
+import 'package:group_management_church_app/data/models/region_model.dart';
 import 'package:group_management_church_app/data/models/user_model.dart';
+import 'package:group_management_church_app/data/providers/region_provider.dart';
 import 'package:group_management_church_app/data/providers/user_provider.dart';
 import 'package:group_management_church_app/widgets/custom_app_bar.dart';
 import 'package:group_management_church_app/widgets/custom_button.dart';
@@ -9,7 +11,7 @@ import 'package:provider/provider.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
 
 class UserRoleManagementScreen extends StatefulWidget {
-  const UserRoleManagementScreen({Key? key}) : super(key: key);
+  const UserRoleManagementScreen({super.key});
 
   @override
   State<UserRoleManagementScreen> createState() => _UserRoleManagementScreenState();
@@ -23,12 +25,28 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
   List<UserModel> _filteredUsers = [];
   
   // Available roles
-  final List<String> _availableRoles = ['user', 'admin', 'super_admin'];
+  final List<String> _availableRoles = ['user', 'admin', 'regional manager', 'super admin'];
+  
+  // Regions list
+  List<RegionModel> _regions = [];
 
   @override
   void initState() {
     super.initState();
     _loadUsers();
+    _loadRegions();
+  }
+  
+  Future<void> _loadRegions() async {
+    try {
+      final regionProvider = Provider.of<RegionProvider>(context, listen: false);
+      await regionProvider.loadRegions();
+      setState(() {
+        _regions = regionProvider.regions;
+      });
+    } catch (e) {
+      _showError('Failed to load regions: ${e.toString()}');
+    }
   }
   
   @override
@@ -98,7 +116,22 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
     });
   }
   
-  Future<void> _updateUserRole(UserModel user, String newRole) async {
+  Future<void> _updateUserRole(UserModel user, String newRole, {String? regionId}) async {
+    // Debug logging
+    print('Attempting to update role for user:');
+    print('User ID: ${user.id}');
+    print('User Name: ${user.fullName}');
+    print('Current Role: ${user.role}');
+    print('New Role: $newRole');
+    print('Region ID: $regionId');
+
+    // Validate user ID
+    if (user.id.isEmpty) {
+      print('Error: User ID is empty');
+      _showError('Invalid user ID. Please try again.');
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
@@ -106,7 +139,7 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
     try {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       
-      // Create updated user model
+      // Create updated user model with all required fields
       final updatedUser = UserModel(
         id: user.id,
         fullName: user.fullName,
@@ -116,19 +149,49 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
         nextOfKinContact: user.nextOfKinContact,
         role: newRole,
         gender: user.gender,
+        regionId: newRole == 'regional manager' ? regionId ?? user.regionId : user.regionId,
+        regionName: user.regionName,
       );
+
+      print('Created updated user model:');
+      print('ID: ${updatedUser.id}');
+      print('Role: ${updatedUser.role}');
       
       // Update user role
-      await userProvider.updateUser(updatedUser);
+      final success = await userProvider.updateUser(updatedUser);
+      
+      if (!success) {
+        print('Failed to update user role');
+        throw Exception('Failed to update user role');
+      }
+      
+      // If the user is a regional manager, assign them to the region
+      if (newRole == 'regional manager' && regionId != null) {
+        print('Assigning user to region: $regionId');
+        final regionSuccess = await userProvider.assignUserToRegion(user.id, regionId);
+        if (!regionSuccess) {
+          print('Failed to assign user to region');
+          throw Exception('Failed to assign user to region');
+        }
+      }
       
       // Refresh user list
       await _loadUsers();
       
       // Show success message
       if (mounted) {
-        _showSuccess('${user.fullName}\'s role updated to $newRole');
+        if (newRole == 'regional manager' && regionId != null) {
+          final region = _regions.firstWhere(
+            (r) => r.id == regionId,
+            orElse: () => RegionModel(id: regionId, name: 'Unknown Region')
+          );
+          _showSuccess('${user.fullName}\'s role updated to Regional Manager for ${region.name}');
+        } else {
+          _showSuccess('${user.fullName}\'s role updated to $newRole');
+        }
       }
     } catch (e) {
+      print('Error in _updateUserRole: $e');
       setState(() {
         _isLoading = false;
       });
@@ -136,6 +199,12 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
       // Show error message
       if (mounted) {
         _showError('Failed to update role: ${e.toString()}');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
       }
     }
   }
@@ -252,6 +321,7 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
                   ),
                 )
               : ListView.builder(
+                  key: const PageStorageKey<String>('userList'),
                   itemCount: _filteredUsers.length,
                   itemBuilder: (context, index) {
                     final user = _filteredUsers[index];
@@ -273,6 +343,9 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
       case 'admin':
         roleColor = Colors.orange;
         break;
+      case 'regional manager':
+        roleColor = Colors.purple;
+        break;
       case 'user':
       default:
         roleColor = Colors.green;
@@ -280,6 +353,7 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
     }
     
     return Card(
+      key: ValueKey(user.id),
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       elevation: 2,
       shape: RoundedRectangleBorder(
@@ -327,14 +401,25 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
                           color: Colors.grey[600],
                         ),
                       ),
+                      if (user.role == 'regional manager' && user.regionName != null)
+                        Text(
+                          'Region: ${user.regionName}',
+                          style: TextStyles.bodyText.copyWith(
+                            color: Colors.purple[700],
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                     ],
                   ),
                 ),
                 
                 // Current role chip
                 Chip(
+                  avatar: user.role == 'regional manager'
+                      ? const Icon(Icons.location_city, color: Colors.white, size: 16)
+                      : null,
                   label: Text(
-                    user.role,
+                    user.role == 'regional manager' ? 'Regional Manager' : user.role,
                     style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
@@ -367,6 +452,7 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
                         return Padding(
                           padding: const EdgeInsets.only(right: 8.0),
                           child: ActionChip(
+                            key: ValueKey('${user.id}-$role'),
                             label: Text(role),
                             backgroundColor: isCurrentRole
                                 ? AppColors.primaryColor
@@ -393,29 +479,118 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
   }
   
   void _showRoleChangeConfirmation(UserModel user, String newRole) {
+    // If the new role is regional manager, show region selection dialog
+    if (newRole == 'regional manager') {
+      _showRegionSelectionDialog(user, newRole);
+    } else {
+      // For other roles, show standard confirmation dialog
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Confirm Role Change'),
+          content: Text(
+            'Are you sure you want to change ${user.fullName}\'s role from ${user.role} to $newRole?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _updateUserRole(user, newRole);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryColor,
+              ),
+              child: const Text('Confirm'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+  
+  void _showRegionSelectionDialog(UserModel user, String newRole) {
+    // Default selected region (either user's current region or first in list)
+    String? selectedRegionId = user.regionId;
+    
+    if (selectedRegionId == null && _regions.isNotEmpty) {
+      selectedRegionId = _regions.first.id;
+    }
+    
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirm Role Change'),
-        content: Text(
-          'Are you sure you want to change ${user.fullName}\'s role from ${user.role} to $newRole?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Assign Regional Manager'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'You are about to change ${user.fullName}\'s role from ${user.role} to Regional Manager.',
+                style: TextStyles.bodyText,
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Select a region to manage:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              if (_regions.isEmpty)
+                const Text(
+                  'No regions available. Please create regions first.',
+                  style: TextStyle(color: Colors.red),
+                )
+              else
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      isExpanded: true,
+                      value: selectedRegionId,
+                      items: _regions.map((region) {
+                        return DropdownMenuItem<String>(
+                          value: region.id,
+                          child: Text(region.name),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          selectedRegionId = value;
+                        });
+                      },
+                    ),
+                  ),
+                ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _updateUserRole(user, newRole);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryColor,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
             ),
-            child: const Text('Confirm'),
-          ),
-        ],
+            ElevatedButton(
+              onPressed: _regions.isEmpty
+                  ? null
+                  : () {
+                      Navigator.pop(context);
+                      _updateUserRole(user, newRole, regionId: selectedRegionId);
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryColor,
+                disabledBackgroundColor: Colors.grey,
+              ),
+              child: const Text('Confirm'),
+            ),
+          ],
+        ),
       ),
     );
   }

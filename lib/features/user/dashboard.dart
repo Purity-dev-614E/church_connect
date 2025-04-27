@@ -723,7 +723,7 @@ class CardWidget extends StatefulWidget {
   final IconData icon;
   final String? group_name;
 
-  CardWidget({
+  const CardWidget({super.key, 
     required this.userName,
     required this.icon,
     this.group_name,

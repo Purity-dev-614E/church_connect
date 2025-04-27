@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:group_management_church_app/data/providers/analytics_providers/admin_analytics_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:group_management_church_app/data/models/group_model.dart';
-import 'package:group_management_church_app/data/providers/analytics_provider.dart';
 import 'package:group_management_church_app/data/providers/attendance_provider.dart';
 import 'package:group_management_church_app/data/providers/group_provider.dart';
 import 'package:group_management_church_app/data/providers/user_provider.dart';
@@ -15,10 +15,10 @@ class AdminDashboardWrapper extends StatefulWidget {
   final String groupName;
 
   const AdminDashboardWrapper({
-    Key? key,
+    super.key,
     required this.groupId,
     required this.groupName,
-  }) : super(key: key);
+  });
 
   @override
   State<AdminDashboardWrapper> createState() => _AdminDashboardWrapperState();
@@ -125,7 +125,7 @@ class _AdminDashboardWrapperState extends State<AdminDashboardWrapper> {
 
     // Check if the required providers are already available in the widget tree
     try {
-      Provider.of<AnalyticsProvider>(context, listen: false);
+      Provider.of<AdminAnalyticsProvider>(context, listen: false);
       Provider.of<AttendanceProvider>(context, listen: false);
       
       // If we get here, the providers are available, so we can directly return the dashboard
@@ -137,7 +137,7 @@ class _AdminDashboardWrapperState extends State<AdminDashboardWrapper> {
       // If providers are not available, wrap the dashboard with the required providers
       return MultiProvider(
         providers: [
-          ChangeNotifierProvider(create: (_) => AnalyticsProvider()),
+          ChangeNotifierProvider(create: (_) => AdminAnalyticsProvider()),
           ChangeNotifierProvider(create: (_) => AttendanceProvider()),
         ],
         child: AdminDashboard(

@@ -35,7 +35,7 @@ class ApiEndpoints {
   static String getGroupDemographics(String id) => '$groups/$id/groupDemographics';
   static String getGroupMembers(String id) => '$groups/$id/members';
   static String getmemberGroups(String userId) => '$groups/user/$userId';
-  static String addGroupMember(String id, String groupId) => '$groups/$id/members';
+  static String addGroupMember(String userid, String groupId) => '$groups/$userid/members';
   static String removeGroupMember(String groupId, String userId) => '$groups/$groupId/members/$userId';
   static String getGroupsByAdmin(String userId) => '$groups/admin/$userId/groups';
   static String assignAdmin = '$groups/assign-admin';
@@ -69,49 +69,77 @@ class ApiEndpoints {
   static String getAttendanceByRegion(String regionId) => '$attendance/region/$regionId';
 
   // Analytics Endpoints
-  static const String analytics = '$baseUrl/analytics';
-  
-  // Group Analytics
-  static String getGroupEngagement(String groupId) => '$analytics/groups/$groupId/engagement';
-  static String getGroupActivityTimeline(String groupId) => '$analytics/groups/$groupId/activity-timeline';
-  static String getGroupAttendanceTrends(String groupId) => '$analytics/groups/$groupId/attendance-trends';
-  static String getGroupGrowth(String groupId) => '$analytics/groups/$groupId/growth';
-  static String compareGroups(List<String> groupIds) => '$analytics/groups/compare';
-  
-  // Region Analytics
-  static String getRegionEngagement(String regionId) => '$analytics/regions/$regionId/engagement';
-  static String getRegionGrowth(String regionId) => '$analytics/regions/$regionId/growth';
-  static String getRegionAttendanceTrends(String regionId) => '$analytics/regions/$regionId/attendance-trends';
-  static String compareRegions(List<String> regionIds) => '$analytics/regions/compare';
-  
-  // Event Analytics
-  static String getAttendanceByEventType(String eventType) => '$analytics/events/type/$eventType';
-  static const String getUpcomingEventsParticipationForecast = '$analytics/events/forecast';
-  static const String getPopularEvents = '$analytics/events/popular';
-  static const String getAttendanceByEventCategory = '$analytics/events/categories';
-  static String compareEventAttendance(List<String> eventIds) => '$analytics/events/compare-attendance';
-  
-  // Member Analytics
-  static const String getMemberEngagementScores = '$analytics/members/engagement';
-  static const String getMemberActivityLevels = '$analytics/members/activity';
-  static const String getMemberParticipationStats = '$analytics/members/participation';
-  static const String getMemberRetentionStats = '$analytics/members/retention';
-  
-  // Dashboard Analytics
-  static const String getDashboardSummary = '$analytics/dashboard/summary';
-  static const String getDashboardTrends = '$analytics/dashboard/trends';
-  static const String getPerformanceMetrics = '$analytics/dashboard/performance-metrics';
-  static String getCustomDashboardData(String timeframe) => '$analytics/dashboard/custom/$timeframe';
-  static String getRegionDashboardSummary(String regionId) => '$analytics/dashboard/region/$regionId/summary';
-  
-  // Correlation Analytics
-  static const String getAttendanceCorrelationFactors = '$analytics/correlation/attendance-correlation';
-  
-  // Export Endpoints
-  static const String exportAttendanceReport = '$analytics/export/attendance';
-  static const String exportMemberReport = '$analytics/export/member-report';
-  static String exportGroupReport(String groupId) => '$analytics/export/group-report/$groupId';
-  static String exportCustomReport(String reportType) => '$analytics/export/custom/$reportType';
-  static String exportRegionReport(String regionId) => '$analytics/export/region-report/$regionId';
-  static const String exportAnalyticsData = '$analytics/export/analytics-data';
+  // Base Analytics URLs
+  static const String superAdminAnalytics = '$baseUrl/super-admin/analytics';
+  static const String regionalManagerAnalytics = '$baseUrl/regional-manager/analytics';
+  static const String adminAnalytics = '$baseUrl/admin/analytics';
+
+// Super Admin Analytics Endpoints
+// Group Analytics
+  static String getSuperAdminGroupDemographics(String groupId) => '$superAdminAnalytics/groups/$groupId/demographics';
+  static String getSuperAdminGroupAttendance(String groupId) => '$superAdminAnalytics/groups/$groupId/attendance';
+  static String getSuperAdminGroupGrowth(String groupId) => '$superAdminAnalytics/groups/$groupId/growth';
+  static const String compareSuperAdminGroups = '$superAdminAnalytics/groups/compare';
+
+// Attendance Analytics
+  static String getSuperAdminAttendanceByPeriod(String period) => '$superAdminAnalytics/attendance/period/$period';
+  static String getSuperAdminOverallAttendanceByPeriod(String period) => '$superAdminAnalytics/attendance/overall/$period';
+  static String getSuperAdminUserAttendanceTrends(String userId) => '$superAdminAnalytics/attendance/user/$userId';
+
+// Event Analytics
+  static String getSuperAdminEventParticipation(String eventId) => '$superAdminAnalytics/events/$eventId/participation';
+  static const String compareSuperAdminEventAttendance = '$superAdminAnalytics/events/compare-attendance';
+
+// Member Analytics
+  static const String getSuperAdminMemberParticipation = '$superAdminAnalytics/members/participation';
+  static const String getSuperAdminMemberActivityStatus = '$superAdminAnalytics/members/activity-status';
+
+// Dashboard Analytics
+  static const String getSuperAdminDashboardSummary = '$superAdminAnalytics/dashboard/summary';
+  static String getSuperAdminGroupDashboardData(String groupId) => '$superAdminAnalytics/dashboard/group/$groupId';
+
+// Regional Manager Analytics Endpoints
+// Group Analytics
+  static String getRegionalManagerGroupDemographics(String groupId) => '$regionalManagerAnalytics/groups/$groupId/demographics';
+  static String getRegionalManagerGroupAttendance(String groupId) => '$regionalManagerAnalytics/groups/$groupId/attendance';
+  static String getRegionalManagerGroupGrowth(String groupId) => '$regionalManagerAnalytics/groups/$groupId/growth';
+  static const String compareRegionalManagerGroups = '$regionalManagerAnalytics/groups/compare';
+
+// Attendance Analytics
+  static String getRegionalManagerAttendanceByPeriod(String period) => '$regionalManagerAnalytics/attendance/period/$period';
+  static String getRegionalManagerOverallAttendanceByPeriod(String period) => '$regionalManagerAnalytics/attendance/overall/$period';
+  static String getRegionalManagerUserAttendanceTrends(String userId) => '$regionalManagerAnalytics/attendance/user/$userId';
+
+// Event Analytics
+  static String getRegionalManagerEventParticipation(String eventId) => '$regionalManagerAnalytics/events/$eventId/participation';
+  static const String compareRegionalManagerEventAttendance = '$regionalManagerAnalytics/events/compare-attendance';
+
+// Member Analytics
+  static const String getRegionalManagerMemberParticipation = '$regionalManagerAnalytics/members/participation';
+  static const String getRegionalManagerMemberActivityStatus = '$regionalManagerAnalytics/members/activity-status';
+
+// Dashboard Analytics
+  static const String getRegionalManagerDashboardSummary = '$regionalManagerAnalytics/dashboard/summary';
+  static String getRegionalManagerGroupDashboardData(String groupId) => '$regionalManagerAnalytics/dashboard/group/$groupId';
+
+// Admin (Group Admin) Analytics Endpoints
+// Group Analytics
+  static String getAdminGroupDemographics(String groupId) => '$adminAnalytics/groups/$groupId/demographics';
+  static String getAdminGroupAttendance(String groupId) => '$adminAnalytics/groups/$groupId/attendance';
+  static String getAdminGroupGrowth(String groupId) => '$adminAnalytics/groups/$groupId/growth';
+
+// Attendance Analytics
+  static String getAdminGroupAttendanceByPeriod(String groupId, String period) => '$adminAnalytics/groups/$groupId/attendance/period/$period';
+
+// Event Analytics
+  static String getAdminEventParticipation(String eventId) => '$adminAnalytics/events/$eventId/participation';
+
+// Member Analytics
+  static String getAdminGroupMemberParticipation(String groupId) => '$adminAnalytics/groups/$groupId/members/participation';
+  static String getAdminGroupMemberActivityStatus(String groupId) => '$adminAnalytics/groups/$groupId/members/activity-status';
+
+// Dashboard Analytics
+  static String getAdminGroupDashboardData(String groupId) => '$adminAnalytics/groups/$groupId/dashboard';
+
+
 }

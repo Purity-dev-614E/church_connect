@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:group_management_church_app/data/models/attendance_model.dart';
 import 'package:group_management_church_app/data/models/event_model.dart';
 import 'package:group_management_church_app/data/models/user_model.dart';
 import 'package:group_management_church_app/data/services/event_services.dart';
@@ -52,18 +51,35 @@ class EventProvider extends ChangeNotifier {
 
   // SECTION: Event Management
 
-  /// Fetch all events for a specific group
-  Future<void> fetchEventsByGroup(String groupId) async {
+  //fetch all events
+  Future<List<EventModel>> fetchOverallEvents() async {
     _setLoading(true);
     try {
-      _events = await _eventServices.getEventsByGroup(groupId);
+      _events = await _eventServices.getOverallEvents();
       _errorMessage = null;
+      return _events;
     } catch (error) {
-      _handleError('fetching events', error);
+      _handleError('fetching all events', error);
+      return [];
     } finally {
       _setLoading(false);
     }
   }
+
+  /// Fetch all events for a specific group
+ Future<List<EventModel>> fetchEventsByGroup(String groupId) async {
+   _setLoading(true);
+   try {
+     _events = await _eventServices.getEventsByGroup(groupId);
+     _errorMessage = null;
+     return _events;
+   } catch (error) {
+     _handleError('fetching events', error);
+     return []; // Return an empty list in case of an error
+   } finally {
+     _setLoading(false);
+   }
+ }
 
 
   /// Fetch a specific event by ID
@@ -194,6 +210,29 @@ class EventProvider extends ChangeNotifier {
   }
 }
 
+  Future<EventModel?> fetchLatestEvent(String groupId) async {
+    _setLoading(true);
+    try {
+      // Fetch past events if you don't have them yet
+      if (_pastEvents.isEmpty) {
+        _pastEvents = await _eventServices.getPastEvents(groupId);
+      }
+
+      if (_pastEvents.isEmpty) {
+        return null; // No events at all
+      }
+
+      _pastEvents.sort((a, b) => b.dateTime.compareTo(a.dateTime)); // Sort newest first
+      return _pastEvents.first; // Return the latest event
+    } catch (error) {
+      _handleError('fetching latest event', error);
+      return null;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+
   /// Fetch events for a specific date range
   Future<List<EventModel>> fetchEventsByDateRange(
     String groupId,
@@ -241,17 +280,19 @@ class EventProvider extends ChangeNotifier {
   }
 
   /// Fetch members who attended an event
-  Future<void> fetchAttendedMembers(String eventId) async {
-    _setLoading(true);
-    try {
-      _attendedMembers = await _eventServices.getAttendedMembers(eventId);
-      _errorMessage = null;
-    } catch (error) {
-      _handleError('fetching attended members', error);
-    } finally {
-      _setLoading(false);
-    }
-  }
+ Future<List<UserModel>> fetchAttendedMembers(String eventId) async {
+   _setLoading(true);
+   try {
+     _attendedMembers = await _eventServices.getAttendedMembers(eventId);
+     _errorMessage = null;
+     return _attendedMembers;
+   } catch (error) {
+     _handleError('fetching attended members', error);
+     return [];
+   } finally {
+     _setLoading(false);
+   }
+ }
 
   /// Fetch attendance details for an event
   Future<void> fetchEventAttendance(String eventId) async {

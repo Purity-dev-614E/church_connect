@@ -7,7 +7,7 @@ class Formatters{
 
  static String formatPhone(String phone) {
    if (phone.startsWith('+254')) {
-     return phone.replaceAll(new RegExp(r'[^0-9]'), '');
+     return phone.replaceAll(RegExp(r'[^0-9]'), '');
    } else {
      throw FormatException('Phone number must start with +254');
    }

@@ -2,7 +2,7 @@
 
 A comprehensive Flutter application designed to streamline church group management, event coordination, and member communication.
 
-![Church Connect App](assets/images/app_logo.png)
+![Church Connect App](assets/images/citam_logo.jpg)
 
 ## Overview
 
@@ -13,6 +13,11 @@ Church Connect is a multi-platform application that helps church administrators 
 ### For All Users
 - **User Authentication**: Secure login, signup, and password reset functionality
 - **Profile Management**: Create and update personal profiles
+- **Region Selection**: 
+  - Select your church region during profile setup
+  - View detailed region information
+  - See region assignments in user profiles
+  - Filter groups and events by region
 - **Group Membership**: View and interact with groups you belong to
 - **Event Participation**: View upcoming events and manage attendance
 
@@ -25,6 +30,12 @@ Church Connect is a multi-platform application that helps church administrators 
 ### For Super Administrators
 - **Church-wide Administration**: Manage all groups and users
 - **Role Management**: Assign and modify user roles
+- **Region Management**: 
+  - Create, edit, and delete church regions
+  - Add descriptive information to regions
+  - Assign region managers
+  - View region-specific analytics
+  - Generate reports by region
 - **System Configuration**: Configure app settings and permissions
 - **Global Analytics**: Access comprehensive church-wide statistics
 
@@ -96,13 +107,31 @@ lib/
 └── widgets/         # Reusable UI components
 ```
 
-## User Roles
+## Organization Structure
 
-1. **Super Admin**: Has complete control over the application, including user management, group creation, and system configuration.
+### User Roles
+
+1. **Super Admin**: Has complete control over the application, including user management, group creation, region management, and system configuration.
 
 2. **Admin**: Manages specific groups, including member administration, event planning, and group-specific settings.
 
 3. **User**: Regular church members who can join groups, view and RSVP to events, and interact with other group members.
+
+### Regional Organization
+
+The app uses a regional organization structure to better manage church groups and members:
+
+1. **Regions**: Geographical or administrative divisions of the church (e.g., North Campus, South Campus, Youth Ministry)
+
+2. **Groups**: Smaller units within regions (e.g., Bible Study Groups, Worship Teams, Service Groups)
+
+3. **Members**: Individual church members assigned to specific regions and groups
+
+This hierarchical structure allows for:
+- Better organization of church activities
+- Targeted communication to specific regions
+- Region-specific analytics and reporting
+- Simplified management of large church communities
 
 ## Contributing
 
@@ -118,9 +147,32 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Contact
 
-Your Name - your.email@example.com
+Your Name - Purity Sang
+Email - puritysang180@gmail.com
 
-Project Link: [https://github.com/your-username/group_management_church_app](https://github.com/your-username/group_management_church_app)
+Project Link: [https://github.com/purity-dev-614E/church_connect](https://github.com/your-username/group_management_church_app)
+
+## Recent Updates
+
+### Version 1.2.0 - Region Selection Feature
+
+We've enhanced the app with a comprehensive region selection system:
+
+- **User Experience Improvements**:
+  - Redesigned region selection UI with improved visibility
+  - Added "View All Regions" dialog for easier selection
+  - Implemented region information display
+  - Added success messages with region confirmation
+
+- **Profile Integration**:
+  - Region information now displayed in user profiles
+  - Visual indicators for region assignment status
+  - Region filtering throughout the app
+
+- **Admin Tools**:
+  - Enhanced region management interface
+  - Region-specific analytics and reporting
+  - Bulk user assignment to regions
 
 ## Acknowledgements
 

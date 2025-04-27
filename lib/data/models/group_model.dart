@@ -4,6 +4,7 @@ class GroupModel{
   final String description;
   final String group_admin;
   final String? region_id;
+  final String created_at;
 
   final List<dynamic>? members;
 
@@ -14,6 +15,7 @@ class GroupModel{
     required this.group_admin,
     this.members,
     required this.region_id,
+    this.created_at = '',
   });
 
   factory GroupModel.fromJson(Map<String, dynamic> json) {
@@ -24,6 +26,7 @@ class GroupModel{
       group_admin: json['group_admin_id'] ?? '',
       region_id: json['region_id'],
       members: json['members'],
+      created_at: json['created_at'] ?? '',
     );
   }
   
@@ -34,6 +37,7 @@ class GroupModel{
       'description': description,
       'group_admin_id': group_admin,
       'region_id': region_id,
+      'created_at': created_at,
     };
   }
 }
