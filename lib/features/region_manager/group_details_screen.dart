@@ -8,6 +8,8 @@ import 'package:group_management_church_app/data/providers/group_provider.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
 import 'package:provider/provider.dart';
 import 'dart:convert';
+import 'package:group_management_church_app/features/member/member_attendance_screen.dart';
+import 'package:group_management_church_app/features/events/overall_event_details.dart';
 
 class GroupDetailsScreen extends StatefulWidget {
   final String groupId;
@@ -58,12 +60,23 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> with SingleTick
       // Load members
       final members = await groupProvider.getGroupMembers(widget.groupId);
       
+      // Convert members to UserModel
+      final userModels = members.map((member) {
+        if (member is UserModel) {
+          return member;
+        } else if (member is Map<String, dynamic>) {
+          return UserModel.fromJson(member);
+        } else {
+          throw Exception('Invalid member data type: ${member.runtimeType}');
+        }
+      }).toList();
+      
       // Load events
       final events = await eventProvider.fetchEventsByGroup(widget.groupId);
 
       if (mounted) {
         setState(() {
-          _members = members.cast<UserModel>();
+          _members = userModels;
           _events = events;
           _isLoading = false;
         });
@@ -205,6 +218,17 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> with SingleTick
                         ),
                       ],
                     ),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => MemberAttendanceScreen(
+                            userId: member.id,
+                            groupId: widget.groupId,
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 );
               },
@@ -270,6 +294,17 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> with SingleTick
                         ),
                       ],
                     ),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => OverallEventDetailsScreen(
+                            eventId: event.id,
+                            eventTitle: event.title,
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 );
               },

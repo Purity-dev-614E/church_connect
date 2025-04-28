@@ -36,34 +36,28 @@ class _RegionManagerScreenState extends State<RegionManagerScreen> {
     });
 
     try {
-      // Get the current user ID
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final authServices = AuthServices();
-      final userId = authServices.getUserId();
-
       // Get the regions managed by this user
       final regionProvider = Provider.of<RegionProvider>(context, listen: false);
       await regionProvider.loadRegions();
       
-      // Filter regions where the user is a manager
-      // In a real implementation, you would have a specific API endpoint for this
+      // Get the list of regions
       final allRegions = regionProvider.regions;
       
-      // For now, we'll assume all regions are managed by this user
-      // In a real implementation, you would check if the user is a manager of each region
       setState(() {
         _managedRegions = allRegions;
         _isLoading = false;
       });
     } catch (e) {
       setState(() {
-        _errorMessage = 'Failed to load managed regions: $e';
+        _errorMessage = 'Failed to load regions: $e';
         _isLoading = false;
       });
     }
   }
 
   void _navigateToRegionDashboard(RegionModel region) {
+    // Just navigate to the details screen with the region ID
+    // The details screen will handle loading the specific region data
     Navigator.push(
       context,
       MaterialPageRoute(

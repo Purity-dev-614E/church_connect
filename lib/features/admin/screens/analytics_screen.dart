@@ -35,6 +35,7 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
 
   String _selectedPeriod = 'weekly';
   bool _isLoading = true;
+  String? _errorMessage;
   bool _showLineChart = true;
 
   Map<String, List<double>> _eventAttendance = {};
@@ -49,79 +50,129 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
   }
 
   Future<void> _loadAnalytics() async {
-    setState(() => _isLoading = true);
-    try{
-     _eventAttendance = await _EventAttendance() as Map<String, List<double>>;
-     _eventComparison = await _groupAttendanceTrends() as Map<String, Map<String, int>>;
-     _activityStatus = await _getGroupActivityStatus() as Map<String, double>;
+    if (_isLoading) return;
 
-    }catch (e)  {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await Future.wait([
+        _loadEventAttendance(),
+        _loadGroupAttendanceTrends(),
+        _loadGroupActivityStatus(),
+      ]);
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to load analytics: ${e.toString()}';
+      });
       print('Error loading analytics: $e');
-      CustomNotification(
-          message: 'Error loading analytics: $e',
-      );
+      print('Error stack trace: ${StackTrace.current}');
+    } finally {
+      setState(() => _isLoading = false);
     }
-
-    setState(() => _isLoading = false);
-  }
-Future<Map<String, int>> _EventAttendance() async {
-  final Map<String, int> attendance = {};
-  final events = await _eventProvider.fetchEventsByGroup(widget.groupId);
-
-  for (var event in events) {
-    final attendedMembers = await _eventProvider.fetchAttendedMembers(event.id);
-    attendance[event.title] = attendedMembers.length;
-  }
-  return attendance;
-}
-
-Future<Set<Object>> fetchQuickAnalytics() async {
-  EventModel? latestEvent = await _eventProvider.fetchLatestEvent(widget.groupId);
-  if (latestEvent != null) {
-    print('Latest event title: ${latestEvent.title}');
   }
 
-  final quickStats = await _superProvider.getEventParticipationStats(latestEvent!.id);
-  print('Quick stats: $quickStats');
-  return {
-    quickStats.eventTitle,
-    quickStats.eventDate,
-    quickStats.totalParticipants,
-    quickStats.presentCount,
-    quickStats.attendanceRate
-  };
-}
+  Future<void> _loadEventAttendance() async {
+    try {
+      final events = await _eventProvider.fetchEventsByGroup(widget.groupId);
+      final Map<String, List<double>> attendance = {};
 
-Future<List<dynamic>> groupDemographics() async {
-  final groupDemographics = await _superProvider.getGroupDemographics(widget.groupId);
-  print('Gender distribution: ${groupDemographics.genderDistribution}');
-  return groupDemographics.genderDistribution;
-}
+      for (var event in events) {
+        final attendedMembers = await _eventProvider.fetchAttendedMembers(event.id);
+        attendance[event.title] = [attendedMembers.length.toDouble()];
+      }
 
- Future<Map<String, Map<String, int>>> _getGroupActivityStatus() async {
-    final groupActivityStatus = await _adminProvider.getGroupMemberActivityStatus(widget.groupId);
-    if (groupActivityStatus != null) {
-      print('Group activity status: $groupActivityStatus');
+      setState(() {
+        _eventAttendance = attendance;
+      });
+    } catch (e) {
+      print('Error loading event attendance: $e');
+      throw Exception('Failed to load event attendance: ${e.toString()}');
+    }
+  }
+
+  Future<void> _loadGroupAttendanceTrends() async {
+    try {
+      final trends = await _adminProvider.getGroupAttendanceByPeriod(widget.groupId, _selectedPeriod);
+      
+      if (trends != null) {
+        setState(() {
+          _eventComparison = {
+            'eventStats': trends['eventStats'] as Map<String, int>,
+            'dailyStats': trends['dailyStats'] as Map<String, int>,
+          };
+        });
+      } else {
+        throw Exception('No attendance trends data available');
+      }
+    } catch (e) {
+      print('Error loading group attendance trends: $e');
+      throw Exception('Failed to load group attendance trends: ${e.toString()}');
+    }
+  }
+
+  Future<void> _loadGroupActivityStatus() async {
+    try {
+      final groupActivityStatus = await _adminProvider.getGroupMemberActivityStatus(widget.groupId);
+      
+      if (groupActivityStatus != null) {
+        setState(() {
+          _activityStatus = {
+            'active': (groupActivityStatus['status_summary']['Active'] ?? 0).toDouble(),
+            'inactive': (groupActivityStatus['status_summary']['Inactive'] ?? 0).toDouble(),
+          };
+        });
+      } else {
+        throw Exception('No group activity status data available');
+      }
+    } catch (e) {
+      print('Error loading group activity status: $e');
+      throw Exception('Failed to load group activity status: ${e.toString()}');
+    }
+  }
+
+  Future<Set<Object>> fetchQuickAnalytics() async {
+    try {
+      final latestEvent = await _eventProvider.fetchLatestEvent(widget.groupId);
+      
+      if (latestEvent == null) {
+        throw Exception('No latest event found');
+      }
+
+      final quickStats = await _superProvider.getEventParticipationStats(latestEvent.id);
+      
+      if (quickStats == null) {
+        throw Exception('No quick stats available');
+      }
+
       return {
-        "statusSummary" : groupActivityStatus['statusSummary'],
-        "Active": groupActivityStatus['status_summary']['Active'],
-        "Inactive": groupActivityStatus['status_summary']['Inactive'],
-        "Total": groupActivityStatus['status_summary']['Total'],
-
+        quickStats.eventTitle,
+        quickStats.eventDate,
+        quickStats.totalParticipants,
+        quickStats.presentCount,
+        quickStats.attendanceRate
       };
-    } else {
-      print('No group activity status available.');
-      return {};
+    } catch (e) {
+      print('Error fetching quick analytics: $e');
+      throw Exception('Failed to fetch quick analytics: ${e.toString()}');
     }
- }
+  }
 
- Future<Map<String, dynamic>> _groupAttendanceTrends() async {
-   final trends = await _adminProvider.getGroupAttendanceByPeriod(widget.groupId, _selectedPeriod);
-   print('Group attendance trends: $trends');
-   return {
-     'eventStats': trends['eventStats'],
-     'dailyStats': trends['dailyStats'],
-   };
+  Future<List<dynamic>> groupDemographics() async {
+    try {
+      final groupDemographics = await _superProvider.getGroupDemographics(widget.groupId);
+      
+      if (groupDemographics == null || groupDemographics.genderDistribution == null) {
+        throw Exception('No demographics data available');
+      }
+
+      return groupDemographics.genderDistribution;
+    } catch (e) {
+      print('Error loading group demographics: $e');
+      throw Exception('Failed to load group demographics: ${e.toString()}');
+    }
   }
 
   @override
@@ -130,11 +181,37 @@ Future<List<dynamic>> groupDemographics() async {
       return const Center(child: CircularProgressIndicator());
     }
 
+    if (_errorMessage != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              _errorMessage!,
+              style: const TextStyle(color: Colors.red),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadAnalytics,
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+
     return DefaultTabController(
       length: 2,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Admin Analytics'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _loadAnalytics,
+            ),
+          ],
           bottom: const TabBar(
             tabs: [
               Tab(text: 'Quick Analytics'),
@@ -144,14 +221,30 @@ Future<List<dynamic>> groupDemographics() async {
         ),
         body: TabBarView(
           children: [
-           // Quick Analytics Tab
+            // Quick Analytics Tab
             FutureBuilder<Set<Object>>(
               future: fetchQuickAnalytics(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 } else if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Error: ${snapshot.error}',
+                          style: const TextStyle(color: Colors.red),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: _loadAnalytics,
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  );
                 } else if (snapshot.hasData) {
                   final data = snapshot.data!.toList();
                   return Card(
@@ -243,10 +336,10 @@ Future<List<dynamic>> groupDemographics() async {
           children: [
             const Text('Event Attendance', style: TextStyle(fontSize: 18)),
             const SizedBox(height: 16),
-            _buildPeriodSelector(), // Add the period selector here
+            _buildPeriodSelector(),
             const SizedBox(height: 16),
             FutureBuilder<Map<String, dynamic>>(
-              future: _groupAttendanceTrends(),
+              future: Future.value(_eventComparison),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
@@ -357,18 +450,16 @@ Future<List<dynamic>> groupDemographics() async {
  }
 
  Widget _buildActivityStatusCard() {
-   return FutureBuilder<Map<String, Map<String, int>>>(
-     future: _getGroupActivityStatus(),
+   return FutureBuilder<Map<String, double>>(
+     future: Future.value(_activityStatus),
      builder: (context, snapshot) {
        if (snapshot.connectionState == ConnectionState.waiting) {
          return const Center(child: CircularProgressIndicator());
        } else if (snapshot.hasError) {
          return Center(child: Text('Error: ${snapshot.error}'));
        } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-         final statusSummary = snapshot.data!['statusSummary'] ?? {};
-         final active = snapshot.data!['Active'] ?? 0;
-         final inactive = snapshot.data!['Inactive'] ?? 0;
-         final total = snapshot.data!['Total'] ?? 0;
+         final active = snapshot.data!['active'] ?? 0;
+         final inactive = snapshot.data!['inactive'] ?? 0;
 
          return Card(
            child: Padding(
@@ -381,8 +472,6 @@ Future<List<dynamic>> groupDemographics() async {
                  Text('Active Members: $active', style: const TextStyle(fontSize: 16)),
                  const SizedBox(height: 8),
                  Text('Inactive Members: $inactive', style: const TextStyle(fontSize: 16)),
-                 const SizedBox(height: 8),
-                 Text('Total Members: $total', style: const TextStyle(fontSize: 16)),
                ],
              ),
            ),

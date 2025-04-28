@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:group_management_church_app/core/constants/app_endpoints.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/services/auth_services.dart';
 import '../models/user_model.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 enum AuthStatus {
   initial,
@@ -25,6 +29,8 @@ class AuthResult {
 
 class AuthProvider extends ChangeNotifier {
   final AuthServices _authService = AuthServices();
+  final FlutterSecureStorage _secureStorage = FlutterSecureStorage();
+  static const String _baseUrl = ApiEndpoints.baseUrl; // Replace with your actual API base URL
 
   AuthStatus _status = AuthStatus.initial;
   AuthStatus get status => _status;
@@ -309,5 +315,36 @@ class AuthProvider extends ChangeNotifier {
     }
     
     return true;
+  }
+
+  Future<bool> uploadProfileImage(String userId, String base64Image) async {
+    try {
+      // Get token from secure storage
+      final token = await _secureStorage.read(key: 'token');
+      if (token == null) {
+        throw Exception('No authentication token found');
+      }
+
+      // Make API request to upload profile image
+      final response = await http.post(
+        Uri.parse('$_baseUrl/api/users/$userId/profile-image'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'image': base64Image,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return true;
+      } else {
+        throw Exception('Failed to upload profile image: ${response.body}');
+      }
+    } catch (e) {
+      print('Error uploading profile image: $e');
+      return false;
+    }
   }
 }

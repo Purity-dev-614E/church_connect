@@ -24,82 +24,139 @@ class _RegionManagerAnalyticsScreenState extends State<RegionManagerAnalyticsScr
   late RegionProvider _regionProvider;
   String _selectedPeriod = 'weekly';
   bool _isLoading = true;
+  String? _errorMessage;
   Set<Object> _quickStatsData = {};
   List<double> _regionalAttendanceData = [];
   Map<String, double> _groupAttendanceData = {};
   Map<String, double> _activityStatusData = {};
 
-
-
   @override
   void initState() {
     super.initState();
-    _analyticsProvider =
-        Provider.of<RegionalManagerAnalyticsProvider>(context, listen: false);
+    _analyticsProvider = Provider.of<RegionalManagerAnalyticsProvider>(context, listen: false);
     _regionProvider = Provider.of<RegionProvider>(context, listen: false);
     _loadAnalytics();
   }
 
   Future<void> _loadAnalytics() async {
-    setState(() => _isLoading = true);
+    if (_isLoading) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
 
     try {
-      _quickStatsData = await _quickStats();
-      _regionalAttendanceData = await _regionalAttendanceStat();
-      _groupAttendanceData = await _groupAttendanceStat();
-      _activityStatusData = await _activityStatusStat();
-    } catch (error) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading analytics: $error')),
-      );
+      await Future.wait([
+        _loadQuickStats(),
+        _loadRegionalAttendance(),
+        _loadGroupAttendance(),
+        _loadActivityStatus(),
+      ]);
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to load analytics: ${e.toString()}';
+      });
+      print('Error loading analytics: $e');
+      print('Error stack trace: ${StackTrace.current}');
     } finally {
       setState(() => _isLoading = false);
     }
   }
 
-  Future <Set<Object>> _quickStats() async {
-    final quickStats = await _analyticsProvider.getDashboardSummaryForRegion(
-        widget.regionId);
-    return {
-      quickStats.groupCount,
-      quickStats.eventCount,
-      quickStats.userCount
-    };
-      return {};
+  Future<void> _loadQuickStats() async {
+    try {
+      final quickStats = await _analyticsProvider.getDashboardSummaryForRegion(widget.regionId);
+      
+      if (quickStats != null) {
+        setState(() {
+          _quickStatsData = {
+            quickStats.groupCount,
+            quickStats.eventCount,
+            quickStats.userCount
+          };
+        });
+      } else {
+        throw Exception('No quick stats data available');
+      }
+    } catch (e) {
+      print('Error loading quick stats: $e');
+      throw Exception('Failed to load quick stats: ${e.toString()}');
+    }
   }
 
-  Future<List<double>> _regionalAttendanceStat() async {
-    final regionalAttendanceStat = await _analyticsProvider
-        .getOverallAttendanceByPeriodForRegion(_selectedPeriod, widget.regionId);
+  Future<void> _loadRegionalAttendance() async {
+    try {
+      final regionalAttendanceStat = await _analyticsProvider.getOverallAttendanceByPeriodForRegion(
+        _selectedPeriod,
+        widget.regionId,
+      );
 
-    return [
-      regionalAttendanceStat.overallStats.presentCount.toDouble(),
-    ];
-      return [];
+      if (regionalAttendanceStat?.overallStats?.presentCount != null) {
+        setState(() {
+          _regionalAttendanceData = [
+            regionalAttendanceStat.overallStats.presentCount.toDouble(),
+          ];
+        });
+      } else {
+        throw Exception('No regional attendance data available');
+      }
+    } catch (e) {
+      print('Error loading regional attendance: $e');
+      throw Exception('Failed to load regional attendance: ${e.toString()}');
+    }
   }
 
-  Future<Map<String, double>> _groupAttendanceStat() async {
-    Map<String, double> groupAttendanceData = {};
-    List<GroupModel?> allRegionGroups = await _regionProvider.getGroupsByRegion(widget.regionId);
-    for (var group in allRegionGroups) {
-      if (group != null) {
-        final groupAttendance = await _analyticsProvider.getGroupAttendanceStatsForRegion(group.id);
-        if (groupAttendance != null) {
-          groupAttendanceData[group.name] = groupAttendance.overallStats.presentMembers.toDouble();
+  Future<void> _loadGroupAttendance() async {
+    try {
+      final allRegionGroups = await _regionProvider.getGroupsByRegion(widget.regionId);
+      final Map<String, double> groupAttendanceData = {};
+
+      for (var group in allRegionGroups) {
+        if (group != null) {
+          try {
+            final groupAttendance = await _analyticsProvider.getGroupAttendanceStatsForRegion(group.id);
+            if (groupAttendance?.overallStats?.presentMembers != null) {
+              groupAttendanceData[group.name] = groupAttendance.overallStats.presentMembers.toDouble();
+            }
+          } catch (e) {
+            print('Error loading attendance for group ${group.name}: $e');
+            // Continue with other groups even if one fails
+          }
         }
       }
+
+      if (groupAttendanceData.isEmpty) {
+        throw Exception('No group attendance data available');
+      }
+
+      setState(() {
+        _groupAttendanceData = groupAttendanceData;
+      });
+    } catch (e) {
+      print('Error loading group attendance: $e');
+      throw Exception('Failed to load group attendance: ${e.toString()}');
     }
-      return groupAttendanceData;
   }
 
-  Future<Map<String, double>> _activityStatusStat() async {
-    final regionalActivityStatus = await _analyticsProvider.getActivityStatus(
-        widget.regionId);
-    return {
-      'active': regionalActivityStatus['active']?.toDouble() ?? 0,
-      'inactive': regionalActivityStatus['inactive']?.toDouble() ?? 0,
-    };
-      return {};
+  Future<void> _loadActivityStatus() async {
+    try {
+      final regionalActivityStatus = await _analyticsProvider.getActivityStatus(widget.regionId);
+      
+      if (regionalActivityStatus != null) {
+        setState(() {
+          _activityStatusData = {
+            'active': (regionalActivityStatus['active'] ?? 0).toDouble(),
+            'inactive': (regionalActivityStatus['inactive'] ?? 0).toDouble(),
+          };
+        });
+      } else {
+        throw Exception('No activity status data available');
+      }
+    } catch (e) {
+      print('Error loading activity status: $e');
+      throw Exception('Failed to load activity status: ${e.toString()}');
+    }
   }
 
   Widget _buildQuickStatsCard(Set<Object> quickStats) {
@@ -281,11 +338,39 @@ class _RegionManagerAnalyticsScreenState extends State<RegionManagerAnalyticsScr
           );
         }
 
+        if (_errorMessage != null) {
+          return Scaffold(
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    _errorMessage!,
+                    style: const TextStyle(color: Colors.red),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _loadAnalytics,
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
         return DefaultTabController(
           length: 2,
           child: Scaffold(
             appBar: AppBar(
               title: const Text('Regional Analytics'),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: _loadAnalytics,
+                ),
+              ],
               bottom: const TabBar(
                 tabs: [
                   Tab(text: 'Quick Analytics'),
@@ -298,10 +383,10 @@ class _RegionManagerAnalyticsScreenState extends State<RegionManagerAnalyticsScr
                 // Quick Analytics Tab
                 SingleChildScrollView(
                   padding: const EdgeInsets.all(16),
-                  child: Column (
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildQuickStatsCard( _quickStatsData),
+                      _buildQuickStatsCard(_quickStatsData),
                     ],
                   ),
                 ),
@@ -311,6 +396,8 @@ class _RegionManagerAnalyticsScreenState extends State<RegionManagerAnalyticsScr
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      _buildPeriodSelector(),
+                      const SizedBox(height: 16),
                       _buildRegionalAttendanceChart(_regionalAttendanceData),
                       const SizedBox(height: 16),
                       _buildGroupAttendanceChart(_groupAttendanceData),
@@ -326,7 +413,6 @@ class _RegionManagerAnalyticsScreenState extends State<RegionManagerAnalyticsScr
       },
     );
   }
-
 
   Widget _buildPeriodSelector() {
     return Row(

@@ -24,11 +24,35 @@ class RegionServices {
         },
       );
 
+      print('API Response Status: ${response.statusCode}');
+      print('API Response Body: ${response.body}');
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final List<dynamic> regionsData = data['data'] ?? [];
+        print('Decoded Data: $data');
         
-        return regionsData.map((region) => RegionModel.fromJson(region)).toList();
+        // Check if data is a list or has a 'data' field
+        final List<dynamic> regionsData;
+        if (data is List) {
+          regionsData = data;
+        } else if (data['data'] != null) {
+          regionsData = data['data'];
+        } else {
+          regionsData = [];
+        }
+        
+        print('Regions Data: $regionsData');
+        
+        // Ensure each region data is properly formatted
+        return regionsData.map((region) {
+          // Convert all values to strings to ensure type safety
+          final Map<String, dynamic> safeRegion = {
+            'id': region['id']?.toString() ?? '',
+            'name': region['name']?.toString() ?? '',
+            'description': region['description']?.toString(),
+          };
+          return RegionModel.fromJson(safeRegion);
+        }).toList();
       } else {
         throw Exception('Failed to load regions: ${response.statusCode}');
       }
@@ -47,6 +71,7 @@ class RegionServices {
         throw Exception('Not authenticated');
       }
 
+      print('Fetching region with ID: $regionId');
       final response = await http.get(
         Uri.parse(ApiEndpoints.getRegionById(regionId)),
         headers: {
@@ -55,9 +80,34 @@ class RegionServices {
         },
       );
 
+      print('Region API Response Status: ${response.statusCode}');
+      print('Region API Response Body: ${response.body}');
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        return RegionModel.fromJson(data['data']);
+        print('Decoded Region Data: $data');
+        
+        // Check if data is a map or has a 'data' field
+        final Map<String, dynamic> regionData;
+        if (data is Map<String, dynamic>) {
+          regionData = data;
+        } else if (data['data'] != null) {
+          regionData = data['data'];
+        } else {
+          print('Invalid region data format');
+          return null;
+        }
+        
+        print('Region Data: $regionData');
+        
+        // Convert all values to strings to ensure type safety
+        final Map<String, dynamic> safeRegion = {
+          'id': regionData['id']?.toString() ?? '',
+          'name': regionData['name']?.toString() ?? '',
+          'description': regionData['description']?.toString(),
+        };
+        
+        return RegionModel.fromJson(safeRegion);
       } else {
         throw Exception('Failed to load region: ${response.statusCode}');
       }

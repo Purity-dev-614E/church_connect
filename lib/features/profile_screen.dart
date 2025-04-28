@@ -12,6 +12,9 @@ import 'package:group_management_church_app/widgets/custom_button.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
 import 'package:provider/provider.dart';
 import '../data/providers/user_provider.dart';
+import 'package:image_picker_web/image_picker_web.dart';
+import 'dart:convert';
+import 'dart:typed_data';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -21,8 +24,10 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  // Profile image URL - null means we'll show initials
+  // Profile image state
+  Uint8List? _profileImageBytes;
   String? _profileImageUrl;
+  bool _isUploadingImage = false;
   bool _isLoading = true;
   String? _errorMessage;
   final _formKey = GlobalKey<FormState>();
@@ -65,6 +70,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         throw Exception('Failed to load user data');
       }
       
+      // Set profile image URL if available
+      if (_user!.profileImageUrl != null) {
+        setState(() {
+          _profileImageUrl = _user!.profileImageUrl;
+        });
+      }
+      
       // Load user groups
       final groupProvider = Provider.of<GroupProvider>(context, listen: false);
       _userGroups = await groupProvider.getUserGroups(userId);
@@ -81,6 +93,73 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _errorMessage = 'Error loading profile: $e';
       });
       print('Error loading profile data: $e');
+    }
+  }
+
+  Future<void> _pickProfileImage() async {
+    try {
+      final image = await ImagePickerWeb.getImageAsBytes();
+      if (image != null) {
+        setState(() {
+          _profileImageBytes = image;
+          _profileImageUrl = null;
+        });
+      }
+    } catch (e) {
+      _showError('Failed to pick image: $e');
+    }
+  }
+
+  Future<void> _uploadProfileImage() async {
+    if (_profileImageBytes == null) return;
+
+    setState(() {
+      _isUploadingImage = true;
+    });
+
+    try {
+      // Convert image bytes to base64
+      final base64Image = base64Encode(_profileImageBytes!);
+      
+      // Get auth provider for token
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      // Get user ID
+      final authService = AuthServices();
+      final userId = await authService.getUserId();
+      if (userId == null) {
+        throw Exception('User ID not found');
+      }
+      
+      // Upload image to server
+      final success = await authProvider.uploadProfileImage(
+        userId,
+        base64Image,
+      );
+
+      if (success) {
+        _showSuccess('Profile picture updated successfully');
+        // Get the new image URL
+        final userProvider = Provider.of<UserProvider>(context, listen: false);
+        await userProvider.loadUser(userId);
+        final updatedUser = userProvider.currentUser;
+        if (updatedUser != null && updatedUser.profileImageUrl != null) {
+          setState(() {
+            _profileImageUrl = updatedUser.profileImageUrl;
+            _profileImageBytes = null;
+          });
+        }
+      } else {
+        _showError('Failed to upload profile picture');
+      }
+    } catch (e) {
+      _showError('Error uploading profile picture: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingImage = false;
+        });
+      }
     }
   }
 
@@ -402,45 +481,143 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildProfileAvatar(String fullName) {
-    return Hero(
-      tag: 'profile-avatar',
-      child: Container(
-        width: 120,
-        height: 120,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              AppColors.primaryColor,
-              AppColors.secondaryColor,
-            ],
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primaryColor.withOpacity(0.3),
-              blurRadius: 15,
-              offset: const Offset(0, 5),
-            ),
-          ],
-        ),
-        child: _profileImageUrl != null
-            ? CircleAvatar(
-                backgroundImage: NetworkImage(_profileImageUrl!),
-                backgroundColor: Colors.transparent,
-              )
-            : Center(
-                child: Text(
-                  _getInitials(fullName),
-                  style: TextStyles.heading1.copyWith(
-                    color: Colors.white,
-                    fontSize: 42,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+    return Stack(
+      children: [
+        Hero(
+          tag: 'profile-avatar',
+          child: Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppColors.primaryColor,
+                  AppColors.secondaryColor,
+                ],
               ),
-      ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primaryColor.withOpacity(0.3),
+                  blurRadius: 15,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: _profileImageBytes != null
+                ? ClipOval(
+                    child: Image.memory(
+                      _profileImageBytes!,
+                      fit: BoxFit.cover,
+                      width: 120,
+                      height: 120,
+                    ),
+                  )
+                : _profileImageUrl != null
+                    ? ClipOval(
+                        child: Image.network(
+                          _profileImageUrl!,
+                          fit: BoxFit.cover,
+                          width: 120,
+                          height: 120,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Center(
+                              child: Text(
+                                _getInitials(fullName),
+                                style: TextStyles.heading1.copyWith(
+                                  color: Colors.white,
+                                  fontSize: 42,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      )
+                    : Center(
+                        child: Text(
+                          _getInitials(fullName),
+                          style: TextStyles.heading1.copyWith(
+                            color: Colors.white,
+                            fontSize: 42,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+          ),
+        ),
+        Positioned(
+          bottom: 0,
+          right: 0,
+          child: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppColors.primaryColor,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.white,
+                width: 2,
+              ),
+            ),
+            child: IconButton(
+              icon: const Icon(
+                Icons.camera_alt,
+                size: 20,
+                color: Colors.white,
+              ),
+              onPressed: _isUploadingImage ? null : _pickProfileImage,
+            ),
+          ),
+        ),
+        if (_profileImageBytes != null)
+          Positioned(
+            top: 0,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.primaryColor.withOpacity(0.8),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextButton.icon(
+                    onPressed: _isUploadingImage ? null : _uploadProfileImage,
+                    icon: const Icon(Icons.upload, color: Colors.white, size: 16),
+                    label: const Text(
+                      'Upload',
+                      style: TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    icon: const Icon(Icons.cancel, color: Colors.white, size: 16),
+                    onPressed: _isUploadingImage
+                        ? null
+                        : () {
+                            setState(() {
+                              _profileImageBytes = null;
+                            });
+                          },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        if (_isUploadingImage)
+          const Positioned.fill(
+            child: Center(
+              child: CircularProgressIndicator(
+                color: Colors.white,
+                strokeWidth: 2,
+              ),
+            ),
+          ),
+      ],
     );
   }
 

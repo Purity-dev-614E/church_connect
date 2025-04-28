@@ -259,19 +259,32 @@ class RegionAnalyticsService {
     }
 
     try {
+      print('Fetching overall attendance by period for region: $regionId');
+      print('Period: $period');
+      print('API Endpoint: $baseUrl/regional-manager/analytics/attendance/overall/$period');
+      
       final response = await _httpClient.get(
-        '$baseUrl/api/analytics/region/$regionId/attendance/$period'
+        '$baseUrl/regional-manager/analytics/attendance/overall/$period'
       );
+
+      print('Overall Attendance API Response Status: ${response.statusCode}');
+      print('Overall Attendance API Response Headers: ${response.headers}');
+      print('Overall Attendance API Response Body: ${response.body}');
 
       if (response.statusCode == 200) {
         return AttendanceByPeriod.fromJson(json.decode(response.body));
       } else {
         throw Exception(
-          'Failed to fetch attendance by period: ${response.statusCode}'
+          'Failed to fetch overall attendance: ${response.statusCode} - ${response.body}'
         );
       }
     } catch (error) {
-      throw Exception('Error fetching attendance by period: $error');
+      print('Error fetching overall attendance: $error');
+      print('Error details: ${error.toString()}');
+      if (error is Exception) {
+        print('Exception type: ${error.runtimeType}');
+      }
+      throw Exception('Error fetching overall attendance: $error');
     }
   }
 
@@ -383,18 +396,31 @@ class RegionAnalyticsService {
     }
 
     try {
+      print('Fetching attendance by period for region: $regionId');
+      print('Period: $period');
+      print('API Endpoint: $baseUrl/analytics/region/$regionId/attendance-by-period/$period');
+      
       final response = await _httpClient.get(
-        '$baseUrl/api/analytics/region/$regionId/attendance-by-period/$period'
+        '$baseUrl/analytics/region/$regionId/attendance-by-period/$period'
       );
+
+      print('Attendance API Response Status: ${response.statusCode}');
+      print('Attendance API Response Headers: ${response.headers}');
+      print('Attendance API Response Body: ${response.body}');
 
       if (response.statusCode == 200) {
         return AttendanceByPeriodStats.fromJson(json.decode(response.body));
       } else {
         throw Exception(
-          'Failed to fetch attendance by period: ${response.statusCode}'
+          'Failed to fetch attendance by period: ${response.statusCode} - ${response.body}'
         );
       }
     } catch (error) {
+      print('Error fetching attendance by period: $error');
+      print('Error details: ${error.toString()}');
+      if (error is Exception) {
+        print('Exception type: ${error.runtimeType}');
+      }
       throw Exception('Error fetching attendance by period: $error');
     }
   }
@@ -407,18 +433,30 @@ class RegionAnalyticsService {
     }
 
     try {
+      print('Fetching member activity status for region: $regionId');
+      print('API Endpoint: $baseUrl/analytics/region/$regionId/member-activity');
+      
       final response = await _httpClient.get(
-        '$baseUrl/api/analytics/region/$regionId/member-activity'
+        '$baseUrl/analytics/region/$regionId/member-activity'
       );
+
+      print('Member Activity API Response Status: ${response.statusCode}');
+      print('Member Activity API Response Headers: ${response.headers}');
+      print('Member Activity API Response Body: ${response.body}');
 
       if (response.statusCode == 200) {
         return MemberActivityStatus.fromJson(json.decode(response.body));
       } else {
         throw Exception(
-          'Failed to fetch member activity status: ${response.statusCode}'
+          'Failed to fetch member activity status: ${response.statusCode} - ${response.body}'
         );
       }
     } catch (error) {
+      print('Error fetching member activity status: $error');
+      print('Error details: ${error.toString()}');
+      if (error is Exception) {
+        print('Exception type: ${error.runtimeType}');
+      }
       throw Exception('Error fetching member activity status: $error');
     }
   }

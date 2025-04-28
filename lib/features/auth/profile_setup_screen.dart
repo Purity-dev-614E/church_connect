@@ -12,6 +12,10 @@ import 'package:group_management_church_app/widgets/custom_button.dart';
 import 'package:group_management_church_app/widgets/input_field.dart';
 import 'package:provider/provider.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
+import 'package:image_picker_web/image_picker_web.dart';
+import 'dart:html' as html;
+import 'dart:convert';
+import 'dart:typed_data';
 
 class ProfileSetupScreen extends StatefulWidget {
   final String userId;
@@ -48,6 +52,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   
   // Default role is 'user' - only super_admin can change roles
   final String _userRole = 'user';
+
+  // Profile picture state
+  Uint8List? _profileImageBytes;
+  String? _profileImageUrl;
+  bool _isUploadingImage = false;
 
   @override
   void initState() {
@@ -265,6 +274,67 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       }
     }
   }
+
+  Future<void> _pickProfileImage() async {
+    try {
+      final image = await ImagePickerWeb.getImageAsBytes();
+      if (image != null) {
+        setState(() {
+          _profileImageBytes = image;
+          _profileImageUrl = null;
+        });
+      }
+    } catch (e) {
+      _showError('Failed to pick image: $e');
+    }
+  }
+
+  Future<void> _uploadProfileImage() async {
+    if (_profileImageBytes == null) return;
+
+    setState(() {
+      _isUploadingImage = true;
+    });
+
+    try {
+      // Convert image bytes to base64
+      final base64Image = base64Encode(_profileImageBytes!);
+      
+      // Get auth provider for token
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      // Upload image to server
+      final success = await authProvider.uploadProfileImage(
+        widget.userId,
+        base64Image,
+      );
+
+      if (success) {
+        _showSuccess('Profile picture updated successfully');
+        // Get the new image URL
+        final userProvider = Provider.of<UserProvider>(context, listen: false);
+        await userProvider.loadUser(widget.userId);
+        final updatedUser = userProvider.currentUser;
+        if (updatedUser != null && updatedUser.profileImageUrl != null) {
+          setState(() {
+            _profileImageUrl = updatedUser.profileImageUrl;
+            _profileImageBytes = null;
+          });
+        }
+      } else {
+        _showError('Failed to upload profile picture');
+      }
+    } catch (e) {
+      _showError('Error uploading profile picture: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingImage = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -358,13 +428,36 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                     width: 2,
                   ),
                 ),
-                child: const Center(
-                  child: Icon(
-                    Icons.person,
-                    size: 60,
-                    color: AppColors.primaryColor,
-                  ),
-                ),
+                child: _profileImageBytes != null
+                    ? ClipOval(
+                        child: Image.memory(
+                          _profileImageBytes!,
+                          fit: BoxFit.cover,
+                          width: 120,
+                          height: 120,
+                        ),
+                      )
+                    : _profileImageUrl != null
+                        ? ClipOval(
+                            child: Image.network(
+                              _profileImageUrl!,
+                              fit: BoxFit.cover,
+                              width: 120,
+                              height: 120,
+                              errorBuilder: (context, error, stackTrace) {
+                                return const Icon(
+                                  Icons.person,
+                                  size: 60,
+                                  color: AppColors.primaryColor,
+                                );
+                              },
+                            ),
+                          )
+                        : const Icon(
+                            Icons.person,
+                            size: 60,
+                            color: AppColors.primaryColor,
+                          ),
               ),
               
               // Edit button
@@ -388,22 +481,63 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                       size: 20,
                       color: Colors.white,
                     ),
-                    onPressed: () {
-                      // TODO: Implement image picker
-                      _showInfo('Profile picture upload will be implemented');
-                    },
+                    onPressed: _isUploadingImage ? null : _pickProfileImage,
                   ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 16),
-          Text(
-            'Add Profile Picture',
-            style: TextStyles.bodyText.copyWith(
-              fontWeight: FontWeight.w500,
+          if (_profileImageBytes != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  TextButton.icon(
+                    onPressed: _isUploadingImage ? null : _uploadProfileImage,
+                    icon: const Icon(Icons.upload),
+                    label: const Text('Upload'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.primaryColor,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton.icon(
+                    onPressed: _isUploadingImage
+                        ? null
+                        : () {
+                            setState(() {
+                              _profileImageBytes = null;
+                            });
+                          },
+                    icon: const Icon(Icons.cancel),
+                    label: const Text('Cancel'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.errorColor,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            Text(
+              'Add Profile Picture',
+              style: TextStyles.bodyText.copyWith(
+                fontWeight: FontWeight.w500,
+              ),
             ),
-          ),
+          if (_isUploadingImage)
+            const Padding(
+              padding: EdgeInsets.only(top: 8.0),
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                ),
+              ),
+            ),
         ],
       ),
     );

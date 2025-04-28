@@ -28,83 +28,90 @@ class MemberParticipationParams {
 
 class SuperAdminAnalyticsProvider extends ChangeNotifier {
   final SuperAdminAnalyticsService _analyticsService;
-  
+
   // State variables
   bool _isLoading = false;
-  String? _errorMessage;
-  
+  String _errorMessage = '';
+
   // Group analytics data
   final Map<String, GroupDemographics> _groupDemographics = {};
   final Map<String, GroupAttendanceStats> _groupAttendanceStats = {};
   final Map<String, GroupGrowthAnalytics> _groupGrowthAnalytics = {};
   final Map<String, GroupComparison> _compareGroupsData = {};
-  
+
   // Attendance analytics data
   final Map<String, AttendanceByPeriod> _attendanceByPeriod = {};
   final Map<String, OverallAttendanceByPeriod> _overallAttendanceByPeriod = {};
   final Map<String, Map<String, dynamic>> _userAttendanceTrends = {};
-  
+
   // Event analytics data
   final Map<String, EventParticipationStats> _eventParticipationStats = {};
   final Map<String, EventAttendanceComparison> _compareEventAttendance = {};
-  
+
   // Member analytics data
   Map<String, dynamic> _memberParticipationStats = {};
   MemberActivityStatus? _memberActivityStatus;
-  
+
   // Dashboard data
   DashboardSummary? _dashboardSummary;
   final Map<String, GroupDashboardData> _groupDashboardData = {};
-  Map<String, dynamic> _combinedDashboard = {};
-  
+
   // Additional data for super admin
   final Map<String, dynamic> _attendanceTrends = {};
   final Map<String, dynamic> _groupGrowthTrends = {};
   final List<dynamic> _recentGroups = [];
   final List<dynamic> _recentUsers = [];
-  
+
   // Getters
   bool get isLoading => _isLoading;
-  String? get errorMessage => _errorMessage;
-  Map<String, dynamic>? get dashboardSummary => _dashboardSummary?.toMap();
+
+  String get errorMessage => _errorMessage;
+
+  DashboardSummary? get dashboardSummary => _dashboardSummary;
+
   MemberActivityStatus? get memberActivityStatus => _memberActivityStatus;
+
   Map<String, dynamic> get attendanceTrends => _attendanceTrends;
+
   Map<String, dynamic> get groupGrowthTrends => _groupGrowthTrends;
+
   List<dynamic> get recentGroups => _recentGroups;
+
   List<dynamic> get recentUsers => _recentUsers;
   final AuthServices _authServices = AuthServices();
-  
+
   SuperAdminAnalyticsProvider({
     String baseUrl = ApiEndpoints.baseUrl,
   })
       : _analyticsService = SuperAdminAnalyticsService(
-          baseUrl: ApiEndpoints.baseUrl,
-        );
-  
+    baseUrl: ApiEndpoints.baseUrl,
+  );
+
   // Helper methods
   void _setLoading(bool loading) {
     _isLoading = loading;
     notifyListeners();
   }
-  
+
   void _handleError(String operation, dynamic error) {
     _errorMessage = 'Error $operation: $error';
     debugPrint(_errorMessage);
     notifyListeners();
   }
-  
+
   void clearError() {
-    _errorMessage = null;
+    _errorMessage = '';
     notifyListeners();
   }
-  
+
   // Group Analytics Methods
   Future<GroupDemographics> getGroupDemographics(String groupId) async {
     _setLoading(true);
     try {
-      final demographics = await _analyticsService.getGroupDemographics(groupId);
+      final demographics = await _analyticsService.getGroupDemographics(
+          groupId);
       _groupDemographics[groupId] = demographics;
-      _errorMessage = null;
+      _errorMessage = '';
       _setLoading(false);
       return demographics;
     } catch (error) {
@@ -116,13 +123,13 @@ class SuperAdminAnalyticsProvider extends ChangeNotifier {
       );
     }
   }
-  
+
   Future<GroupAttendanceStats> getGroupAttendanceStats(String groupId) async {
     _setLoading(true);
     try {
       final stats = await _analyticsService.getGroupAttendanceStats(groupId);
       _groupAttendanceStats[groupId] = stats;
-      _errorMessage = null;
+      _errorMessage = '';
       _setLoading(false);
       return stats;
     } catch (error) {
@@ -139,13 +146,14 @@ class SuperAdminAnalyticsProvider extends ChangeNotifier {
       );
     }
   }
-  
+
   Future<GroupGrowthAnalytics> getGroupGrowthAnalytics(String groupId) async {
     _setLoading(true);
     try {
-      final analytics = await _analyticsService.getGroupGrowthAnalytics(groupId);
+      final analytics = await _analyticsService.getGroupGrowthAnalytics(
+          groupId);
       _groupGrowthAnalytics[groupId] = analytics;
-      _errorMessage = null;
+      _errorMessage = '';
       _setLoading(false);
       return analytics;
     } catch (error) {
@@ -157,14 +165,14 @@ class SuperAdminAnalyticsProvider extends ChangeNotifier {
       );
     }
   }
-  
+
   Future<GroupComparison> compareGroups(List<String> groupIds) async {
     _setLoading(true);
     try {
       final comparison = await _analyticsService.compareGroups(groupIds);
       final key = groupIds.join('-');
       _compareGroupsData[key] = comparison;
-      _errorMessage = null;
+      _errorMessage = '';
       _setLoading(false);
       return comparison;
     } catch (error) {
@@ -176,14 +184,14 @@ class SuperAdminAnalyticsProvider extends ChangeNotifier {
       );
     }
   }
-  
+
   // Attendance Analytics Methods
   Future<AttendanceByPeriod> getAttendanceByPeriod(String period) async {
     _setLoading(true);
     try {
       final attendance = await _analyticsService.getAttendanceByPeriod(period);
       _attendanceByPeriod[period] = attendance;
-      _errorMessage = null;
+      _errorMessage = '';
       _setLoading(false);
       return attendance;
     } catch (error) {
@@ -195,13 +203,15 @@ class SuperAdminAnalyticsProvider extends ChangeNotifier {
       );
     }
   }
-  
-  Future<OverallAttendanceByPeriod> getOverallAttendanceByPeriod(String period) async {
+
+  Future<OverallAttendanceByPeriod> getOverallAttendanceByPeriod(
+      String period) async {
     _setLoading(true);
     try {
-      final attendance = await _analyticsService.getOverallAttendanceByPeriod(period);
+      final attendance = await _analyticsService.getOverallAttendanceByPeriod(
+          period);
       _overallAttendanceByPeriod[period] = attendance;
-      _errorMessage = null;
+      _errorMessage = '';
       _setLoading(false);
       return attendance;
     } catch (error) {
@@ -218,7 +228,7 @@ class SuperAdminAnalyticsProvider extends ChangeNotifier {
       );
     }
   }
-  
+
   // This method is missing in the service, so we'll implement a stub
   Future<Map<String, dynamic>> getUserAttendanceTrends(String userId) async {
     _setLoading(true);
@@ -232,7 +242,7 @@ class SuperAdminAnalyticsProvider extends ChangeNotifier {
         'message': 'This is a placeholder. Method not implemented in service.',
       };
       _userAttendanceTrends[userId] = data;
-      _errorMessage = null;
+      _errorMessage = '';
       _setLoading(false);
       return data;
     } catch (error) {
@@ -241,14 +251,15 @@ class SuperAdminAnalyticsProvider extends ChangeNotifier {
       return {};
     }
   }
-  
+
   // Event Analytics Methods
-  Future<EventParticipationStats> getEventParticipationStats(String eventId) async {
+  Future<EventParticipationStats> getEventParticipationStats(
+      String eventId) async {
     _setLoading(true);
     try {
       final stats = await _analyticsService.getEventParticipationStats(eventId);
       _eventParticipationStats[eventId] = stats;
-      _errorMessage = null;
+      _errorMessage = '';
       _setLoading(false);
       return stats;
     } catch (error) {
@@ -267,14 +278,16 @@ class SuperAdminAnalyticsProvider extends ChangeNotifier {
       );
     }
   }
-  
-  Future<EventAttendanceComparison> compareEventAttendance(List<String> eventIds) async {
+
+  Future<EventAttendanceComparison> compareEventAttendance(
+      List<String> eventIds) async {
     _setLoading(true);
     try {
-      final comparison = await _analyticsService.compareEventAttendance(eventIds);
+      final comparison = await _analyticsService.compareEventAttendance(
+          eventIds);
       final key = eventIds.join('-');
       _compareEventAttendance[key] = comparison;
-      _errorMessage = null;
+      _errorMessage = '';
       _setLoading(false);
       return comparison;
     } catch (error) {
@@ -285,7 +298,7 @@ class SuperAdminAnalyticsProvider extends ChangeNotifier {
       );
     }
   }
-  
+
   // Member Analytics Methods
   // This method is missing in the service, so we'll implement a stub
   Future<Map<String, dynamic>> getMemberParticipationStats({
@@ -304,7 +317,7 @@ class SuperAdminAnalyticsProvider extends ChangeNotifier {
         'message': 'This is a placeholder. Method not implemented in service.',
       };
       _memberParticipationStats = data;
-      _errorMessage = null;
+      _errorMessage = '';
       _setLoading(false);
       return data;
     } catch (error) {
@@ -313,13 +326,13 @@ class SuperAdminAnalyticsProvider extends ChangeNotifier {
       return {};
     }
   }
-  
+
   Future<MemberActivityStatus> getMemberActivityStatus() async {
     _setLoading(true);
     try {
       final status = await _analyticsService.getMemberActivityStatus();
       _memberActivityStatus = status;
-      _errorMessage = null;
+      _errorMessage = '';
       _setLoading(false);
       return status;
     } catch (error) {
@@ -335,23 +348,32 @@ class SuperAdminAnalyticsProvider extends ChangeNotifier {
       );
     }
   }
-  
+
   // Dashboard Analytics Methods
   Future<Map<String, dynamic>> getDashboardSummary() async {
     _setLoading(true);
     try {
+      print('Loading dashboard summary...');
       final summary = await _analyticsService.getDashboardSummary();
-      _dashboardSummary = summary;
-      _errorMessage = null;
-      _setLoading(false);
-      
+      print('Dashboard summary response: $summary');
+
       // Convert DashboardSummary to Map<String, dynamic>
-      return summary.toMap();
-    } catch (error) {
-      _handleError('fetching dashboard summary', error);
+      final summaryMap = {
+        'totalUsers': summary.totalUsers,
+        'totalGroups': summary.totalGroups,
+        'totalEvents': summary.totalEvents,
+        'recentEvents': summary.recentEvents.map((e) => e.toJson()).toList(),
+        'upcomingEvents': summary.upcomingEvents.map((e) => e.toJson()).toList(),
+      };
+
+      _dashboardSummary = summary;
+      _errorMessage = '';
       _setLoading(false);
-      
-      // Return a default Map<String, dynamic> instead of DashboardSummary
+      return summaryMap;
+    } catch (e) {
+      print('Error loading dashboard summary: $e');
+      _errorMessage = 'Failed to load dashboard summary: $e';
+      _setLoading(false);
       return {
         'totalUsers': 0,
         'totalGroups': 0,
@@ -361,13 +383,34 @@ class SuperAdminAnalyticsProvider extends ChangeNotifier {
       };
     }
   }
-  
+
+  Future<void> loadDashboardSummary() async {
+    _isLoading = true;
+    _errorMessage = '';
+    notifyListeners();
+
+    try {
+      print('Loading dashboard summary...');
+      final summary = await _analyticsService.getDashboardSummary();
+      print('Dashboard summary response: $summary');
+
+      _dashboardSummary = summary;
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      print('Error loading dashboard summary: $e');
+      _errorMessage = 'Failed to load dashboard summary: $e';
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<GroupDashboardData> getGroupDashboardData(String groupId) async {
     _setLoading(true);
     try {
       final data = await _analyticsService.getGroupDashboardData(groupId);
       _groupDashboardData[groupId] = data;
-      _errorMessage = null;
+      _errorMessage = '';
       _setLoading(false);
       return data;
     } catch (error) {
@@ -387,28 +430,6 @@ class SuperAdminAnalyticsProvider extends ChangeNotifier {
       );
     }
   }
+}
   
   // Combined Dashboard Data
-  Future<Map<String, dynamic>> getCombinedDashboard() async {
-    _setLoading(true);
-    try {
-      // Get dashboard summary as Map<String, dynamic>
-      final summary = await getDashboardSummary();
-      
-      // Combine the data
-      final combinedData = {
-        'summary': summary,
-        'timestamp': DateTime.now().toIso8601String(),
-      };
-      
-      _combinedDashboard = combinedData;
-      _errorMessage = null;
-      _setLoading(false);
-      return combinedData;
-    } catch (error) {
-      _handleError('fetching combined dashboard', error);
-      _setLoading(false);
-      return {};
-    }
-  }
-}

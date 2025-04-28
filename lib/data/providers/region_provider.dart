@@ -38,12 +38,15 @@ class RegionProvider extends ChangeNotifier {
 
   // Load all regions
   Future<void> loadRegions() async {
+    if (_isLoading) return; // Prevent multiple simultaneous loads
+    
     _isLoading = true;
     _errorMessage = '';
     notifyListeners();
     
     try {
-      _regions = await _regionServices.getRegions();
+      final regions = await _regionServices.getRegions();
+      _regions = regions;
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -55,10 +58,18 @@ class RegionProvider extends ChangeNotifier {
   
   // Get region by ID
   Future<RegionModel?> getRegionById(String regionId) async {
+    _isLoading = true;
+    _errorMessage = '';
+    notifyListeners();
+    
     try {
-      return await _regionServices.getRegionById(regionId);
+      final region = await _regionServices.getRegionById(regionId);
+      _isLoading = false;
+      notifyListeners();
+      return region;
     } catch (e) {
       _errorMessage = 'Failed to get region: $e';
+      _isLoading = false;
       notifyListeners();
       return null;
     }

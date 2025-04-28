@@ -10,6 +10,7 @@ class UserModel{
   final String regionId;
   final String? regionName;
   final String? createdAt;
+  final String? profileImageUrl;
 
   UserModel({
     required this.id,
@@ -23,13 +24,10 @@ class UserModel{
     required this.regionId,
     this.regionName,
     this.createdAt,
+    this.profileImageUrl,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
-    // Debug logging
-    print('Creating UserModel from JSON:');
-    print('Raw JSON: $json');
-    
     // Get the user ID from various possible fields
     String userId = '';
     if (json['uid'] != null) {
@@ -39,8 +37,6 @@ class UserModel{
     } else if (json['_id'] != null) {
       userId = json['_id'].toString();
     }
-    
-    print('Extracted user ID: $userId');
 
     // Normalize role to lowercase for consistent comparison
     String role = (json['role'] ?? 'user').toString().toLowerCase();
@@ -69,6 +65,7 @@ class UserModel{
       regionId: json['region_id'] ?? json['regionId'] ?? '',
       regionName: json['location'] ?? json['regionName'] ?? '',
       createdAt: json['created_at'] ?? json['createdAt'],
+      profileImageUrl: json['profile_picture'] ?? json['profile_picture'] ?? ''
     );
   }
 
@@ -84,6 +81,7 @@ class UserModel{
       'gender': gender,
       'region_id': regionId,
       'location': regionName,
+      'profile_picture': profileImageUrl,
     };
   }
 }

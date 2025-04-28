@@ -2,20 +2,21 @@ class RegionModel {
   final String id;
   final String name;
   final String? description;
+  final bool isActive;
 
   RegionModel({
     required this.id,
     required this.name,
     this.description,
-
+    this.isActive = true, // Default to true for backward compatibility
   });
 
   factory RegionModel.fromJson(Map<String, dynamic> json) {
     return RegionModel(
-      id: json['id'] ?? '',
-      name: json['name'] ?? '',
-      description: json['description'],
-
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      description: json['description']?.toString(),
+      isActive: json['is_active'] ?? json['isActive'] ?? true,
     );
   }
 
@@ -24,7 +25,7 @@ class RegionModel {
       'id': id,
       'name': name,
       'description': description,
-
+      'is_active': isActive,
     };
   }
 }

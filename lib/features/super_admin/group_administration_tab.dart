@@ -12,6 +12,7 @@ import 'package:provider/provider.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
 
 import '../admin/Admin_dashboard.dart';
+import '../region_manager/group_details_screen.dart';
 
 
 class GroupAdministrationTab extends StatefulWidget {
@@ -348,10 +349,9 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => AdminDashboard(
+                        builder: (context) => GroupDetailsScreen(
                           groupId: group.id,
                           groupName: group.name,
-                          initialTabIndex: 0,
                         ),
                       ),
                     );

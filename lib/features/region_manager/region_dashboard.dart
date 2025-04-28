@@ -215,80 +215,9 @@ class _RegionDashboardState extends State<RegionDashboard> {
         });
       }
 
-      // Load region attendance trends
-      final attendanceTrends = await _analyticsServices.getRegionAttendanceStats(widget.regionId);
-
-      if (mounted) {
-        setState(() {
-          // Convert RegionAttendanceStats to Map<String, dynamic> for chart processing
-          _attendanceTrends = {
-            'trend_data': attendanceTrends.eventStats.map((stat) => {
-              'month': stat.eventDate.month.toString(),
-              'attendance_rate': stat.attendanceRate
-            }).toList(),
-            'overall_stats': {
-              'total_events': attendanceTrends.overallStats.totalEvents,
-              'total_members': attendanceTrends.overallStats.totalMembers,
-              'present_members': attendanceTrends.overallStats.presentMembers,
-              'attendance_rate': attendanceTrends.overallStats.attendanceRate
-            }
-          };
-          _processAttendanceChartData();
-        });
-      }
-
-      // Load region growth trends
-      final growthTrends = await _analyticsServices.getRegionGrowthAnalytics(widget.regionId);
-
-      if (mounted) {
-        setState(() {
-          _growthTrends = growthTrends;
-        });
-      }
     } catch (e) {
       print('Error loading region analytics: $e');
       // Continue without analytics data
-    }
-  }
-
-  void _processAttendanceChartData() {
-    _attendanceSpots = [];
-    _attendanceLabels = [];
-
-    try {
-      if (_attendanceTrends.containsKey('trend_data')) {
-        final trendData = _attendanceTrends['trend_data'] as List;
-
-        for (int i = 0; i < trendData.length; i++) {
-          final item = trendData[i];
-          final rate = item['attendance_rate'] as double? ?? 0.0;
-          _attendanceSpots.add(FlSpot(i.toDouble(), rate));
-          _attendanceLabels.add(item['month'] as String? ?? '');
-        }
-      } else {
-        // Fallback to sample data if no trend data is available
-        _attendanceSpots = [
-          const FlSpot(0, 75),
-          const FlSpot(1, 82),
-          const FlSpot(2, 88),
-          const FlSpot(3, 85),
-          const FlSpot(4, 92),
-          const FlSpot(5, 90),
-        ];
-        _attendanceLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-      }
-    } catch (e) {
-      print('Error processing attendance chart data: $e');
-      // Fallback to sample data
-      _attendanceSpots = [
-        const FlSpot(0, 75),
-        const FlSpot(1, 82),
-        const FlSpot(2, 88),
-        const FlSpot(3, 85),
-        const FlSpot(4, 92),
-        const FlSpot(5, 90),
-      ];
-      _attendanceLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
     }
   }
 
@@ -338,50 +267,6 @@ class _RegionDashboardState extends State<RegionDashboard> {
       message: message,
       type: NotificationType.info,
     );
-  }
-  
-  Future<void> _exportAnalyticsData(String format) async {
-    try {
-      setState(() {
-        _isLoading = true;
-      });
-      
-      // Convert format to lowercase for API
-      final formatLower = format.toLowerCase();
-      
-      // Determine what data to export based on current tab
-      String dataType = 'region_summary';
-      if (_selectedIndex == 1) {
-        dataType = 'region_users';
-      } else if (_selectedIndex == 2) {
-        dataType = 'region_groups';
-      } else if (_selectedIndex == 3) {
-        dataType = 'region_attendance';
-      }
-      
-
-      
-      // Get the app's temporary directory
-      final directory = await getTemporaryDirectory();
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final fileName = 'region_report_$timestamp.$formatLower';
-      final filePath = '${directory.path}/$fileName';
-      
-
-      // Share the file
-      await Share.shareFiles([filePath], text: 'Region Report');
-      
-      setState(() {
-        _isLoading = false;
-      });
-      
-      _showSuccess('Report exported successfully');
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      _showError('Failed to export report: $e');
-    }
   }
 
   @override
@@ -512,8 +397,6 @@ class _RegionDashboardState extends State<RegionDashboard> {
             _buildSectionHeader('Quick Analytics', Icons.analytics, () {
               _onItemTapped(3); // Navigate to Analytics tab
             }),
-            const SizedBox(height: 16),
-            _buildQuickAnalyticsChart(),
             const SizedBox(height: 32),
           ],
         ),
@@ -912,102 +795,6 @@ class _RegionDashboardState extends State<RegionDashboard> {
     );
   }
 
-  Widget _buildQuickAnalyticsChart() {
-    return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Attendance Trends',
-              style: TextStyles.heading2.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Region attendance over the last 6 months',
-              style: TextStyles.bodyText.copyWith(
-                color: AppColors.textColor.withOpacity(0.7),
-              ),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              height: 200,
-              child: LineChart(
-                LineChartData(
-                  gridData: FlGridData(show: false),
-                  titlesData: FlTitlesData(
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 30,
-                        getTitlesWidget: (value, meta) {
-                          return Text(
-                            '${value.toInt()}%',
-                            style: TextStyles.bodyText.copyWith(
-                              color: AppColors.textColor.withOpacity(0.7),
-                              fontSize: 12,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        getTitlesWidget: (value, meta) {
-                          if (value.toInt() >= 0 && value.toInt() < _attendanceLabels.length) {
-                            return Padding(
-                              padding: const EdgeInsets.only(top: 8.0),
-                              child: Text(
-                                _attendanceLabels[value.toInt()],
-                                style: TextStyles.bodyText.copyWith(
-                                  color: AppColors.textColor.withOpacity(0.7),
-                                  fontSize: 12,
-                                ),
-                              ),
-                            );
-                          }
-                          return const Text('');
-                        },
-                      ),
-                    ),
-                    rightTitles: AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    topTitles: AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                  ),
-                  borderData: FlBorderData(show: false),
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: _attendanceSpots,
-                      isCurved: true,
-                      color: AppColors.primaryColor,
-                      barWidth: 4,
-                      isStrokeCapRound: true,
-                      dotData: FlDotData(show: true),
-                      belowBarData: BarAreaData(
-                        show: true,
-                        color: AppColors.primaryColor.withOpacity(0.2),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   // ANALYTICS TAB
   Widget _buildAnalyticsTab() {
     return RegionManagerAnalyticsScreen(regionId: widget.regionId);
@@ -1095,63 +882,6 @@ class _RegionDashboardState extends State<RegionDashboard> {
                       _showInfo('Theme settings will be applied on restart');
                     },
                     activeColor: AppColors.primaryColor,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          
-          // Export settings
-          Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Export Settings',
-                    style: TextStyles.heading2.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    value: _selectedExportFormat,
-                    decoration: InputDecoration(
-                      labelText: 'Default Export Format',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    items: _exportFormats.map((format) {
-                      return DropdownMenuItem(
-                        value: format,
-                        child: Text(format),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() {
-                          _selectedExportFormat = value;
-                        });
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => _exportAnalyticsData(_selectedExportFormat),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryColor,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child: const Text('Export Region Report'),
-                    ),
                   ),
                 ],
               ),

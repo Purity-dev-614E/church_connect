@@ -3,10 +3,12 @@ import 'package:group_management_church_app/core/constants/colors.dart';
 import 'package:group_management_church_app/core/constants/text_styles.dart';
 import 'package:group_management_church_app/data/models/group_model.dart';
 import 'package:group_management_church_app/data/models/user_model.dart';
+import 'package:group_management_church_app/data/models/region_model.dart';
 import 'package:group_management_church_app/features/profile_screen.dart';
 import 'package:group_management_church_app/features/super_admin/group_administration_tab.dart';
 import 'package:group_management_church_app/features/super_admin/screens/analytics_screen.dart';
 import 'package:group_management_church_app/features/super_admin/user_management_tab.dart';
+import 'package:group_management_church_app/features/region_manager/region_details_screen.dart';
 import 'package:group_management_church_app/widgets/custom_app_bar.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -18,9 +20,11 @@ import '../../data/models/event_model.dart';
 import '../../data/providers/event_provider.dart';
 import '../../data/providers/group_provider.dart';
 import '../../data/providers/user_provider.dart';
+import '../../data/providers/region_provider.dart';
 import '../../data/services/event_services.dart';
 import '../../data/providers/auth_provider.dart';
 import '../../data/providers/analytics_providers/super_admin_analytics_provider.dart';
+import 'package:flutter/foundation.dart';
 
 class SuperAdminDashboard extends StatefulWidget {
   const SuperAdminDashboard({super.key});
@@ -151,11 +155,13 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
       if (mounted) {
         setState(() {
           if (_analyticsProvider.dashboardSummary != null) {
-            _dashboardSummary = _analyticsProvider.dashboardSummary!;
+            _dashboardSummary = _analyticsProvider.dashboardSummary!.toMap();
             print('Dashboard summary loaded successfully');
+            _isLoading = false;  // Clear loading state after data is loaded
           } else {
             _errorMessage = 'Dashboard data is not available';
             print('Dashboard summary is null');
+            _isLoading = false;  // Clear loading state even if data is not available
           }
         });
       }
@@ -184,508 +190,6 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
       index,
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
-    );
-  }
-
-  void _navigateToProfile() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const ProfileScreen()),
-    );
-  }
-
-  void _showError(String message) {
-    // Use Future.microtask to schedule the notification after the build is complete
-    Future.microtask(() {
-      if (mounted) {
-        CustomNotification.show(
-          context: context,
-          message: message,
-          type: NotificationType.error,
-        );
-      }
-    });
-  }
-
-  void _showSuccess(String message) {
-    // Use Future.microtask to schedule the notification after the build is complete
-    Future.microtask(() {
-      if (mounted) {
-        CustomNotification.show(
-          context: context,
-          message: message,
-          type: NotificationType.success,
-        );
-      }
-    });
-  }
-
-  void _showInfo(String message) {
-    // Use Future.microtask to schedule the notification after the build is complete
-    Future.microtask(() {
-      if (mounted) {
-        CustomNotification.show(
-          context: context,
-          message: message,
-          type: NotificationType.info,
-        );
-      }
-    });
-  }
-
-  Future<void> _exportAnalyticsData(String format) async {
-    try {
-      setState(() {
-        _isLoading = true;
-      });
-
-      // Get the auth provider for token refresh
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-
-      // Try to refresh the token before making the API call
-      bool tokenRefreshed = await authProvider.refreshToken();
-
-      if (!tokenRefreshed) {
-        // If token refresh failed, show an error
-        setState(() {
-          _isLoading = false;
-        });
-        _showError('Authentication failed. Please login again.');
-        return;
-      }
-
-      // Convert format to lowercase for API
-      final formatLower = format.toLowerCase();
-
-      // Determine what data to export based on current tab
-      String dataType = 'dashboard_summary';
-      if (_selectedIndex == 1) {
-        dataType = 'user_management';
-      } else if (_selectedIndex == 2) {
-        dataType = 'group_management';
-      } else if (_selectedIndex == 3) {
-        dataType = 'attendance_trends';
-      }
-
-      // Make sure we have the analytics provider
-      try {
-        // This will throw an error if _analyticsProvider hasn't been initialized
-        _analyticsProvider.hashCode;
-      } catch (e) {
-        // Initialize it if needed
-        _analyticsProvider = Provider.of<SuperAdminAnalyticsProvider>(
-          context,
-          listen: false,
-        );
-      }
-
-      // Since we don't have a direct export method in the provider, we'll create a mock URL
-      // In a real app, you would call the appropriate export method
-      final downloadUrl = "https://example.com/export/$dataType.$formatLower";
-
-      setState(() {
-        _isLoading = false;
-      });
-
-      if (downloadUrl.isNotEmpty) {
-        _showSuccess('Data exported successfully');
-
-        // Share the download URL
-        await Share.share(
-          'Download your exported church data: $downloadUrl',
-          subject: 'Church Management App - Exported Data',
-        );
-      } else {
-        _showError('Failed to export data');
-      }
-    } catch (e) {
-      // Check if it's an authentication error (401)
-      if (e.toString().contains('401')) {
-        // Try to refresh the token
-        final authProvider = Provider.of<AuthProvider>(context, listen: false);
-        bool tokenRefreshed = await authProvider.refreshToken();
-
-        if (tokenRefreshed) {
-          // If token was refreshed successfully, try again
-          try {
-            // Recursive call to try again with the refreshed token
-            await _exportAnalyticsData(format);
-            return;
-          } catch (retryError) {
-            _showError('Error exporting data after token refresh: $retryError');
-          }
-        } else {
-          // If token refresh failed, show authentication error
-          _showError('Authentication failed. Please login again.');
-        }
-      } else {
-        _showError('Error exporting data: $e');
-      }
-
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
-  Future<void> _showEventDetails(EventModel event) async {
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Text(event.title),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Date & Time:',
-                    style: TextStyles.bodyText.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    DateFormat(
-                      'EEEE, MMMM d, yyyy - h:mm a',
-                    ).format(event.dateTime),
-                    style: TextStyles.bodyText,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Location:',
-                    style: TextStyles.bodyText.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(event.location, style: TextStyles.bodyText),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Description:',
-                    style: TextStyles.bodyText.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(event.description, style: TextStyles.bodyText),
-                  const SizedBox(height: 16),
-                  FutureBuilder<Map<String, dynamic>>(
-                    future: _getEventAttendanceWithTokenRefresh(event.id),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-
-                      if (snapshot.hasError || !snapshot.hasData) {
-                        return Text(
-                          'No attendance data available: ${snapshot.error}',
-                        );
-                      }
-
-                      final attendanceData = snapshot.data!;
-                      final attendanceCount =
-                          attendanceData['attendance_count'] ?? 0;
-                      final totalMembers = attendanceData['total_members'] ?? 0;
-                      final attendanceRate =
-                          totalMembers > 0
-                              ? (attendanceCount / totalMembers * 100)
-                                  .toStringAsFixed(1)
-                              : '0.0';
-
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Attendance:',
-                            style: TextStyles.bodyText.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            '$attendanceCount out of $totalMembers members ($attendanceRate%)',
-                            style: TextStyles.bodyText,
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Close'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  _showAttendanceDialog(event);
-                },
-                child: const Text('Manage Attendance'),
-              ),
-            ],
-          ),
-    );
-  }
-
-  // Helper method to get event attendance with token refresh
-  Future<Map<String, dynamic>> _getEventAttendanceWithTokenRefresh(
-    String eventId,
-  ) async {
-    try {
-      // Try to get event attendance
-      return await _eventServices.getEventAttendance(eventId);
-    } catch (e) {
-      // Check if it's an authentication error (401)
-      if (e.toString().contains('401')) {
-        // Try to refresh the token
-        final authProvider = Provider.of<AuthProvider>(context, listen: false);
-        bool tokenRefreshed = await authProvider.refreshToken();
-
-        if (tokenRefreshed) {
-          // If token was refreshed successfully, try again
-          return await _eventServices.getEventAttendance(eventId);
-        } else {
-          // If token refresh failed, throw authentication error
-          throw Exception('Authentication failed. Please login again.');
-        }
-      }
-      // If it's not an authentication error, rethrow
-      rethrow;
-    }
-  }
-
-  // Helper method to get attended members with token refresh
-  Future<List<UserModel>> _getAttendedMembersWithTokenRefresh(
-    String eventId,
-  ) async {
-    try {
-      // Try to get attended members
-      return await _eventServices.getAttendedMembers(eventId);
-    } catch (e) {
-      // Check if it's an authentication error (401)
-      if (e.toString().contains('401')) {
-        // Try to refresh the token
-        final authProvider = Provider.of<AuthProvider>(context, listen: false);
-        bool tokenRefreshed = await authProvider.refreshToken();
-
-        if (tokenRefreshed) {
-          // If token was refreshed successfully, try again
-          return await _eventServices.getAttendedMembers(eventId);
-        } else {
-          // If token refresh failed, throw authentication error
-          throw Exception('Authentication failed. Please login again.');
-        }
-      }
-      // If it's not an authentication error, rethrow
-      rethrow;
-    }
-  }
-
-  Future<void> _showAttendanceDialog(EventModel event) async {
-    try {
-      // Get group members
-      final groupProvider = Provider.of<GroupProvider>(context, listen: false);
-      final members = await groupProvider.getGroupMembers(event.groupId);
-
-      // Get attended members with token refresh
-      final attendedMembers = await _getAttendedMembersWithTokenRefresh(
-        event.id,
-      );
-      final attendedMemberIds = attendedMembers.map((user) => user.id).toList();
-
-      // Create a map to track attendance
-      Map<String, bool> attendanceMap = {};
-      for (var member in members) {
-        final memberId = member.id as String;
-        attendanceMap[memberId] = attendedMemberIds.contains(memberId);
-      }
-
-      showDialog(
-        context: context,
-        builder:
-            (context) => StatefulBuilder(
-              builder:
-                  (context, setState) => AlertDialog(
-                    title: Text('Attendance for ${event.title}'),
-                    content: SizedBox(
-                      width: double.maxFinite,
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: members.length,
-                        itemBuilder: (context, index) {
-                          final member = members[index];
-                          final memberId = member.id as String;
-                          final memberName =
-                              member.fullName as String? ?? 'Unknown';
-
-                          return CheckboxListTile(
-                            title: Text(memberName),
-                            value: attendanceMap[memberId] ?? false,
-                            onChanged: (value) {
-                              setState(() {
-                                attendanceMap[memberId] = value ?? false;
-                              });
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Cancel'),
-                      ),
-                      ElevatedButton(
-                        onPressed: () async {
-                          try {
-                            // Get list of attended member IDs
-                            final List<String> attendedIds = [];
-                            attendanceMap.forEach((id, attended) {
-                              if (attended) {
-                                attendedIds.add(id);
-                              }
-                            });
-
-                            // Save attendance
-                            await _eventServices.createEventAttendance(
-                              event.id,
-                              attendedIds,
-                            );
-
-                            Navigator.pop(context);
-                            _showSuccess('Attendance saved successfully');
-                          } catch (e) {
-                            _showError('Failed to save attendance: $e');
-                          }
-                        },
-                        child: const Text('Save Attendance'),
-                      ),
-                    ],
-                  ),
-            ),
-      );
-    } catch (e) {
-      _showError('Failed to load attendance data: $e');
-    }
-  }
-
-  Future<void> _loadUsers() async {
-    try {
-      await _userProvider.getAllUsers();
-      if (mounted) {
-        setState(() async {
-          _recentUsers = await _userProvider.getAllUsers();
-        });
-      }
-    } catch (e) {
-      print('Error refreshing users: $e');
-      if (mounted) {
-        _showError('Failed to refresh users');
-      }
-    }
-  }
-
-  void _showEditUserDialog(UserModel user) {
-    final TextEditingController nameController = TextEditingController(
-      text: user.fullName,
-    );
-    final TextEditingController emailController = TextEditingController(
-      text: user.email,
-    );
-    String selectedRole = user.role;
-
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Edit User'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: nameController,
-                    decoration: const InputDecoration(labelText: 'Full Name'),
-                  ),
-                  TextField(
-                    controller: emailController,
-                    decoration: const InputDecoration(labelText: 'Email'),
-                    keyboardType: TextInputType.emailAddress,
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    value: selectedRole,
-                    decoration: const InputDecoration(labelText: 'Role'),
-                    items: const [
-                      DropdownMenuItem(value: 'user', child: Text('Member')),
-                      DropdownMenuItem(
-                        value: 'admin',
-                        child: Text('Group Leader'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'super_admin',
-                        child: Text('Super Admin'),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) {
-                        selectedRole = value;
-                      }
-                    },
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  if (nameController.text.isEmpty ||
-                      emailController.text.isEmpty) {
-                    _showError('Please fill all fields');
-                    return;
-                  }
-
-                  try {
-                    final updatedUser = UserModel(
-                      id: user.id,
-                      fullName: nameController.text.trim(),
-                      email: emailController.text.trim(),
-                      contact: user.contact,
-                      nextOfKin: user.nextOfKin,
-                      nextOfKinContact: user.nextOfKinContact,
-                      role: selectedRole,
-                      gender: user.gender,
-                      regionId: user.regionId,
-                    );
-
-                    final authProvider = Provider.of<AuthProvider>(
-                      context,
-                      listen: false,
-                    );
-                    final success = await authProvider.updateProfile(
-                      updatedUser,
-                    );
-
-                    if (success) {
-                      _showSuccess('User updated successfully');
-                      Navigator.pop(context);
-                      _loadUsers(); // Refresh the user list
-                    } else {
-                      _showError('Failed to update user');
-                    }
-                  } catch (e) {
-                    _showError('Failed to update user: ${e.toString()}');
-                  }
-                },
-                child: const Text('Update'),
-              ),
-            ],
-          ),
     );
   }
 
@@ -1113,59 +617,12 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                 ),
               ],
             ),
-            const SizedBox(height: 20),
-            _buildQuickActions(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildQuickActions() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Text(
-            'Quick Actions',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-          ),
-        ),
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 3,
-          mainAxisSpacing: 16,
-          crossAxisSpacing: 16,
-          padding: const EdgeInsets.all(16),
-          childAspectRatio: 1.2,
-          children: [
-            _buildQuickActionButton(
-              icon: Icons.group_add,
-              label: 'Add Group',
-              color: AppColors.primaryColor,
-              onTap: () => _onItemTapped(2),
-            ),
-            _buildQuickActionButton(
-              icon: Icons.analytics,
-              label: 'Analytics',
-              color: AppColors.secondaryColor,
-              onTap: () => _onItemTapped(3),
-            ),
-            _buildQuickActionButton(
-              icon: Icons.settings,
-              label: 'Settings',
-              color: AppColors.accentColor,
-              onTap: () => _onItemTapped(4),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
 
   Widget _buildQuickActionButton({
     required IconData icon,
@@ -1354,8 +811,6 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         ),
       ],
     );
-    // Add a default return statement to ensure a Widget is always returned
-    return const SizedBox.shrink();
   }
 
   Widget _buildStatCard(
@@ -1423,333 +878,46 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     );
   }
 
-  Widget _buildRecentUsersList() {
-    if (_recentUsers.isEmpty) {
-      return const Center(child: Text('No recent users found'));
-    }
-
-    return Container(
-      height: 150, // Increased height to accommodate content
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: _recentUsers.length > 5 ? 5 : _recentUsers.length,
-        itemBuilder: (context, index) {
-          final user = _recentUsers[index];
-          return Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: _buildRecentUserCard(user),
-          );
-        },
-      ),
+  void _navigateToProfile() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ProfileScreen()),
     );
   }
 
-  Widget _buildRecentUserCard(UserModel user) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Container(
-        width: 160, // Slightly wider
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircleAvatar(
-              backgroundColor: AppColors.primaryColor.withOpacity(0.2),
-              radius: 24,
-              child: Text(
-                user.fullName.isNotEmpty ? user.fullName[0].toUpperCase() : '?',
-                style: TextStyles.heading2.copyWith(
-                  color: AppColors.primaryColor,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            const SizedBox(height: 10), // More spacing
-            Flexible(
-              child: Text(
-                user.fullName,
-                style: TextStyles.bodyText.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-              ),
-            ),
-            const SizedBox(height: 6), // More spacing
-            Flexible(
-              child: Text(
-                user.role,
-                style: TextStyles.bodyText.copyWith(
-                  fontSize: 12,
-                  color: AppColors.textColor.withOpacity(0.7),
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  void _showError(String message) {
+    Future.microtask(() {
+      if (mounted) {
+        CustomNotification.show(
+          context: context,
+          message: message,
+          type: NotificationType.error,
+        );
+      }
+    });
   }
 
-  Widget _buildRecentGroupsList() {
-    if (_recentGroups.isEmpty) {
-      return const Center(child: Text('No recent groups found'));
-    }
-
-    // Sort groups by creation date (newest first)
-    final sortedGroups = List<GroupModel>.from(_recentGroups);
-    sortedGroups.sort((a, b) => b.created_at.compareTo(a.created_at));
-
-    // Take only the last two created groups
-    final recentTwoGroups =
-        sortedGroups.length > 2 ? sortedGroups.sublist(0, 2) : sortedGroups;
-
-    return Container(
-      height: 150, // Increased height to accommodate content
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: recentTwoGroups.length,
-        itemBuilder: (context, index) {
-          final group = recentTwoGroups[index];
-          return Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: _buildRecentGroupCard(group),
-          );
-        },
-      ),
-    );
+  void _showSuccess(String message) {
+    Future.microtask(() {
+      if (mounted) {
+        CustomNotification.show(
+          context: context,
+          message: message,
+          type: NotificationType.success,
+        );
+      }
+    });
   }
 
-  Widget _buildRecentGroupCard(GroupModel group) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Container(
-        width: 160, // Slightly wider
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircleAvatar(
-              backgroundColor: AppColors.secondaryColor.withOpacity(0.2),
-              radius: 24,
-              child: Icon(
-                Icons.groups,
-                color: AppColors.secondaryColor,
-                size: 28,
-              ),
-            ),
-            const SizedBox(height: 10), // More spacing
-            Flexible(
-              child: Text(
-                group.name,
-                style: TextStyles.bodyText.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-              ),
-            ),
-            const SizedBox(height: 6), // More spacing
-            Flexible(
-              child: FutureBuilder<List<dynamic>>(
-                future: Provider.of<GroupProvider>(
-                  context,
-                  listen: false,
-                ).getGroupMembers(group.id),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Text(
-                      'Loading...',
-                      style: TextStyle(fontSize: 12, color: Colors.grey),
-                      textAlign: TextAlign.center,
-                    );
-                  }
-
-                  final memberCount = snapshot.data?.length ?? 0;
-                  return Text(
-                    '$memberCount members',
-                    style: TextStyles.bodyText.copyWith(
-                      fontSize: 12,
-                      color: AppColors.textColor.withOpacity(0.7),
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRecentEventsList() {
-    // Get recent events from dashboard summary
-    final recentEvents =
-        _dashboardSummary['recentEvents'] as List<dynamic>? ?? [];
-
-    if (recentEvents.isEmpty) {
-      return const Center(child: Text('No recent events found'));
-    }
-
-    return Container(
-      height: 180, // Increased height to accommodate content
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: recentEvents.length,
-        itemBuilder: (context, index) {
-          final event = recentEvents[index];
-          return Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: _buildRecentEventCard(event),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildRecentEventCard(Map<String, dynamic> event) {
-    // Extract event data
-    final String eventId = event['eventId'] ?? '';
-    final String title = event['eventTitle'] ?? 'Untitled Event';
-    final String dateString =
-        event['eventDate'] ?? DateTime.now().toIso8601String();
-    final double attendanceRate = (event['attendanceRate'] ?? 0).toDouble();
-
-    // Parse date
-    DateTime dateTime;
-    try {
-      dateTime = DateTime.parse(dateString);
-    } catch (e) {
-      dateTime = DateTime.now();
-    }
-
-    // Format date
-    final formattedDate = DateFormat('MMM d, y').format(dateTime);
-    final formattedTime = DateFormat('h:mm a').format(dateTime);
-
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Container(
-        width: 200,
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: AppColors.accentColor.withOpacity(0.2),
-                  radius: 20,
-                  child: Icon(
-                    Icons.event,
-                    color: AppColors.accentColor,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: TextStyles.bodyText.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Icon(
-                  Icons.calendar_today,
-                  size: 14,
-                  color: AppColors.textColor.withOpacity(0.7),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  formattedDate,
-                  style: TextStyles.bodyText.copyWith(
-                    fontSize: 12,
-                    color: AppColors.textColor.withOpacity(0.7),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Icon(
-                  Icons.access_time,
-                  size: 14,
-                  color: AppColors.textColor.withOpacity(0.7),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  formattedTime,
-                  style: TextStyles.bodyText.copyWith(
-                    fontSize: 12,
-                    color: AppColors.textColor.withOpacity(0.7),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Attendance:',
-                  style: TextStyles.bodyText.copyWith(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _getAttendanceColor(attendanceRate).withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '${attendanceRate.toStringAsFixed(0)}%',
-                    style: TextStyles.bodyText.copyWith(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: _getAttendanceColor(attendanceRate),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Color _getAttendanceColor(double rate) {
-    if (rate >= 80) return Colors.green;
-    if (rate >= 60) return Colors.orange;
-    if (rate >= 40) return Colors.amber;
-    return Colors.red;
+  void _showInfo(String message) {
+    Future.microtask(() {
+      if (mounted) {
+        CustomNotification.show(
+          context: context,
+          message: message,
+          type: NotificationType.info,
+        );
+      }
+    });
   }
 }

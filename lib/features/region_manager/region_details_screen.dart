@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:group_management_church_app/core/constants/colors.dart';
 import 'package:group_management_church_app/core/constants/text_styles.dart';
 import 'package:group_management_church_app/data/models/region_model.dart';
+import 'package:group_management_church_app/data/providers/analytics_providers/regional_manager_analytics_provider.dart';
 import 'package:group_management_church_app/data/providers/region_provider.dart';
 import 'package:group_management_church_app/data/providers/user_provider.dart';
 import 'package:group_management_church_app/data/providers/group_provider.dart';
@@ -38,13 +39,15 @@ class _RegionDetailsScreenState extends State<RegionDetailsScreen> {
   }
 
   Future<void> _loadRegionDetails() async {
+    if (!mounted) return;
+    
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      // Get region details
+      // Get region details first
       final regionProvider = Provider.of<RegionProvider>(context, listen: false);
       final region = await regionProvider.getRegionById(widget.regionId);
       
@@ -52,33 +55,99 @@ class _RegionDetailsScreenState extends State<RegionDetailsScreen> {
         throw Exception('Region not found');
       }
 
-      // Get users in region
+      if (!mounted) return;
+      setState(() {
+        _region = region;
+      });
+
+      // Load other data in parallel
+      await Future.wait([
+        _loadUsers(),
+        _loadGroups(),
+        _loadEvents(),
+        _loadActivityStatus(),
+      ]);
+
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = 'Failed to load region details: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadUsers() async {
+    try {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       final users = await userProvider.getUsersByRegion(widget.regionId);
-
-      // Get groups in region
-      final groupProvider = Provider.of<GroupProvider>(context, listen: false);
-      final groups = await groupProvider.getGroupsByRegion(widget.regionId);
-
-      // Get events in region
-      final eventProvider = Provider.of<EventProvider>(context, listen: false);
-      final events = await eventProvider.getEventsByRegion(widget.regionId);
-
       if (mounted) {
         setState(() {
-          _region = region;
           _userCount = users.length;
-          _groupCount = groups.length;
-          _eventCount = events.length;
-          _isActive = true; // You can add an isActive field to RegionModel if needed
-          _isLoading = false;
         });
       }
     } catch (e) {
+      print('Error loading users: $e');
+    }
+  }
+
+  Future<void> _loadGroups() async {
+    try {
+      final groupProvider = Provider.of<GroupProvider>(context, listen: false);
+      final groups = await groupProvider.getGroupsByRegion(widget.regionId);
       if (mounted) {
         setState(() {
-          _errorMessage = 'Failed to load region details: $e';
-          _isLoading = false;
+          _groupCount = groups.length;
+        });
+      }
+    } catch (e) {
+      print('Error loading groups: $e');
+    }
+  }
+
+  Future<void> _loadEvents() async {
+    try {
+      final eventProvider = Provider.of<EventProvider>(context, listen: false);
+      final events = await eventProvider.getEventsByRegion(widget.regionId);
+      if (mounted) {
+        setState(() {
+          _eventCount = events.length;
+        });
+      }
+    } catch (e) {
+      print('Error loading events: $e');
+    }
+  }
+
+  Future<void> _loadActivityStatus() async {
+    try {
+      final regionmanagerProvider = Provider.of<RegionalManagerAnalyticsProvider>(context, listen: false);
+      final activityStatus = await regionmanagerProvider.getMemberActivityStatusForRegion(widget.regionId);
+      
+      // Calculate if region is active based on member activity
+      final activeMembers = activityStatus.statusSummary.active ?? 0;
+      final inactiveMembers = activityStatus.statusSummary.inactive ?? 0;
+      
+      if (mounted) {
+        setState(() {
+          // If both active and inactive are zero, consider the region inactive
+          if (activeMembers == 0 && inactiveMembers == 0) {
+            _isActive = false;
+          } else {
+            _isActive = activeMembers > inactiveMembers;
+          }
+        });
+      }
+    } catch (e) {
+      print('Error loading activity status: $e');
+      // Default to false if we can't get the status
+      if (mounted) {
+        setState(() {
+          _isActive = false;
         });
       }
     }

@@ -212,28 +212,66 @@ class SuperAdminAnalyticsService {
 
   /// Get activity status for all members
   Future<MemberActivityStatus> getMemberActivityStatus() async {
-    final url = Uri.parse('https://safari-backend-production-bf65.up.railway.app/apisuper-admin/analytics/members/activity-status');
-    
-    final response = await _handleRequest(() async {
-      return await http.get(url, headers: await _getHeaders());
-    });
+    try {
+      print('Fetching member activity status for super admin');
+      print('API Endpoint: $baseUrl/analytics/member-activity');
+      
+      final response = await _httpClient.get(
+        '$baseUrl/analytics/member-activity'
+      );
 
-    final data = json.decode(response.body);
-    return MemberActivityStatus.fromJson(data);
+      print('Member Activity API Response Status: ${response.statusCode}');
+      print('Member Activity API Response Headers: ${response.headers}');
+      print('Member Activity API Response Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception(
+          'Failed to fetch member activity status: ${response.statusCode} - ${response.body}'
+        );
+      }
+    } catch (error) {
+      print('Error fetching member activity status: $error');
+      print('Error details: ${error.toString()}');
+      if (error is Exception) {
+        print('Exception type: ${error.runtimeType}');
+      }
+      throw Exception('Error fetching member activity status: $error');
+    }
   }
 
   // Dashboard Analytics
 
   /// Get overall dashboard summary
   Future<DashboardSummary> getDashboardSummary() async {
-    final url = Uri.parse('https://safari-backend-production-bf65.up.railway.app/api/super-admin/analytics/dashboard/summary');
-    
-    final response = await _handleRequest(() async {
-      return await http.get(url, headers: await _getHeaders());
-    });
+    try {
+      print('Fetching dashboard summary');
+      print('API Endpoint: $baseUrl/super-admin/analytics/dashboard/summary');
+      
+      final response = await _httpClient.get(
+        '$baseUrl/super-admin/analytics/dashboard/summary'
+      );
 
-    final data = json.decode(response.body);
-    return DashboardSummary.fromJson(data);
+      print('Dashboard Summary API Response Status: ${response.statusCode}');
+      print('Dashboard Summary API Response Headers: ${response.headers}');
+      print('Dashboard Summary API Response Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return DashboardSummary.fromJson(json.decode(response.body));
+      } else {
+        throw Exception(
+          'Failed to fetch dashboard summary: ${response.statusCode} - ${response.body}'
+        );
+      }
+    } catch (error) {
+      print('Error fetching dashboard summary: $error');
+      print('Error details: ${error.toString()}');
+      if (error is Exception) {
+        print('Exception type: ${error.runtimeType}');
+      }
+      throw Exception('Error fetching dashboard summary: $error');
+    }
   }
 
   /// Get dashboard data for a specific group
