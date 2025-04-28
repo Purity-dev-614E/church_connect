@@ -126,7 +126,11 @@ class _RegionDetailsScreenState extends State<RegionDetailsScreen> {
   Future<void> _loadActivityStatus() async {
     try {
       final regionmanagerProvider = Provider.of<RegionalManagerAnalyticsProvider>(context, listen: false);
-      final activityStatus = await regionmanagerProvider.getMemberActivityStatusForRegion(widget.regionId);
+      final activityStatus = await regionmanagerProvider.getActivityStatus(widget.regionId);
+      
+      if (activityStatus == null) {
+        throw Exception('Activity status is null');
+      }
       
       // Calculate if region is active based on member activity
       final activeMembers = activityStatus.statusSummary.active ?? 0;

@@ -133,7 +133,7 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
           );
 
           if (attendanceStats?.overallStats?.attendanceRate != null) {
-            _regionAttendance[region.name] = attendanceStats.overallStats.attendanceRate;
+            _regionAttendance[region.name] = attendanceStats!.overallStats!.attendanceRate;
           }
         } catch (e) {
           print('Error loading attendance for region ${region.name}: $e');
@@ -162,7 +162,7 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
       if (activityStatus?.counts != null) {
         setState(() {
           _activityStatus = {
-            'active': (activityStatus.counts.active ?? 0).toDouble(),
+            'active': (activityStatus!.counts.active ?? 0).toDouble(),
             'inactive': (activityStatus.counts.inactive ?? 0).toDouble(),
           };
         });
@@ -196,7 +196,7 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
       
       if (attendance?.overallStats?.attendanceRate != null) {
         setState(() {
-          _overallAttendance = attendance.overallStats.attendanceRate;
+          _overallAttendance = attendance!.overallStats!.attendanceRate;
           
           // Generate trend data points
           _attendanceTrend = [

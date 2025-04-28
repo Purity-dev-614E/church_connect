@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:group_management_church_app/data/services/http_client.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter/material.dart';
 
 import '../../models/regional_analytics_model.dart';
 import '../../services/analytics_services/regional_manager_analytics_service.dart';
@@ -95,7 +96,7 @@ class RegionalManagerAnalyticsProvider extends ChangeNotifier {
   
   // State variables
   bool _isLoading = false;
-  String? _errorMessage;
+  String? _error;
   
   // Group-specific analytics for region
   final Map<String, GroupDemographics> _groupDemographics = {};
@@ -118,7 +119,7 @@ class RegionalManagerAnalyticsProvider extends ChangeNotifier {
   
   // Getters
   bool get isLoading => _isLoading;
-  String? get errorMessage => _errorMessage;
+  String? get error => _error;
   
   RegionalManagerAnalyticsProvider({http.Client? client}) 
       : _analyticsService = RegionAnalyticsService(
@@ -132,13 +133,13 @@ class RegionalManagerAnalyticsProvider extends ChangeNotifier {
   }
   
   void _handleError(String operation, dynamic error) {
-    _errorMessage = 'Error $operation: $error';
-    debugPrint(_errorMessage);
+    _error = 'Error $operation: $error';
+    debugPrint(_error!);
     notifyListeners();
   }
   
   void clearError() {
-    _errorMessage = null;
+    _error = null;
     notifyListeners();
   }
   
@@ -153,7 +154,7 @@ class RegionalManagerAnalyticsProvider extends ChangeNotifier {
       
       final data = await _analyticsService.getGroupDemographicsForRegion(groupId);
       _groupDemographics[groupId] = data;
-      _errorMessage = null;
+      _error = null;
       _setLoading(false);
       return data;
     } catch (error) {
@@ -163,9 +164,13 @@ class RegionalManagerAnalyticsProvider extends ChangeNotifier {
     }
   }
   
-  Future<GroupAttendanceStats> getGroupAttendanceStatsForRegion(String groupId) async {
-    _setLoading(true);
+  Future<GroupAttendanceStats?> getGroupAttendanceStatsForRegion(String groupId) async {
     try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      print('Fetching group attendance stats for group: $groupId');
       if (_groupAttendanceStats.containsKey(groupId)) {
         _setLoading(false);
         return _groupAttendanceStats[groupId]!;
@@ -173,13 +178,15 @@ class RegionalManagerAnalyticsProvider extends ChangeNotifier {
       
       final data = await _analyticsService.getGroupAttendanceStatsForRegion(groupId);
       _groupAttendanceStats[groupId] = data;
-      _errorMessage = null;
+      _error = null;
       _setLoading(false);
       return data;
     } catch (error) {
-      _handleError('fetching group attendance stats for region', error);
-      _setLoading(false);
-      rethrow;
+      print('Error in getGroupAttendanceStatsForRegion: $error');
+      _error = error.toString();
+      _isLoading = false;
+      notifyListeners();
+      return null;
     }
   }
   
@@ -193,7 +200,7 @@ class RegionalManagerAnalyticsProvider extends ChangeNotifier {
       
       final data = await _analyticsService.getGroupGrowthAnalyticsForRegion(groupId);
       _groupGrowthAnalytics[groupId] = data;
-      _errorMessage = null;
+      _error = null;
       _setLoading(false);
       return data;
     } catch (error) {
@@ -215,7 +222,7 @@ class RegionalManagerAnalyticsProvider extends ChangeNotifier {
       
       final data = await _analyticsService.compareGroupsInRegion(groupIds, regionId);
       _groupComparisons[key] = data;
-      _errorMessage = null;
+      _error = null;
       _setLoading(false);
       return data;
     } catch (error) {
@@ -235,7 +242,7 @@ class RegionalManagerAnalyticsProvider extends ChangeNotifier {
       
       final data = await _analyticsService.getEventParticipationStatsForRegion(eventId);
       _eventParticipationStats[eventId] = data;
-      _errorMessage = null;
+      _error = null;
       _setLoading(false);
       return data;
     } catch (error) {
@@ -258,7 +265,7 @@ class RegionalManagerAnalyticsProvider extends ChangeNotifier {
       
       final data = await _analyticsService.compareEventAttendanceInRegion(eventIds, regionId);
       _eventAttendanceComparisons[key] = data;
-      _errorMessage = null;
+      _error = null;
       _setLoading(false);
       return data;
     } catch (error) {
@@ -280,7 +287,7 @@ class RegionalManagerAnalyticsProvider extends ChangeNotifier {
       
       final data = await _analyticsService.getUserAttendanceTrendsForRegion(userId, regionId);
       _userAttendanceTrends[key] = data;
-      _errorMessage = null;
+      _error = null;
       _setLoading(false);
       return data;
     } catch (error) {
@@ -290,9 +297,16 @@ class RegionalManagerAnalyticsProvider extends ChangeNotifier {
     }
   }
   
-  Future<AttendanceByPeriod> getOverallAttendanceByPeriodForRegion(String period, String regionId) async {
-    _setLoading(true);
+  Future<AttendanceByPeriod?> getOverallAttendanceByPeriodForRegion(
+    String period,
+    String regionId,
+  ) async {
     try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      print('Fetching overall attendance for region: $regionId, period: $period');
       final key = '${regionId}_$period';
       
       if (_attendanceByPeriod.containsKey(key)) {
@@ -300,15 +314,20 @@ class RegionalManagerAnalyticsProvider extends ChangeNotifier {
         return _attendanceByPeriod[key]!;
       }
       
-      final data = await _analyticsService.getOverallAttendanceByPeriodForRegion(period, regionId);
+      final data = await _analyticsService.getOverallAttendanceByPeriodForRegion(
+        period,
+        regionId,
+      );
       _attendanceByPeriod[key] = data;
-      _errorMessage = null;
+      _error = null;
       _setLoading(false);
       return data;
-    } catch (error) {
-      _handleError('fetching overall attendance by period for region', error);
-      _setLoading(false);
-      rethrow;
+    } catch (e) {
+      print('Error in getOverallAttendanceByPeriodForRegion: $e');
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return null;
     }
   }
   
@@ -322,7 +341,7 @@ class RegionalManagerAnalyticsProvider extends ChangeNotifier {
       
       final data = await _analyticsService.getGroupDashboardDataForRegion(groupId);
       _groupDashboardData[groupId] = data;
-      _errorMessage = null;
+      _error = null;
       _setLoading(false);
       return data;
     } catch (error) {
@@ -343,7 +362,7 @@ class RegionalManagerAnalyticsProvider extends ChangeNotifier {
       
       final data = await _analyticsService.getRegionDemographics(regionId);
       _regionDemographics[regionId] = data;
-      _errorMessage = null;
+      _error = null;
       _setLoading(false);
       return data;
     } catch (error) {
@@ -363,7 +382,7 @@ class RegionalManagerAnalyticsProvider extends ChangeNotifier {
       
       final data = await _analyticsService.getRegionAttendanceStats(regionId);
       _regionAttendanceStats[regionId] = data;
-      _errorMessage = null;
+      _error = null;
       _setLoading(false);
       return data;
     } catch (error) {
@@ -383,7 +402,7 @@ class RegionalManagerAnalyticsProvider extends ChangeNotifier {
       
       final data = await _analyticsService.getRegionGrowthAnalytics(regionId);
       _regionGrowthAnalytics[regionId] = data;
-      _errorMessage = null;
+      _error = null;
       _setLoading(false);
       return data;
     } catch (error) {
@@ -405,7 +424,7 @@ class RegionalManagerAnalyticsProvider extends ChangeNotifier {
       
       final data = await _analyticsService.getAttendanceByPeriodForRegion(period, regionId);
       _attendanceByPeriodStats[key] = data;
-      _errorMessage = null;
+      _error = null;
       _setLoading(false);
       return data;
     } catch (error) {
@@ -415,43 +434,68 @@ class RegionalManagerAnalyticsProvider extends ChangeNotifier {
     }
   }
   
-  Future<DashboardSummary> getDashboardSummaryForRegion(String regionId) async {
-    _setLoading(true);
+  Future<DashboardSummary?> getDashboardSummaryForRegion(String regionId) async {
     try {
-      if (_dashboardSummary.containsKey(regionId)) {
-        _setLoading(false);
-        return _dashboardSummary[regionId]!;
-      }
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      print('Fetching dashboard summary for region: $regionId');
+      final response = await _analyticsService.getDashboardSummaryForRegion(regionId);
       
-      final data = await _analyticsService.getDashboardSummaryForRegion(regionId);
-      _dashboardSummary[regionId] = data;
-      _errorMessage = null;
-      _setLoading(false);
-      return data;
-    } catch (error) {
-      _handleError('fetching dashboard summary for region', error);
-      _setLoading(false);
-      rethrow;
+      _isLoading = false;
+      notifyListeners();
+      return response;
+    } catch (e) {
+      print('Error in getDashboardSummaryForRegion: $e');
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return null;
     }
   }
   
-  Future<MemberActivityStatus> getMemberActivityStatusForRegion(String regionId) async {
-    _setLoading(true);
+  Future<MemberActivityStatus?> getActivityStatus(String regionId) async {
     try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      print('Fetching activity status for region: $regionId');
       if (_memberActivityStatus.containsKey(regionId)) {
         _setLoading(false);
         return _memberActivityStatus[regionId]!;
       }
       
-      final data = await _analyticsService.getMemberActivityStatusForRegion(regionId);
-      _memberActivityStatus[regionId] = data;
-      _errorMessage = null;
-      _setLoading(false);
-      return data;
-    } catch (error) {
-      _handleError('fetching member activity status for region', error);
-      _setLoading(false);
-      rethrow;
+      try {
+        final data = await _analyticsService.getMemberActivityStatusForRegion(regionId);
+        _memberActivityStatus[regionId] = data;
+        _error = null;
+        _setLoading(false);
+        notifyListeners();
+        return data;
+      } catch (e) {
+        print('Error fetching activity status, using default values: $e');
+        // Return default values when API fails
+        final defaultStatus = MemberActivityStatus(
+          userStats: [],
+          statusSummary: StatusSummary(
+            active: 0,
+            inactive: 0,
+            total: 0,
+          ),
+        );
+        _memberActivityStatus[regionId] = defaultStatus;
+        _setLoading(false);
+        notifyListeners();
+        return defaultStatus;
+      }
+    } catch (e) {
+      print('Error in getActivityStatus: $e');
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return null;
     }
   }
   
@@ -489,21 +533,6 @@ class RegionalManagerAnalyticsProvider extends ChangeNotifier {
     } catch (error) {
       _handleError('getting group attendance', error);
       return {};
-    }
-  }
-  
-  Future<Map<String, double>> getActivityStatus(String regionId) async {
-    try {
-      final memberActivity = await getMemberActivityStatusForRegion(regionId);
-      final Map<String, double> activityStatus = {
-        'active': (memberActivity.statusSummary.active / memberActivity.statusSummary.total) * 100,
-        'inactive': (memberActivity.statusSummary.inactive / memberActivity.statusSummary.total) * 100,
-      };
-      
-      return activityStatus;
-    } catch (error) {
-      _handleError('getting activity status', error);
-      return {'active': 0, 'inactive': 0};
     }
   }
   

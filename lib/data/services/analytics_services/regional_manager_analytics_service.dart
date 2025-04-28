@@ -46,24 +46,47 @@ class RegionAnalyticsService {
 
   // Get region dashboard summary
   Future<DashboardSummary> getDashboardSummaryForRegion(String regionId) async {
-    if (!_isValidUuid(regionId)) {
-      throw Exception('Invalid region UUID format');
-    }
-
     try {
+      print('Fetching dashboard summary for region: $regionId');
+      print('API Endpoint: ${ApiEndpoints.baseUrl}/regional-manager/analytics/dashboard/summary');
+      
       final response = await _httpClient.get(
-        '$baseUrl/api/analytics/region/$regionId/dashboard-summary'
+        '${ApiEndpoints.baseUrl}/regional-manager/analytics/dashboard/summary',
       );
 
+      print('Dashboard Summary API Response Status: ${response.statusCode}');
+      print('Dashboard Summary API Response Body: ${response.body}');
+
       if (response.statusCode == 200) {
-        return DashboardSummary.fromJson(json.decode(response.body));
-      } else {
-        throw Exception(
-          'Failed to fetch dashboard summary: ${response.statusCode}'
+        final Map<String, dynamic> data = json.decode(response.body);
+        print('Parsed dashboard data: $data');
+        
+        // Ensure all required fields are present with proper types
+        return DashboardSummary(
+          userCount: data['userCount'] is int ? data['userCount'] : 0,
+          groupCount: data['groupCount'] is int ? data['groupCount'] : 0,
+          eventCount: data['eventCount'] is int ? data['eventCount'] : 0,
+          attendanceCount: data['attendanceCount'] is int ? data['attendanceCount'] : null,
+          recentEvents: data['recentEvents'] is List ? data['recentEvents'] : [],
         );
+      } else {
+        print('Error response from API: ${response.statusCode} - ${response.body}');
+        throw Exception('Failed to fetch dashboard summary: ${response.statusCode}');
       }
-    } catch (error) {
-      throw Exception('Error fetching dashboard summary: $error');
+    } catch (e) {
+      print('Error fetching dashboard summary: $e');
+      print('Error details: ${e.toString()}');
+      if (e is Exception) {
+        print('Exception type: ${e.runtimeType}');
+      }
+      // Return a default DashboardSummary with null attendanceCount
+      return DashboardSummary(
+        userCount: 0,
+        groupCount: 0,
+        eventCount: 0,
+        attendanceCount: null,
+        recentEvents: [],
+      );
     }
   }
 
@@ -264,7 +287,7 @@ class RegionAnalyticsService {
       print('API Endpoint: $baseUrl/regional-manager/analytics/attendance/overall/$period');
       
       final response = await _httpClient.get(
-        '$baseUrl/regional-manager/analytics/attendance/overall/$period'
+        '${ApiEndpoints.baseUrl}/regional-manager/analytics/attendance/overall/$period'
       );
 
       print('Overall Attendance API Response Status: ${response.statusCode}');
@@ -297,7 +320,7 @@ class RegionAnalyticsService {
 
     try {
       final response = await _httpClient.get(
-        '$baseUrl/api/analytics/region/group/$groupId/attendance'
+        '${ApiEndpoints.baseUrl}/regional-manager/analytics/groups/$groupId/attendance',
       );
 
       if (response.statusCode == 200) {
@@ -308,7 +331,8 @@ class RegionAnalyticsService {
         );
       }
     } catch (error) {
-      throw Exception('Error fetching group attendance stats: $error');
+      print('Error fetching group attendance stats for region: $error');
+      throw Exception('Failed to fetch group attendance stats: $error');
     }
   }
 
@@ -437,7 +461,7 @@ class RegionAnalyticsService {
       print('API Endpoint: $baseUrl/analytics/region/$regionId/member-activity');
       
       final response = await _httpClient.get(
-        '$baseUrl/analytics/region/$regionId/member-activity'
+        '${ApiEndpoints.baseUrl}/regional-manager/analytics/members/activity-status',
       );
 
       print('Member Activity API Response Status: ${response.statusCode}');

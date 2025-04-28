@@ -634,24 +634,24 @@ class DashboardSummary {
   final int userCount;
   final int groupCount;
   final int eventCount;
-  final int attendanceCount;
+  final int? attendanceCount;
   final List<dynamic> recentEvents;
 
   DashboardSummary({
     required this.userCount,
     required this.groupCount,
     required this.eventCount,
-    required this.attendanceCount,
+    this.attendanceCount,
     required this.recentEvents,
   });
 
   factory DashboardSummary.fromJson(Map<String, dynamic> json) {
     return DashboardSummary(
-      userCount: json['userCount'],
-      groupCount: json['groupCount'],
-      eventCount: json['eventCount'],
+      userCount: json['userCount'] ?? 0,
+      groupCount: json['groupCount'] ?? 0,
+      eventCount: json['eventCount'] ?? 0,
       attendanceCount: json['attendanceCount'],
-      recentEvents: json['recentEvents'],
+      recentEvents: json['recentEvents'] ?? [],
     );
   }
 }
