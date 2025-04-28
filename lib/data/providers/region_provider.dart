@@ -5,13 +5,15 @@ import '../models/group_model.dart';
 import '../services/region_services.dart';
 import '../services/user_services.dart';
 import '../services/group_services.dart';
-import '../services/analytics_services.dart';
+import '../services/analytics_services/regional_manager_analytics_service.dart';
 
 class RegionProvider extends ChangeNotifier {
   final RegionServices _regionServices = RegionServices();
   final UserServices _userServices = UserServices();
   final GroupServices _groupServices = GroupServices();
-  final AnalyticsServices _analyticsServices = AnalyticsServices();
+  final RegionAnalyticsService _analyticsServices = RegionAnalyticsService(
+    baseUrl: 'https://safari-backend-production-bf65.up.railway.app',
+  );
   
   List<RegionModel> _regions = [];
   List<RegionModel> get regions => _regions;
@@ -235,16 +237,16 @@ class RegionProvider extends ChangeNotifier {
     
     try {
       // Get dashboard summary
-      final summary = await _analyticsServices.getRegionDashboardSummary(regionId);
+      final summary = await _analyticsServices.getDashboardSummaryForRegion(regionId);
       
       // Get attendance trends
-      final attendanceTrends = await _analyticsServices.getRegionAttendanceTrends(regionId);
+      final attendanceTrends = await _analyticsServices.getRegionAttendanceStats(regionId);
       
       // Get growth trends
-      final growthTrends = await _analyticsServices.getRegionGrowth(regionId);
+      final growthTrends = await _analyticsServices.getRegionGrowthAnalytics(regionId);
       
       // Get engagement metrics
-      final engagement = await _analyticsServices.getRegionEngagement(regionId);
+      final engagement = await _analyticsServices.getMemberActivityStatusForRegion(regionId);
       
       // Combine all analytics data
       _regionAnalytics = {
@@ -272,7 +274,21 @@ class RegionProvider extends ChangeNotifier {
     notifyListeners();
     
     try {
-      final report = await _analyticsServices.exportRegionReport(regionId);
+      // Get all analytics data
+      final summary = await _analyticsServices.getDashboardSummaryForRegion(regionId);
+      final attendanceStats = await _analyticsServices.getRegionAttendanceStats(regionId);
+      final growthAnalytics = await _analyticsServices.getRegionGrowthAnalytics(regionId);
+      final demographics = await _analyticsServices.getRegionDemographics(regionId);
+      
+      // Combine into a report
+      final report = {
+        'summary': summary,
+        'attendance_stats': attendanceStats,
+        'growth_analytics': growthAnalytics,
+        'demographics': demographics,
+        'timestamp': DateTime.now().toIso8601String(),
+      };
+      
       _isLoading = false;
       notifyListeners();
       return report;

@@ -305,22 +305,26 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
     try {
       if (!mounted) return;
       
-      // Load members directly
-      final _groupProvider = Provider.of<GroupProvider>(context, listen: false);
-      final members = await _groupProvider.getGroupMembers(widget.groupId);
+      print('Loading group members for group: ${widget.groupId}');
       
-      if (!mounted) return;
+      // Get provider
+      final groupProvider = Provider.of<GroupProvider>(context, listen: false);
       
-      setState(() {
-        _groupMembers = members;
-      });
+      // Get members
+      final members = await groupProvider.getGroupMembers(widget.groupId);
+      
+      if (mounted) {
+        setState(() {
+          _groupMembers = members.cast<UserModel>();
+        });
+      }
     } catch (e) {
       print('Error loading group members: $e');
-      if (!mounted) return;
-      
-      setState(() {
-        _errorMessage = 'Error loading group members: ${e.toString()}';
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Error loading group members: ${e.toString()}';
+        });
+      }
     }
   }
 

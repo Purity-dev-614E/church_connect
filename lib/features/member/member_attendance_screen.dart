@@ -62,7 +62,9 @@ class _MemberAttendanceScreenState extends State<MemberAttendanceScreen> {
       final attendanceRecords = await attendanceProvider.getUserAttendanceRecords(widget.userId);
 
       // Convert records to AttendanceModel objects
-      final List<AttendanceModel> attendanceModels = attendanceRecords;
+      final List<AttendanceModel> attendanceModels = attendanceRecords.map((record) => 
+        AttendanceModel.fromJson(record as Map<String, dynamic>)
+      ).toList();
 
       // Separate attended and unattended events
       final Set<String> attendedEventIds = attendanceModels

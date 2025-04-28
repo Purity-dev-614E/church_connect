@@ -7,7 +7,6 @@ import 'package:group_management_church_app/features/profile_screen.dart';
 import 'package:group_management_church_app/features/super_admin/group_administration_tab.dart';
 import 'package:group_management_church_app/features/super_admin/screens/analytics_screen.dart';
 import 'package:group_management_church_app/features/super_admin/user_management_tab.dart';
-import 'package:group_management_church_app/features/region_manager/region_manager_screen.dart';
 import 'package:group_management_church_app/widgets/custom_app_bar.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -22,9 +21,6 @@ import '../../data/providers/user_provider.dart';
 import '../../data/services/event_services.dart';
 import '../../data/providers/auth_provider.dart';
 import '../../data/providers/analytics_providers/super_admin_analytics_provider.dart';
-import '../../data/models/region_model.dart';
-import '../../data/providers/region_provider.dart';
-import '../../features/region_manager/region_details_screen.dart';
 
 class SuperAdminDashboard extends StatefulWidget {
   const SuperAdminDashboard({super.key});
@@ -34,7 +30,7 @@ class SuperAdminDashboard extends StatefulWidget {
 }
 
 class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
-  _SuperAdminDashboardState(); // Add an unnamed constructor
+  _SuperAdminDashboardState();
 
   int _selectedIndex = 0;
   final PageController _pageController = PageController();
@@ -47,7 +43,6 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   List<UserModel> _recentUsers = [];
   final List<GroupModel> _recentGroups = [];
   Map<String, dynamic> _dashboardSummary = {};
-  List<RegionModel> _regions = [];
 
   bool _isLoading = true;
   String? _errorMessage;
@@ -56,13 +51,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   bool _usersDataRequested = false;
   bool _groupsDataRequested = false;
   bool _eventsDataRequested = false;
-  bool _regionsDataRequested = false;
 
   // Settings state
   bool _notificationsEnabled = true;
   bool _darkModeEnabled = false;
-
-  // Chart data
 
   @override
   void initState() {
@@ -697,37 +689,8 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     );
   }
 
-  Future<void> _loadRegions() async {
-    if (_regionsDataRequested) return;
-    
-    _regionsDataRequested = true;
-    
-    try {
-      final regionProvider = Provider.of<RegionProvider>(context, listen: false);
-      await regionProvider.loadRegions();
-      
-      if (mounted) {
-        setState(() {
-          _regions = regionProvider.regions;
-        });
-      }
-    } catch (e) {
-      print('Error loading regions: $e');
-    }
-  }
-
-  void _navigateToRegionDetails(RegionModel region) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => RegionDetailsScreen(regionId: region.id),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    // Use Consumer pattern to avoid unnecessary rebuilds
     return Scaffold(
       appBar: CustomAppBar(
         title: 'Super Admin Dashboard',
@@ -752,7 +715,6 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
       ),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
-        // Required for more than 3 items
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(
             icon: Icon(Icons.dashboard),
@@ -1188,33 +1150,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
               onTap: () => _onItemTapped(2),
             ),
             _buildQuickActionButton(
-              icon: Icons.location_city,
-              label: 'Regions',
+              icon: Icons.analytics,
+              label: 'Analytics',
               color: AppColors.secondaryColor,
-              onTap: () {
-                if (!_regionsDataRequested) {
-                  _loadRegions();
-                }
-                showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(20),
-                    ),
-                  ),
-                  builder: (context) => DraggableScrollableSheet(
-                    initialChildSize: 0.7,
-                    minChildSize: 0.5,
-                    maxChildSize: 0.9,
-                    expand: false,
-                    builder: (context, scrollController) => SingleChildScrollView(
-                      controller: scrollController,
-                      child: _buildRegionsList(),
-                    ),
-                  ),
-                );
-              },
+              onTap: () => _onItemTapped(3),
             ),
             _buildQuickActionButton(
               icon: Icons.settings,
@@ -1261,45 +1200,6 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildRegionsList() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Text(
-            'Regions',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-          ),
-        ),
-        if (_regions.isEmpty)
-          const Center(
-            child: Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Text('No regions found'),
-            ),
-          )
-        else
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _regions.length,
-            itemBuilder: (context, index) {
-              final region = _regions[index];
-              return ListTile(
-                leading: const Icon(Icons.location_on),
-                title: Text(region.name),
-                subtitle: Text(region.description ?? ''),
-                onTap: () => _navigateToRegionDetails(region),
-              );
-            },
-          ),
-      ],
     );
   }
 

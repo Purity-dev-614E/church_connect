@@ -79,10 +79,6 @@ class AuthServices {
           await prefs.setString('user_data', json.encode(userData));
           await prefs.setString('user_id', userId);
 
-          // Set tokens in HttpClient
-          await _httpClient.setTokens(accessToken, refreshToken);
-
-          print('Tokens and user data stored successfully');
 
           return {
             'success': true,

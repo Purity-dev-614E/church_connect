@@ -63,7 +63,7 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> with SingleTick
 
       if (mounted) {
         setState(() {
-          _members = members;
+          _members = members.cast<UserModel>();
           _events = events;
           _isLoading = false;
         });

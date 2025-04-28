@@ -97,12 +97,27 @@ class _AuthWrapperState extends State<AuthWrapper> {
         }
         return;
       }
+
+      // Check group membership for regular users
+      if (user.role.toLowerCase() == 'user') {
+        final groupProvider = Provider.of<GroupProvider>(context, listen: false);
+        final userGroups = await groupProvider.getUserGroups(userId);
+        
+        if (userGroups.isEmpty) {
+          // User is not in any group, show no group screen
+          if (mounted) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (context) => const NoGroupScreen()),
+            );
+          }
+          return;
+        }
+      }
       
       setState(() {
         _isLoading = false;
         _currentUser = user;
       });
-      
     } catch (e) {
       log('Error in _checkAuthAndNavigate: $e');
       setState(() {
