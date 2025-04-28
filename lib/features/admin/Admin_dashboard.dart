@@ -44,7 +44,7 @@ class AdminDashboard extends StatefulWidget {
 class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStateMixin {
   final PageController _pageController = PageController();
   int _selectedIndex = 0;
-  bool _isLoading = false;
+  bool _isLoading = true;
   String? _errorMessage;
   late AdminAnalyticsProvider _analyticsProvider;
   late SuperAdminAnalyticsProvider _superAdminAnalyticsProvider;
@@ -52,6 +52,19 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
     start: DateTime.now().subtract(const Duration(days: 180)),
     end: DateTime.now(),
   );
+
+  // State variables for data
+  Map<String, double> _analyticsData = {
+    'totalMembers': 0.0,
+    'activeMembers': 0.0,
+    'eventsThisMonth': 0.0,
+  };
+  List<UserModel> _groupMembers = [];
+  List<EventModel> _groupEvents = [];
+
+  // Date and time selection
+  DateTime _selectedDate = DateTime.now();
+  TimeOfDay _selectedTime = TimeOfDay.now();
 
   // Theme settings
   bool _isDarkMode = false;
@@ -66,13 +79,31 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
   int _autoRefreshInterval = 30; // minutes
   bool _analyticsExpanded = true;
 
+  // Getter for analytics data
+  Map<String, double> get analyticsData => _analyticsData;
+
+  // Getter for group members
+  List<UserModel> get groupMembers => _groupMembers;
+
+  // Getter for group events
+  List<EventModel> get groupEvents => _groupEvents;
+
+  // Getter for upcoming events
+  List<EventModel> get _upcomingEvents {
+    return _groupEvents.where((event) => event.dateTime.isAfter(DateTime.now())).toList();
+  }
+
+  // Getter for past events
+  List<EventModel> get _pastEvents {
+    return _groupEvents.where((event) => event.dateTime.isBefore(DateTime.now())).toList();
+  }
 
   @override
   void initState() {
     super.initState();
     _analyticsProvider = Provider.of<AdminAnalyticsProvider>(context, listen: false);
-    _loadAnalyticsData();
-
+    _superAdminAnalyticsProvider = Provider.of<SuperAdminAnalyticsProvider>(context, listen: false);
+    
     // Initialize animation controllers
     _refreshAnimationController = AnimationController(
       vsync: this,
@@ -86,6 +117,23 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
     if (_autoRefreshEnabled) {
       _setupAutoRefresh();
     }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    // Move the page jump to didChangeDependencies to ensure PageView is ready
+    if (_pageController.hasClients) {
+      _pageController.jumpToPage(widget.initialTabIndex);
+    }
+
+    // Schedule data loading after the build is complete
+    Future.microtask(() {
+      if (mounted) {
+        _loadInitialData();
+      }
+    });
   }
 
   Future<void> _loadSettings() async {
@@ -137,600 +185,171 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
     }
   }
 
-  Future<void> _loadAnalyticsData() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    // List to track which analytics failed to load
-    List<String> failedAnalytics = [];
-
-    // Define a helper function to load analytics with proper error handling
-    Future<void> loadAnalytic(String name,
-        Future<dynamic> Function() loader) async {
-      try {
-        await loader();
-        print('Successfully loaded $name');
-      } catch (e) {
-        print('Error fetching $name: $e');
-        failedAnalytics.add(name);
-      }
-    }
-
+  Future<void> _loadInitialData() async {
+    if (!mounted) return;
+    
     try {
-      // Load only the active analytics that are needed for the dashboard
-      List<Future<void>> activeAnalytics = [
-        loadAnalytic('Fetch Dashboard Data', () =>
-            _superAdminAnalyticsProvider.getGroupDashboardData(widget.groupId)
-                .then((data) {
-              // Process the data if needed
-              print('Dashboard data loaded: $data');
-            })
-        ),
-      ];
-
-      // Wait for all active analytics to complete
-      await Future.wait(activeAnalytics);
-
-      // Set error message if any analytics failed to load
-      if (failedAnalytics.isNotEmpty) {
-        _showInfo(
-            'Some analytics data could not be loaded. The dashboard may show incomplete information.');
-
-        setState(() {
-          _errorMessage =
-          'Some analytics data could not be loaded: ${failedAnalytics.join(
-              ', ')}';
-        });
-      }
-    } catch (e) {
-      print('Error in _loadAnalyticsData: $e');
-      setState(() =>
-      _errorMessage = 'Error loading analytics data: ${e.toString()}');
-      _showError('Failed to load analytics data: ${e.toString()}');
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _updateDateRange() async {
-    final DateTimeRange? newRange = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-      initialDateRange: _selectedDateRange,
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: AppColors.primaryColor,
-              onPrimary: Colors.white,
-              surface: Colors.white,
-              onSurface: AppColors.textColor,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-
-    if (newRange != null) {
-      // Show loading indicator
       setState(() {
-        _selectedDateRange = newRange;
         _isLoading = true;
         _errorMessage = null;
       });
 
-      // Convert date range to string format for analytics
-      final timeframe = {
-        'start_date': newRange.start.toIso8601String(),
-        'end_date': newRange.end.toIso8601String(),
-      };
+      await Future.wait([
+        _loadAnalyticsData(),
+        _loadGroupMembers(),
+        _loadGroupEvents(),
+      ]);
+      
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading initial data: $e');
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Error loading data: ${e.toString()}';
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
-      // Format date range for display
-      final startFormatted = DateFormat('MMM d, y').format(newRange.start);
-      final endFormatted = DateFormat('MMM d, y').format(newRange.end);
-      _showInfo(
-          'Updating dashboard for date range: $startFormatted to $endFormatted');
+  Future<void> _retryLoading() async {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
+    await _loadInitialData();
+  }
 
-      // List to track which analytics failed to load
-      List<String> failedAnalytics = [];
+  Future<void> _loadAnalyticsData() async {
+    try {
+      if (!mounted) return;
+      
+      print('Loading analytics data for group: ${widget.groupId}');
+      
+      // Get providers
+      final groupProvider = Provider.of<GroupProvider>(context, listen: false);
+      final eventProvider = Provider.of<EventProvider>(context, listen: false);
+      final attendanceProvider = Provider.of<AttendanceProvider>(context, listen: false);
 
-      // Define a helper function to load analytics with proper error handling
-      Future<void> loadAnalytic(String name,
-          Future<dynamic> Function() loader) async {
-        try {
-          await loader();
-          print('Successfully loaded $name for date range');
-        } catch (e) {
-          print('Error fetching $name for date range: $e');
-          failedAnalytics.add(name);
+      // Get current date range for this month
+      final now = DateTime.now();
+      final firstDayOfMonth = DateTime(now.year, now.month, 1);
+      final lastDayOfMonth = DateTime(now.year, now.month + 1, 0);
+      final thirtyDaysAgo = now.subtract(const Duration(days: 30));
+
+      print('Fetching total members...');
+      // Get total members
+      final members = await groupProvider.getGroupMembers(widget.groupId);
+      final totalMembers = members.length.toDouble();
+      print('Total members found: $totalMembers');
+
+      print('Fetching active members...');
+      // Get active members (attended at least one event in last 30 days)
+      final pastEvents = await eventProvider.fetchPastEvents(widget.groupId);
+      final recentEvents = pastEvents.where((event) => 
+        event.dateTime.isAfter(thirtyDaysAgo) && 
+        event.dateTime.isBefore(now)
+      ).toList();
+      print('Found ${recentEvents.length} recent events');
+
+      Set<String> activeUserIds = {};
+      for (var event in recentEvents) {
+        print('Checking attendance for event: ${event.title}');
+        final attendanceList = await attendanceProvider.fetchEventAttendance(event.id);
+        for (var attendance in attendanceList) {
+          if (attendance.isPresent) {
+            activeUserIds.add(attendance.userId);
+          }
         }
       }
+      final activeMembers = activeUserIds.length.toDouble();
+      print('Active members found: $activeMembers');
 
-      try {
-        // Notify the analytics provider about the date range change
-        _analyticsProvider.setDateRange(newRange.start, newRange.end);
+      print('Fetching events this month...');
+      // Get events this month
+      final upcomingEvents = await eventProvider.getGroupEvents(widget.groupId);
+      final allEvents = [...pastEvents, ...upcomingEvents];
+      final eventsThisMonth = allEvents.where((event) => 
+        event.dateTime.isAfter(firstDayOfMonth.subtract(const Duration(days: 1))) &&
+        event.dateTime.isBefore(lastDayOfMonth.add(const Duration(days: 1)))
+      ).length.toDouble();
+      print('Events this month: $eventsThisMonth');
 
-        // Load only the active analytics with the new date range
-        List<Future<void>> activeAnalytics = [
+      if (!mounted) return;
+      
+      setState(() {
+        _analyticsData = {
+          'totalMembers': totalMembers,
+          'activeMembers': activeMembers,
+          'eventsThisMonth': eventsThisMonth,
+        };
+        print('Analytics data updated: $_analyticsData');
+      });
+    } catch (e) {
+      print('Error fetching analytics data: $e');
+      if (!mounted) return;
+      
+      setState(() {
+        _errorMessage = 'Error loading analytics data: ${e.toString()}';
+      });
+    }
+  }
 
-          loadAnalytic('Dashboard Data', () =>
-            _superAdminAnalyticsProvider.getGroupDashboardData(widget.groupId)
-          .then((data) {
-            // Process the data if needed
-            print('Dashboard data loaded for date range: $data');
-          }))
-        ];
+  Future<void> _loadGroupMembers() async {
+    try {
+      if (!mounted) return;
+      
+      // Load members directly
+      final _groupProvider = Provider.of<GroupProvider>(context, listen: false);
+      final members = await _groupProvider.getGroupMembers(widget.groupId);
+      
+      if (!mounted) return;
+      
+      setState(() {
+        _groupMembers = members;
+      });
+    } catch (e) {
+      print('Error loading group members: $e');
+      if (!mounted) return;
+      
+      setState(() {
+        _errorMessage = 'Error loading group members: ${e.toString()}';
+      });
+    }
+  }
 
-        // Wait for all active analytics to complete
-        await Future.wait(activeAnalytics);
-
-        // Set error message if any analytics failed to load
-        if (failedAnalytics.isNotEmpty) {
-          _showInfo(
-              'Some analytics data could not be loaded for the selected date range. The dashboard may show incomplete information.');
-
-          setState(() {
-            _errorMessage =
-            'Some analytics data could not be loaded for the selected date range: ${failedAnalytics
-                .join(', ')}';
-          });
-        } else {
-          _showSuccess(
-              'Dashboard updated for date range: $startFormatted to $endFormatted');
-        }
-      } catch (e) {
-        print('Error in _updateDateRange: $e');
-        setState(() => _errorMessage =
-        'Error updating analytics for date range: ${e.toString()}');
-        _showError('Failed to update dashboard for selected date range: ${e
-            .toString()}');
-      } finally {
-        setState(() => _isLoading = false);
-      }
+  Future<void> _loadGroupEvents() async {
+    try {
+      if (!mounted) return;
+      
+      // Load events directly
+      final _eventProvider = Provider.of<EventProvider>(context, listen: false);
+      final events = await _eventProvider.getGroupEvents(widget.groupId);
+      
+      if (!mounted) return;
+      
+      setState(() {
+        _groupEvents = events;
+      });
+    } catch (e) {
+      print('Error loading group events: $e');
+      if (!mounted) return;
+      
+      setState(() {
+        _errorMessage = 'Error loading group events: ${e.toString()}';
+      });
     }
   }
 
   // Group members from provider
   List<UserModel> _cachedGroupMembers = [];
   bool _isLoadingMembers = false;
-
-  Future<void> _loadGroupMembers() async {
-    if (_isLoadingMembers) return;
-
-    setState(() {
-      _isLoadingMembers = true;
-    });
-
-    try {
-      final groupProvider = Provider.of<GroupProvider>(context, listen: false);
-      final userProvider = Provider.of<UserProvider>(context, listen: false);
-
-      // Get members data
-      dynamic membersData;
-      try {
-        membersData = await groupProvider.getGroupMembers(widget.groupId);
-      } catch (e) {
-        print('Error in getGroupMembers: $e');
-        rethrow;
-      }
-
-      // Handle different response formats
-      List<dynamic> members = [];
-
-      if (membersData is List) {
-        // If it's already a list, use it directly
-        members = membersData;
-      } else if (membersData is Map<String, dynamic>) {
-        // Check for common response structures
-        if (membersData.containsKey('members') &&
-            membersData['members'] is List) {
-          members = membersData['members'];
-        } else
-        if (membersData.containsKey('data') && membersData['data'] is List) {
-          members = membersData['data'];
-        } else
-        if (membersData.containsKey('users') && membersData['users'] is List) {
-          members = membersData['users'];
-        } else
-        if (membersData.containsKey('items') && membersData['items'] is List) {
-          members = membersData['items'];
-        } else if (membersData.containsKey('results') &&
-            membersData['results'] is List) {
-          members = membersData['results'];
-        } else {
-          // Try to find any list in the map
-          for (var key in membersData.keys) {
-            if (membersData[key] is List) {
-              members = membersData[key];
-              break;
-            }
-          }
-        }
-      }
-
-      print('Processing ${members.length} group members');
-
-      // Convert the dynamic list to UserModel list
-      final List<UserModel> userMembers = [];
-
-      for (var member in members) {
-        try {
-          // Check if the member is already a UserModel
-          if (member is UserModel) {
-            userMembers.add(member);
-            continue;
-          }
-
-          // Check if it's a map with user data
-          if (member is Map) {
-            // Convert to Map<String, dynamic> if needed
-            Map<String, dynamic> memberMap;
-            if (member is Map<String, dynamic>) {
-              memberMap = member;
-            } else {
-              memberMap = {};
-              member.forEach((key, value) {
-                memberMap[key.toString()] = value;
-              });
-            }
-
-            // Check if it has a user_id or uid field
-            String? userId;
-            for (var idField in [
-              'user_id',
-              'uid',
-              'id',
-              '_id',
-              'userId',
-              'member_id'
-            ]) {
-              if (memberMap.containsKey(idField)) {
-                userId = memberMap[idField].toString();
-                break;
-              }
-            }
-
-            if (userId != null && userId.isNotEmpty) {
-              // Try to fetch the complete user data
-              try {
-                final user = await userProvider.getUserById(userId);
-                if (user != null) {
-                  userMembers.add(user);
-                  continue;
-                }
-              } catch (e) {
-                print('Error fetching user by ID $userId: $e');
-                // Continue to create from map
-              }
-            }
-
-            // If we couldn't get the user by ID, try to create from the map
-            try {
-              userMembers.add(UserModel.fromJson(memberMap));
-            } catch (e) {
-              print('Error creating UserModel from map: $e');
-              // Try to create a minimal user model with available data
-              String name = memberMap['full_name'] ??
-                  memberMap['fullName'] ??
-                  memberMap['name'] ??
-                  memberMap['username'] ??
-                  'Unknown User';
-
-              String email = memberMap['email'] ??
-                  memberMap['mail'] ??
-                  'unknown@example.com';
-
-              String role = memberMap['role'] ??
-                  memberMap['user_role'] ??
-                  'Member';
-
-              String gender = memberMap['gender'] ??
-                  memberMap['sex'] ??
-                  'Unknown';
-
-              userMembers.add(UserModel(
-                id: userId ?? 'unknown_${userMembers.length}',
-                fullName: name,
-                email: email,
-                contact: memberMap['contact'] ?? memberMap['phone'] ??
-                    memberMap['phone_number'] ?? '',
-                nextOfKin: memberMap['next_of_kin'] ?? memberMap['nextOfKin'] ??
-                    memberMap['emergency_contact_name'] ?? '',
-                nextOfKinContact: memberMap['next_of_kin_contact'] ??
-                    memberMap['nextOfKinContact'] ??
-                    memberMap['emergency_contact_number'] ?? '',
-                role: role,
-                gender: gender,
-                regionId: memberMap['region_id'] ??
-                    memberMap['regionId'] ?? '',
-              ));
-            }
-          } else if (member is String) {
-            // If it's just a user ID string, try to fetch the user
-            try {
-              final user = await userProvider.getUserById(member);
-              if (user != null) {
-                userMembers.add(user);
-              }
-            } catch (e) {
-              print('Error fetching user by ID string $member: $e');
-            }
-          }
-        } catch (e) {
-          print('Error processing member: $e');
-          // Continue with the next member
-        }
-      }
-
-      print('Successfully processed ${userMembers.length} members');
-
-      setState(() {
-        _cachedGroupMembers = userMembers;
-        _isLoadingMembers = false;
-      });
-    } catch (e) {
-      print('Error loading group members: $e');
-      setState(() {
-        _isLoadingMembers = false;
-      });
-    }
-  }
-
-  // Cache for group events
-  bool _isLoadingEvents = false;
-
-  Future<void> _loadGroupEvents() async {
-    if (_isLoadingEvents) return;
-
-    setState(() {
-      _isLoadingEvents = true;
-    });
-
-    try {
-      final eventProvider = Provider.of<EventProvider>(context, listen: false);
-
-      // Set current group ID in the provider
-      eventProvider.setCurrentGroup(widget.groupId);
-
-      // Load both upcoming and past events with error handling for each
-      List<String> errors = [];
-
-      try {
-        await eventProvider.fetchUpcomingEvents(widget.groupId);
-      } catch (e) {
-        print('Error fetching upcoming events: $e');
-        errors.add('Upcoming events: $e');
-      }
-
-      try {
-        await eventProvider.fetchPastEvents(widget.groupId);
-      } catch (e) {
-        print('Error fetching past events: $e');
-        errors.add('Past events: $e');
-      }
-
-      // If both failed, show an error
-      if (errors.length == 2) {
-        _showError('Failed to load events: ${errors.join(', ')}');
-      } else if (errors.isNotEmpty) {
-        // If only one failed, show a warning
-        _showInfo('Some events could not be loaded');
-      }
-
-      setState(() {
-        _isLoadingEvents = false;
-      });
-    } catch (e) {
-      print('Error loading group events: $e');
-      _showError('Failed to load events: $e');
-      setState(() {
-        _isLoadingEvents = false;
-      });
-    }
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Move the page jump to didChangeDependencies to ensure PageView is ready
-    if (_pageController.hasClients) {
-      _pageController.jumpToPage(widget.initialTabIndex);
-    }
-  }
-
-  // Getter for group members
-  List<UserModel> get _groupMembers {
-    if (_cachedGroupMembers.isEmpty) {
-      _showInfo('No members found. Please refresh or try again later.');
-      return [];
-    }
-    return _cachedGroupMembers;
-  }
-
-  // Events data from provider
-  List<EventModel> get _upcomingEvents {
-    final eventProvider = Provider.of<EventProvider>(context, listen: false);
-    return eventProvider.upcomingEvents;
-  }
-
-  List<EventModel> get _pastEvents {
-    final eventProvider = Provider.of<EventProvider>(context, listen: false);
-    return eventProvider.pastEvents;
-  }
-
-  // Analytics data from provider
-  Future<Map<String, double>> get _analyticsData async {
-    try {
-      final groupProvider = Provider.of<GroupProvider>(context, listen: false);
-      final eventProvider = Provider.of<EventProvider>(context, listen: false);
-      final attendanceProvider = Provider.of<AttendanceProvider>(
-          context, listen: false);
-      final analyticsProvider = Provider.of<AdminAnalyticsProvider>(
-          context, listen: false);
-
-      // Initialize with default values
-      double totalMembers = 0.0;
-      double activeMembers = 0.0;
-      double averageAttendance = 0.0;
-      double eventsThisMonth = 0.0;
-
-      // Try to get data from analytics provider first (more efficient)
-      try {
-        // Check if we have dashboard data from the analytics provider
-          final trends = await _superAdminAnalyticsProvider.getGroupDashboardData(widget.groupId);
-
-         totalMembers = trends.memberStats.totalMembers.toDouble();
-         activeMembers = trends.memberStats.activeMembers.toDouble();
-         eventsThisMonth = (trends.upcomingEvents as num).toDouble();
-
-          // If we got all the data we need, return it
-          if (totalMembers > 0 && averageAttendance > 0 &&
-              eventsThisMonth > 0) {
-            return {
-              'totalMembers': totalMembers,
-              'activeMembers': activeMembers,
-              'averageAttendance': averageAttendance,
-              'eventsThisMonth': eventsThisMonth,
-            };
-          }
-
-      } catch (analyticsError) {
-        print('Error getting analytics data from provider: $analyticsError');
-        // Continue with manual calculation
-      }
-
-      // If analytics provider didn't have the data, calculate it manually
-
-      // Get total members
-      try {
-        final members = await groupProvider.getGroupMembers(widget.groupId);
-        totalMembers = members.length.toDouble();
-      } catch (e) {
-        print('Error getting group members: $e');
-        totalMembers = 0.0;
-      }
-
-      // Calculate active members (members who attended at least one event in the last 30 days)
-      try {
-        // Fetch past events
-        final pastEvents = await eventProvider.fetchPastEvents(widget.groupId);
-
-        // Get events in the last 30 days
-        final now = DateTime.now();
-        final thirtyDaysAgo = now.subtract(const Duration(days: 30));
-        final recentEvents = pastEvents.where((event) =>
-        event.dateTime.isAfter(thirtyDaysAgo) && event.dateTime.isBefore(now)
-        ).toList();
-
-        // Track unique active members
-        Set<String> activeUserIds = {};
-
-        // Calculate average attendance
-        if (pastEvents.isNotEmpty) {
-          double totalAttendanceRate = 0.0;
-          int eventsWithAttendance = 0;
-
-          for (var event in pastEvents) {
-            try {
-              final attendanceList = await attendanceProvider
-                  .fetchEventAttendance(event.id);
-              if (attendanceList.isNotEmpty) {
-                final presentCount = attendanceList
-                    .where((a) => a.isPresent)
-                    .length;
-                final attendanceRate = (presentCount / attendanceList.length) *
-                    100;
-                totalAttendanceRate += attendanceRate;
-                eventsWithAttendance++;
-
-                // Add active users from recent events
-                if (recentEvents.any((e) => e.id == event.id)) {
-                  for (var attendance in attendanceList) {
-                    if (attendance.isPresent) {
-                      activeUserIds.add(attendance.userId);
-                    }
-                  }
-                }
-              }
-            } catch (e) {
-              print('Error processing attendance for event ${event.id}: $e');
-              // Continue with next event
-            }
-          }
-
-          if (eventsWithAttendance > 0) {
-            averageAttendance = totalAttendanceRate / eventsWithAttendance;
-          }
-
-          // Set active members count
-          activeMembers = activeUserIds.length.toDouble();
-        }
-      } catch (e) {
-        print('Error calculating active members and attendance: $e');
-        activeMembers = 0.0;
-        averageAttendance = 0.0;
-      }
-
-      // Calculate events this month
-      try {
-        final now = DateTime.now();
-        final firstDayOfMonth = DateTime(now.year, now.month, 1);
-        final lastDayOfMonth = DateTime(now.year, now.month + 1, 0);
-
-        final pastEvents = await eventProvider.fetchPastEvents(widget.groupId);
-        final upcomingEvents = eventProvider.upcomingEvents;
-        final allEvents = [...pastEvents, ...upcomingEvents];
-
-        eventsThisMonth = allEvents.where((event) {
-          return event.dateTime.isAfter(
-              firstDayOfMonth.subtract(const Duration(days: 1))) &&
-              event.dateTime.isBefore(
-                  lastDayOfMonth.add(const Duration(days: 1)));
-        }).length.toDouble();
-      } catch (e) {
-        print('Error calculating events this month: $e');
-        eventsThisMonth = 0.0;
-      }
-
-      return {
-        'totalMembers': totalMembers,
-        'activeMembers': activeMembers,
-        'averageAttendance': averageAttendance,
-        'eventsThisMonth': eventsThisMonth,
-      };
-    } catch (e) {
-      print('Error calculating analytics data: $e');
-      return {
-        'totalMembers': 0.0,
-        'activeMembers': 0.0,
-        'averageAttendance': 0.0,
-        'eventsThisMonth': 0.0,
-      };
-    }
-  }
-
-  // Helper method to parse various types to double
-  double _parseDouble(dynamic value) {
-    if (value == null) return 0.0;
-    if (value is double) return value;
-    if (value is int) return value.toDouble();
-    if (value is String) {
-      try {
-        return double.parse(value);
-      } catch (e) {
-        return 0.0;
-      }
-    }
-    return 0.0;
-  }
-
-  // Date and time for event creation
-  DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
-  TimeOfDay _selectedTime = TimeOfDay.now();
 
   @override
   void dispose() {
@@ -740,14 +359,19 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
   }
 
   void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
+    // Use Future.microtask to ensure state update happens after build
+    Future.microtask(() {
+      if (mounted) {
+        setState(() {
+          _selectedIndex = index;
+        });
+        _pageController.animateToPage(
+          index,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      }
     });
-    _pageController.animateToPage(
-      index,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
   }
 
   void _navigateToProfile() {
@@ -782,6 +406,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
   }
 
   void _showAddMemberDialog() {
+    print('Starting member addition dialog for group: ${widget.groupId}');
     final TextEditingController searchController = TextEditingController();
     List<UserModel> searchResults = [];
     UserModel? selectedUser;
@@ -821,6 +446,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                                   ),
                                 ),
                                 onChanged: (value) {
+                                  print('Search query changed: $value');
                                   // Clear selection when search query changes
                                   setDialogState(() {
                                     selectedUser = null;
@@ -831,17 +457,21 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                             const SizedBox(width: 8),
                             ElevatedButton(
                               onPressed: () async {
-                                if (searchController.text.isEmpty) return;
+                                if (searchController.text.isEmpty) {
+                                  print('Search attempted with empty query');
+                                  return;
+                                }
 
+                                print('Initiating user search with query: ${searchController.text}');
                                 setDialogState(() {
                                   isSearching = true;
                                 });
 
                                 try {
-                                  final userProvider = Provider.of<
-                                      UserProvider>(context, listen: false);
-                                  final results = await userProvider
-                                      .searchUsers(searchController.text);
+                                  final userProvider = Provider.of<UserProvider>(context, listen: false);
+                                  print('Fetching users from provider...');
+                                  final results = await userProvider.searchUsers(searchController.text);
+                                  print('Search completed. Found ${results.length} users');
 
                                   setDialogState(() {
                                     searchResults = results;
@@ -882,24 +512,21 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                                   itemCount: searchResults.length,
                                   itemBuilder: (context, index) {
                                     final user = searchResults[index];
-                                    final isSelected = selectedUser?.id ==
-                                        user.id;
+                                    final isSelected = selectedUser?.id == user.id;
 
                                     return ListTile(
                                       title: Text(user.fullName),
                                       subtitle: Text(user.email),
                                       selected: isSelected,
-                                      tileColor: isSelected ? AppColors
-                                          .primaryColor.withOpacity(0.1) : null,
+                                      tileColor: isSelected ? AppColors.primaryColor.withOpacity(0.1) : null,
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(8),
                                         side: isSelected
-                                            ? BorderSide(
-                                            color: AppColors.primaryColor,
-                                            width: 1)
+                                            ? BorderSide(color: AppColors.primaryColor, width: 1)
                                             : BorderSide.none,
                                       ),
                                       onTap: () {
+                                        print('User selected: ${user.fullName} (${user.id})');
                                         setDialogState(() {
                                           selectedUser = user;
                                         });
@@ -913,8 +540,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                             if (searchController.text.isNotEmpty)
                               Center(
                                 child: Text(
-                                  'No users found matching "${searchController
-                                      .text}"',
+                                  'No users found matching "${searchController.text}"',
                                   style: TextStyles.bodyText,
                                   textAlign: TextAlign.center,
                                 ),
@@ -925,6 +551,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                   actions: [
                     TextButton(
                       onPressed: () {
+                        print('Member addition cancelled');
                         searchController.dispose();
                         Navigator.pop(context);
                       },
@@ -936,33 +563,48 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                       ),
                     ),
                     ElevatedButton(
-                      onPressed: selectedUser == null ? null : () {
-                        final groupProvider = Provider.of<GroupProvider>(
-                            context, listen: false);
+                      onPressed: selectedUser == null ? null : () async {
+                        print('Attempting to add member: ${selectedUser!.fullName} (${selectedUser!.id}) to group: ${widget.groupId}');
+                        final groupProvider = Provider.of<GroupProvider>(context, listen: false);
 
-                        groupProvider.addMemberToGroup(
-                            widget.groupId, selectedUser!.id).then((success) {
+                        try {
+                          print('Sending request to add member...');
+                          print('Request details:');
+                          print('Group ID: ${widget.groupId}');
+                          print('User ID: ${selectedUser!.id}');
+                          print('User Name: ${selectedUser!.fullName}');
+                          print('User Email: ${selectedUser!.email}');
+
+                          final success = await groupProvider.addMemberToGroup(widget.groupId, selectedUser!.id);
+                          
                           if (success) {
-                            _showSuccess('${selectedUser!
-                                .fullName} added to group successfully');
+                            print('Member added successfully');
+                            _showSuccess('${selectedUser!.fullName} added to group successfully');
                             // Refresh the members list
-                            _loadGroupMembers();
+                            await _loadGroupMembers();
                           } else {
-                            _showError('Failed to add ${selectedUser!
-                                .fullName} to group');
+                            print('Failed to add member - success returned false');
+                            _showError('Failed to add ${selectedUser!.fullName} to group');
                           }
-                        });
-
-                        searchController.dispose();
-                        Navigator.pop(context);
+                        } catch (e) {
+                          print('Error adding member: $e');
+                          print('Error type: ${e.runtimeType}');
+                          print('Error details:');
+                          if (e is Exception) {
+                            print('Exception message: ${e.toString()}');
+                          }
+                          _showError('Error adding member: ${e.toString()}');
+                        } finally {
+                          searchController.dispose();
+                          Navigator.pop(context);
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primaryColor,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        disabledBackgroundColor: AppColors.primaryColor
-                            .withOpacity(0.5),
+                        disabledBackgroundColor: AppColors.primaryColor.withOpacity(0.5),
                       ),
                       child: Text(
                         'Add',
@@ -1678,20 +1320,57 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         showProfileAvatar: true,
         onProfileTap: _navigateToProfile,
       ),
-      body: PageView(
-        controller: _pageController,
-        onPageChanged: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
+      body: StatefulBuilder(
+        builder: (context, setLocalState) {
+          if (_isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (_errorMessage != null) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                  const SizedBox(height: 16),
+                  Text(
+                    _errorMessage!,
+                    style: TextStyles.bodyText,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () async {
+                      setLocalState(() {
+                        _isLoading = true;
+                        _errorMessage = null;
+                      });
+                      await _loadInitialData();
+                    },
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return PageView(
+            controller: _pageController,
+            onPageChanged: (index) {
+              // Use setLocalState instead of setState
+              setLocalState(() {
+                _selectedIndex = index;
+              });
+            },
+            children: [
+              _buildDashboardTab(),
+              _buildMembersTab(),
+              _buildEventsTab(),
+              _buildAnalyticsTab(),
+              _buildSettingsTab(),
+            ],
+          );
         },
-        children: [
-          _buildDashboardTab(),
-          _buildMembersTab(),
-          _buildEventsTab(),
-          _buildAnalyticsTab(),
-          _buildSettingsTab(),
-        ],
       ),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
@@ -1720,7 +1399,21 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         currentIndex: _selectedIndex,
         selectedItemColor: _accentColor,
         unselectedItemColor: Colors.grey,
-        onTap: _onItemTapped,
+        onTap: (index) {
+          // Use Future.microtask to ensure state update happens after build
+          Future.microtask(() {
+            if (mounted) {
+              setState(() {
+                _selectedIndex = index;
+              });
+              _pageController.animateToPage(
+                index,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+              );
+            }
+          });
+        },
       ),
       floatingActionButton: _buildFloatingActionButton(),
     );
@@ -1912,14 +1605,27 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
 
   Widget _buildStatisticsGrid() {
     return FutureBuilder<Map<String, double>>(
-      future: _analyticsData,
+      future: _getDirectStatistics(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator());
+          return const Center(child: CircularProgressIndicator());
         } else if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}'));
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                const SizedBox(height: 16),
+                Text(
+                  'Error loading statistics: ${snapshot.error}',
+                  style: TextStyles.bodyText,
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          );
         } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return Center(child: Text('No data available'));
+          return const Center(child: Text('No data available'));
         } else {
           final data = snapshot.data!;
           return GridView.count(
@@ -1930,19 +1636,86 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
             physics: const NeverScrollableScrollPhysics(),
             children: [
               _buildStatCard(
-                  'Total Members', '${data['totalMembers']?.toInt()}',
-                  Icons.people, AppColors.primaryColor),
+                'Total Members',
+                '${data['totalMembers']?.toInt() ?? 0}',
+                Icons.people,
+                AppColors.primaryColor,
+              ),
               _buildStatCard(
-                  'Active Members', '${data['activeMembers']?.toInt()}',
-                  Icons.person_outline, AppColors.secondaryColor),
+                'Active Members',
+                '${data['activeMembers']?.toInt() ?? 0}',
+                Icons.person_outline,
+                AppColors.secondaryColor,
+              ),
               _buildStatCard(
-                  'Events This Month', '${data['eventsThisMonth']?.toInt()}',
-                  Icons.event, AppColors.buttonColor),
+                'Events This Month',
+                '${data['eventsThisMonth']?.toInt() ?? 0}',
+                Icons.event,
+                AppColors.buttonColor,
+              ),
             ],
           );
         }
       },
     );
+  }
+
+  Future<Map<String, double>> _getDirectStatistics() async {
+    try {
+      // Get providers
+      final groupProvider = Provider.of<GroupProvider>(context, listen: false);
+      final eventProvider = Provider.of<EventProvider>(context, listen: false);
+      final attendanceProvider = Provider.of<AttendanceProvider>(context, listen: false);
+
+      // Get current date range for this month
+      final now = DateTime.now();
+      final firstDayOfMonth = DateTime(now.year, now.month, 1);
+      final lastDayOfMonth = DateTime(now.year, now.month + 1, 0);
+
+      // Get total members
+      final members = await groupProvider.getGroupMembers(widget.groupId);
+      final totalMembers = members.length.toDouble();
+
+      // Get active members (attended at least one event in last 30 days)
+      final thirtyDaysAgo = now.subtract(const Duration(days: 30));
+      final pastEvents = await eventProvider.fetchPastEvents(widget.groupId);
+      final recentEvents = pastEvents.where((event) => 
+        event.dateTime.isAfter(thirtyDaysAgo) && 
+        event.dateTime.isBefore(now)
+      ).toList();
+
+      Set<String> activeUserIds = {};
+      for (var event in recentEvents) {
+        final attendanceList = await attendanceProvider.fetchEventAttendance(event.id);
+        for (var attendance in attendanceList) {
+          if (attendance.isPresent) {
+            activeUserIds.add(attendance.userId);
+          }
+        }
+      }
+      final activeMembers = activeUserIds.length.toDouble();
+
+      // Get events this month
+      final upcomingEvents = eventProvider.upcomingEvents;
+      final allEvents = [...pastEvents, ...upcomingEvents];
+      final eventsThisMonth = allEvents.where((event) => 
+        event.dateTime.isAfter(firstDayOfMonth.subtract(const Duration(days: 1))) &&
+        event.dateTime.isBefore(lastDayOfMonth.add(const Duration(days: 1)))
+      ).length.toDouble();
+
+      return {
+        'totalMembers': totalMembers,
+        'activeMembers': activeMembers,
+        'eventsThisMonth': eventsThisMonth,
+      };
+    } catch (e) {
+      print('Error getting direct statistics: $e');
+      return {
+        'totalMembers': 0.0,
+        'activeMembers': 0.0,
+        'eventsThisMonth': 0.0,
+      };
+    }
   }
 
   Widget _buildStatCard(String title, String value, IconData icon,
@@ -2052,7 +1825,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
           child: Row(
             children: [
               Text(
-                'All Members (${_groupMembers.length})',
+                'All Members (${groupMembers.length})',
                 style: TextStyles.heading2.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -2081,9 +1854,9 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
   }
 
   Widget _buildMembersList({required bool showLimit}) {
-    final displayMembers = showLimit && _groupMembers.length > 3
-        ? _groupMembers.sublist(0, 3)
-        : _groupMembers;
+    final displayMembers = showLimit && groupMembers.length > 3
+        ? groupMembers.sublist(0, 3)
+        : groupMembers;
 
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -2125,16 +1898,9 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
             ),
             trailing: IconButton(
               icon: const Icon(Icons.more_vert),
-             onPressed: () {
-               print('Member passed to _showMemberOptionsDialog: ${member.fullName}, ID: ${member.id}');
-               _showMemberOptionsDialog(member);
-             },
+              onPressed: () => _showMemberOptionsDialog(member),
             ),
-            onTap: () {
-              print('Member passed to _showMemberOptionsDialog: ${member
-                  .fullName}, ID: ${member.id}');
-              _showMemberOptionsDialog(member);
-            },
+            onTap: () => _showMemberOptionsDialog(member),
           ),
         );
       },
@@ -2189,98 +1955,98 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
 
     return displayEvents.isEmpty
         ? Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.event_busy,
-            size: 64,
-            color: AppColors.textColor.withOpacity(0.5),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No upcoming events',
-            style: TextStyles.bodyText.copyWith(
-              color: AppColors.textColor.withOpacity(0.7),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.event_busy,
+                  size: 64,
+                  color: AppColors.textColor.withOpacity(0.5),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'No upcoming events',
+                  style: TextStyles.bodyText.copyWith(
+                    color: AppColors.textColor.withOpacity(0.7),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                CustomButton(
+                  label: 'Create Event',
+                  onPressed: _showCreateEventDialog,
+                  icon: Icons.add,
+                  color: AppColors.primaryColor,
+                  isFullWidth: false,
+                  horizontalPadding: 24,
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 24),
-          CustomButton(
-            label: 'Create Event',
-            onPressed: _showCreateEventDialog,
-            icon: Icons.add,
-            color: AppColors.primaryColor,
-            isFullWidth: false,
-            horizontalPadding: 24,
-          ),
-        ],
-      ),
-    )
+          )
         : ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: displayEvents.length,
-      shrinkWrap: true,
-      physics: showLimit
-          ? const NeverScrollableScrollPhysics()
-          : const AlwaysScrollableScrollPhysics(),
-      itemBuilder: (context, index) {
-        final event = displayEvents[index];
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12.0),
-          child: GestureDetector(
-            onTap: () => _showEventOptionsDialog(event),
-            child: EventCard(
-              eventTitle: event.title,
-              eventDate: _formatEventDate(event.dateTime),
-              eventLocation: event.location,
-              onTap: () => _showEventOptionsDialog(event),
-            ),
-          ),
-        );
-      },
-    );
+            padding: const EdgeInsets.all(16),
+            itemCount: displayEvents.length,
+            shrinkWrap: true,
+            physics: showLimit
+                ? const NeverScrollableScrollPhysics()
+                : const AlwaysScrollableScrollPhysics(),
+            itemBuilder: (context, index) {
+              final event = displayEvents[index];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12.0),
+                child: GestureDetector(
+                  onTap: () => _showEventOptionsDialog(event),
+                  child: EventCard(
+                    eventTitle: event.title,
+                    eventDate: _formatEventDate(event.dateTime),
+                    eventLocation: event.location,
+                    onTap: () => _showEventOptionsDialog(event),
+                  ),
+                ),
+              );
+            },
+          );
   }
 
   Widget _buildPastEventsList() {
     return _pastEvents.isEmpty
         ? Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.event_busy,
-            size: 64,
-            color: AppColors.textColor.withOpacity(0.5),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No past events',
-            style: TextStyles.bodyText.copyWith(
-              color: AppColors.textColor.withOpacity(0.7),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.event_busy,
+                  size: 64,
+                  color: AppColors.textColor.withOpacity(0.5),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'No past events',
+                  style: TextStyles.bodyText.copyWith(
+                    color: AppColors.textColor.withOpacity(0.7),
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
-    )
+          )
         : ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _pastEvents.length,
-      itemBuilder: (context, index) {
-        final event = _pastEvents[index];
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12.0),
-          child: GestureDetector(
-            onTap: () => _showEventOptionsDialog(event),
-            child: EventCard(
-              eventTitle: event.title,
-              eventDate: _formatEventDate(event.dateTime),
-              eventLocation: event.location,
-              onTap: () => _showEventOptionsDialog(event),
-            ),
-          ),
-        );
-      },
-    );
+            padding: const EdgeInsets.all(16),
+            itemCount: _pastEvents.length,
+            itemBuilder: (context, index) {
+              final event = _pastEvents[index];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12.0),
+                child: GestureDetector(
+                  onTap: () => _showEventOptionsDialog(event),
+                  child: EventCard(
+                    eventTitle: event.title,
+                    eventDate: _formatEventDate(event.dateTime),
+                    eventLocation: event.location,
+                    onTap: () => _showEventOptionsDialog(event),
+                  ),
+                ),
+              );
+            },
+          );
   }
 
   // ANALYTICS TAB
@@ -2653,140 +2419,5 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
 
     return Container(); // No FAB for settings tab
   }
-
-  // Conversion methods for analytics models
-  //
-  // /// Convert GroupDemographics to Map<String, dynamic>
-  // Map<String, dynamic> _convertGroupDemographicsToMap(
-  //     GroupDemographics demographics) {
-  //   // Calculate total members from gender distribution
-  //   int totalFromGender = demographics.genderDistribution.values.fold(
-  //       0, (sum, value) => sum + value);
-  //
-  //   // Calculate total members from role distribution
-  //   int totalFromRole = demographics.roleDistribution.values.fold(
-  //       0, (sum, value) => sum + value);
-  //
-  //   // Use the larger value as the total members count
-  //   int totalMembers = totalFromGender > 0 ? totalFromGender :
-  //                     (totalFromRole > 0 ? totalFromRole :
-  //                     demographics.ageDistribution.values.fold(0, (sum, value) => sum + value));
-  //
-  //   return {
-  //     'ageDistribution': demographics.ageDistribution,
-  //     'genderDistribution': demographics.genderDistribution,
-  //     'roleDistribution': demographics.roleDistribution,
-  //     'locationDistribution': demographics.locationDistribution,
-  //     'additionalMetrics': demographics.additionalMetrics,
-  //     // Add common field names for compatibility with the UI
-  //     'age_distribution': demographics.ageDistribution,
-  //     'gender_distribution': demographics.genderDistribution,
-  //     'role_distribution': demographics.roleDistribution,
-  //     'location_distribution': demographics.locationDistribution,
-  //     'totalMembers': totalMembers,
-  //     'maleCount': demographics.genderDistribution['male'] ?? 0,
-  //     'femaleCount': demographics.genderDistribution['female'] ?? 0,
-  //     'adminCount': demographics.roleDistribution['admin'] ?? 0,
-  //     'userCount': demographics.roleDistribution['user'] ?? 0,
-  //     'ageGroups': demographics.ageDistribution,
-  //     'isEmpty': demographics.isEmpty,
-  //     // Use the isEmpty property from the model
-  //   };
-  // }
-  //
-  // // /// Convert GroupAttendanceStats to Map<String, dynamic>
-  // // Map<String, dynamic> _convertGroupAttendanceStatsToMap(GroupAttendanceStats stats) {
-  // //   return {
-  // //     'averageAttendance': stats.averageAttendance,
-  // //     'attendanceTrend': stats.attendanceTrend,
-  // //     'attendanceByDayOfWeek': stats.attendanceByDayOfWeek,
-  // //     'totalSessions': stats.totalSessions,
-  // //     'growthRate': stats.growthRate,
-  // //     // Add common field names for compatibility with the UI
-  // //     'average_attendance_rate': stats.averageAttendance,
-  // //     'attendance_by_month': stats.attendanceTrend,
-  // //     'total_events': stats.totalSessions,
-  // //     'totalAttendance': stats.attendanceByDayOfWeek.values.fold(0, (sum, value) => sum + value),
-  // //     'attendanceRate': stats.averageAttendance / 100,
-  // //     'isEmpty': stats.isEmpty, // Use the isEmpty property from the model
-  // //   };
-  // // }
-  // //
-  // /// Convert MemberParticipationStats to Map<String, dynamic>
-  // Map<String, dynamic> _convertMemberParticipationStatsToMap(
-  //     MemberParticipationStats stats) {
-  //   // Calculate active and inactive members from top participants
-  //   final activeMembers = stats.topParticipants.length;
-  //   final inactiveMembers = stats
-  //       .participationByDemographic['inactive_count'] ?? 0;
-  //
-  //   return {
-  //     'topParticipants': stats.topParticipants,
-  //     'participationByDemographic': stats.participationByDemographic,
-  //     'participationTrend': stats.participationTrend,
-  //     'engagementMetrics': stats.engagementMetrics,
-  //     // Add common field names for compatibility with the UI
-  //     'top_members': stats.topParticipants,
-  //     'participation_by_demographic': stats.participationByDemographic,
-  //     'participation_trend': stats.participationTrend,
-  //     'engagement_metrics': stats.engagementMetrics,
-  //     'activeMembers': activeMembers,
-  //     'inactiveMembers': inactiveMembers,
-  //     'participationRate': stats.engagementMetrics['overall_rate'] ?? 0.75,
-  //     'topMembers': stats.topParticipants,
-  //     'isEmpty': stats.isEmpty, // Use the isEmpty property from the model
-  //   };
-  // }
-  //
-  // /// Convert EventParticipationStats to Map<String, dynamic>
-  // Map<String, dynamic> _convertEventParticipationStatsToMap(
-  //     EventParticipationStats stats) {
-  //   // Format the event date for display
-  //   String formattedDate = '';
-  //   try {
-  //     formattedDate = DateFormat('MMM d, y').format(stats.eventDate);
-  //   } catch (e) {
-  //     formattedDate = 'Unknown date';
-  //   }
-  //
-  //   return {
-  //     // New API fields
-  //     'eventId': stats.eventId,
-  //     'eventTitle': stats.eventTitle,
-  //     'eventDate': stats.eventDate,
-  //     'formattedEventDate': formattedDate,
-  //     'totalPossible': stats.totalPossible,
-  //     'presentCount': stats.presentCount,
-  //     'absentCount': stats.absentCount,
-  //     'attendanceRate': stats.attendanceRate / 100, // Convert percentage to decimal
-  //
-  //     // Legacy fields for backward compatibility
-  //     'totalParticipants': stats.totalParticipants > 0 ? stats.totalParticipants : stats.presentCount,
-  //     'participationRate': stats.participationRate > 0 ? stats.participationRate : stats.attendanceRate / 100,
-  //     'participantDemographics': stats.participantDemographics,
-  //     'participationTrend': stats.participationTrend,
-  //     'feedback': stats.feedback,
-  //
-  //     // Add common field names for compatibility with the UI
-  //     'total_participants': stats.totalParticipants > 0 ? stats.totalParticipants : stats.presentCount,
-  //     'participation_rate': stats.participationRate > 0 ? stats.participationRate : stats.attendanceRate / 100,
-  //     'participant_demographics': stats.participantDemographics,
-  //     'participation_trend': stats.participationTrend,
-  //     'totalEvents': 1, // Since we're now dealing with a single event
-  //     'attendedEvents': stats.presentCount,
-  //     'popularEvents': stats.feedback['popular_events'] ?? [],
-  //     'isEmpty': stats.isEmpty, // Use the isEmpty property from the model
-  //
-  //     // Additional fields for the new UI
-  //     'event_title': stats.eventTitle,
-  //     'event_date': formattedDate,
-  //     'total_possible': stats.totalPossible,
-  //     'present_count': stats.presentCount,
-  //     'absent_count': stats.absentCount,
-  //     'attendance_rate': stats.attendanceRate,
-  //   };
-  // }
-  //
-  //
 
 }

@@ -22,6 +22,9 @@ import '../../data/providers/user_provider.dart';
 import '../../data/services/event_services.dart';
 import '../../data/providers/auth_provider.dart';
 import '../../data/providers/analytics_providers/super_admin_analytics_provider.dart';
+import '../../data/models/region_model.dart';
+import '../../data/providers/region_provider.dart';
+import '../../features/region_manager/region_details_screen.dart';
 
 class SuperAdminDashboard extends StatefulWidget {
   const SuperAdminDashboard({super.key});
@@ -44,6 +47,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   List<UserModel> _recentUsers = [];
   final List<GroupModel> _recentGroups = [];
   Map<String, dynamic> _dashboardSummary = {};
+  List<RegionModel> _regions = [];
 
   bool _isLoading = true;
   String? _errorMessage;
@@ -52,6 +56,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   bool _usersDataRequested = false;
   bool _groupsDataRequested = false;
   bool _eventsDataRequested = false;
+  bool _regionsDataRequested = false;
 
   // Settings state
   bool _notificationsEnabled = true;
@@ -91,6 +96,8 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   Future<void> _initializeData() async {
     if (!mounted) return;
 
+    print('Initializing dashboard data...');
+
     // Only set loading state if we're not already loading
     if (!_isLoading) {
       setState(() {
@@ -117,92 +124,51 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     });
 
     try {
+      print('Getting analytics provider...');
       // Get the analytics provider
       _analyticsProvider = Provider.of<SuperAdminAnalyticsProvider>(
         context,
         listen: false,
       );
 
+      print('Getting auth provider...');
       // Get the auth provider for token refresh
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-      // Fetch dashboard summary first as it contains most of the data we need
-      try {
-        // Try to refresh the token before making the API call
-        bool tokenRefreshed = await authProvider.refreshToken();
+      print('Attempting token refresh...');
+      // Try to refresh the token before making the API call
+      bool tokenRefreshed = await authProvider.refreshToken();
+      print('Token refresh result: $tokenRefreshed');
 
-        if (!tokenRefreshed) {
-          // If token refresh failed, show an error
-          if (mounted) {
-            setState(() {
-              _isLoading = false;
-              _errorMessage = 'Authentication failed. Please login again.';
-            });
-          }
-          return;
-        }
-
-        // Now try to get the dashboard summary with the refreshed token
-        await _analyticsProvider.getDashboardSummary();
-
+      if (!tokenRefreshed) {
+        // If token refresh failed, show an error
+        print('Token refresh failed, redirecting to login...');
         if (mounted) {
           setState(() {
-            if (_analyticsProvider.dashboardSummary != null) {
-              _dashboardSummary = _analyticsProvider.dashboardSummary!;
-            } else {
-              _errorMessage = 'Dashboard data is not available';
-            }
+            _isLoading = false;
+            _errorMessage = 'Authentication failed. Please login again.';
           });
         }
-      } catch (e) {
-        print('Error fetching dashboard summary: $e');
-
-        // Check if it's an authentication error (401)
-        if (e.toString().contains('401')) {
-          // Try to refresh the token
-          bool tokenRefreshed = await authProvider.refreshToken();
-
-          if (tokenRefreshed) {
-            // If token was refreshed successfully, try again
-            try {
-              await _analyticsProvider.getDashboardSummary();
-
-              if (mounted) {
-                setState(() {
-                  if (_analyticsProvider.dashboardSummary != null) {
-                    _dashboardSummary = _analyticsProvider.dashboardSummary!;
-                  } else {
-                    _errorMessage = 'Dashboard data is not available';
-                  }
-                });
-              }
-            } catch (retryError) {
-              print('Error retrying after token refresh: $retryError');
-              if (mounted) {
-                setState(() {
-                  _errorMessage =
-                      'Failed to load dashboard data after token refresh: $retryError';
-                });
-              }
-            }
-          } else {
-            // If token refresh failed, show authentication error
-            if (mounted) {
-              setState(() {
-                _errorMessage = 'Authentication failed. Please login again.';
-              });
-            }
-          }
-        }
+        return;
       }
+
+      print('Fetching dashboard summary...');
+      // Now try to get the dashboard summary with the refreshed token
+      await _analyticsProvider.getDashboardSummary();
 
       if (mounted) {
         setState(() {
-          _isLoading = false;
-          _errorMessage ??= _analyticsProvider.errorMessage;
+          if (_analyticsProvider.dashboardSummary != null) {
+            _dashboardSummary = _analyticsProvider.dashboardSummary!;
+            print('Dashboard summary loaded successfully');
+          } else {
+            _errorMessage = 'Dashboard data is not available';
+            print('Dashboard summary is null');
+          }
         });
       }
     } catch (e) {
+      print('Error in _initializeData: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -539,7 +505,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
       // Create a map to track attendance
       Map<String, bool> attendanceMap = {};
       for (var member in members) {
-        final memberId = member['id'] as String;
+        final memberId = member.id as String;
         attendanceMap[memberId] = attendedMemberIds.contains(memberId);
       }
 
@@ -557,9 +523,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                         itemCount: members.length,
                         itemBuilder: (context, index) {
                           final member = members[index];
-                          final memberId = member['id'] as String;
+                          final memberId = member.id as String;
                           final memberName =
-                              member['fullName'] as String? ?? 'Unknown';
+                              member.fullName as String? ?? 'Unknown';
 
                           return CheckboxListTile(
                             title: Text(memberName),
@@ -728,6 +694,34 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
               ),
             ],
           ),
+    );
+  }
+
+  Future<void> _loadRegions() async {
+    if (_regionsDataRequested) return;
+    
+    _regionsDataRequested = true;
+    
+    try {
+      final regionProvider = Provider.of<RegionProvider>(context, listen: false);
+      await regionProvider.loadRegions();
+      
+      if (mounted) {
+        setState(() {
+          _regions = regionProvider.regions;
+        });
+      }
+    } catch (e) {
+      print('Error loading regions: $e');
+    }
+  }
+
+  void _navigateToRegionDetails(RegionModel region) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RegionDetailsScreen(regionId: region.id),
+      ),
     );
   }
 
@@ -1158,30 +1152,111 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
               ],
             ),
             const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildQuickActionButton(
-                  'Add Group',
-                  Icons.group_add,
-                  () => _onItemTapped(2),
+            _buildQuickActions(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickActions() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Text(
+            'Quick Actions',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
                 ),
-                _buildQuickActionButton(
-                  'Regions',
-                  Icons.location_city,
-                  () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const RegionManagerScreen(),
+          ),
+        ),
+        GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: 3,
+          mainAxisSpacing: 16,
+          crossAxisSpacing: 16,
+          padding: const EdgeInsets.all(16),
+          childAspectRatio: 1.2,
+          children: [
+            _buildQuickActionButton(
+              icon: Icons.group_add,
+              label: 'Add Group',
+              color: AppColors.primaryColor,
+              onTap: () => _onItemTapped(2),
+            ),
+            _buildQuickActionButton(
+              icon: Icons.location_city,
+              label: 'Regions',
+              color: AppColors.secondaryColor,
+              onTap: () {
+                if (!_regionsDataRequested) {
+                  _loadRegions();
+                }
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(20),
                     ),
                   ),
-                ),
-                _buildQuickActionButton(
-                  'Settings',
-                  Icons.settings,
-                  () => _onItemTapped(4),
-                ),
-              ],
+                  builder: (context) => DraggableScrollableSheet(
+                    initialChildSize: 0.7,
+                    minChildSize: 0.5,
+                    maxChildSize: 0.9,
+                    expand: false,
+                    builder: (context, scrollController) => SingleChildScrollView(
+                      controller: scrollController,
+                      child: _buildRegionsList(),
+                    ),
+                  ),
+                );
+              },
+            ),
+            _buildQuickActionButton(
+              icon: Icons.settings,
+              label: 'Settings',
+              color: AppColors.accentColor,
+              onTap: () => _onItemTapped(4),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickActionButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withOpacity(0.2)),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: color, size: 28),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -1189,33 +1264,42 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     );
   }
 
-  Widget _buildQuickActionButton(
-    String label,
-    IconData icon,
-    VoidCallback onTap,
-  ) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(12),
+  Widget _buildRegionsList() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Text(
+            'Regions',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
         ),
-        child: Column(
-          children: [
-            Icon(icon, color: Colors.white, size: 24),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: TextStyles.bodyText.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w500,
-              ),
+        if (_regions.isEmpty)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text('No regions found'),
             ),
-          ],
-        ),
-      ),
+          )
+        else
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _regions.length,
+            itemBuilder: (context, index) {
+              final region = _regions[index];
+              return ListTile(
+                leading: const Icon(Icons.location_on),
+                title: Text(region.name),
+                subtitle: Text(region.description ?? ''),
+                onTap: () => _navigateToRegionDetails(region),
+              );
+            },
+          ),
+      ],
     );
   }
 

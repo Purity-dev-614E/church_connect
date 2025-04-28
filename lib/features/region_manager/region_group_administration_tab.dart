@@ -5,17 +5,20 @@ import 'package:group_management_church_app/data/models/group_model.dart';
 import 'package:group_management_church_app/data/models/user_model.dart';
 import 'package:group_management_church_app/data/providers/group_provider.dart';
 import 'package:group_management_church_app/data/providers/user_provider.dart';
+import 'package:group_management_church_app/features/region_manager/region_user_management_tab.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
 import 'package:provider/provider.dart';
+import '../../data/providers/analytics_providers/admin_analytics_provider.dart';
 import '../admin/Admin_dashboard.dart';
+import 'package:group_management_church_app/features/region_manager/group_details_screen.dart';
 
 class RegionGroupAdministrationTab extends StatefulWidget {
   final String regionId;
 
   const RegionGroupAdministrationTab({
-    Key? key,
+    super.key,
     required this.regionId,
-  }) : super(key: key);
+  });
 
   @override
   State<RegionGroupAdministrationTab> createState() => _RegionGroupAdministrationTabState();
@@ -267,20 +270,28 @@ class _RegionGroupAdministrationTabState extends State<RegionGroupAdministration
                     ],
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.successColor,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    'Active',
-                    style: TextStyles.bodyText.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w500,
-                      fontSize: 12,
-                    ),
-                  ),
+                FutureBuilder<Map<String, int>>(
+                  future: _fetchGroupActivityStatus(group.id),
+                  builder: (context, snapshot) {
+                    final status = snapshot.data ?? {'active': 0, 'inactive': 0};
+                    final isActive = status['active']! >= status['inactive']!;
+                    
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isActive ? AppColors.successColor : Colors.orange,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        isActive ? 'Active' : 'Inactive',
+                        style: TextStyles.bodyText.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w500,
+                          fontSize: 12,
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),
@@ -334,18 +345,19 @@ class _RegionGroupAdministrationTabState extends State<RegionGroupAdministration
               },
             ),
             const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: WrapAlignment.end,
               children: [
                 TextButton.icon(
                   onPressed: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => AdminDashboard(
+                        builder: (context) => GroupDetailsScreen(
                           groupId: group.id,
                           groupName: group.name,
-                          initialTabIndex: 0,
                         ),
                       ),
                     );
@@ -354,9 +366,9 @@ class _RegionGroupAdministrationTabState extends State<RegionGroupAdministration
                   label: const Text('View'),
                   style: TextButton.styleFrom(
                     foregroundColor: AppColors.primaryColor,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   ),
                 ),
-                const SizedBox(width: 8),
                 TextButton.icon(
                   onPressed: () {
                     _showEditGroupDialog(context, group);
@@ -365,9 +377,20 @@ class _RegionGroupAdministrationTabState extends State<RegionGroupAdministration
                   label: const Text('Edit'),
                   style: TextButton.styleFrom(
                     foregroundColor: AppColors.secondaryColor,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   ),
                 ),
-                const SizedBox(width: 8),
+                TextButton.icon(
+                  onPressed: () {
+                    _showAssignAdminDialog(context, group);
+                  },
+                  icon: const Icon(Icons.person_add, size: 18),
+                  label: const Text('Assign Admin'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.accentColor,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                ),
                 TextButton.icon(
                   onPressed: () {
                     _showDeleteGroupDialog(context, group);
@@ -376,6 +399,7 @@ class _RegionGroupAdministrationTabState extends State<RegionGroupAdministration
                   label: const Text('Delete'),
                   style: TextButton.styleFrom(
                     foregroundColor: Colors.red,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   ),
                 ),
               ],
@@ -444,111 +468,124 @@ class _RegionGroupAdministrationTabState extends State<RegionGroupAdministration
     }
   }
   
+  Future<Map<String, int>> _fetchGroupActivityStatus(String groupId) async {
+    try {
+      final analyticsProvider = Provider.of<AdminAnalyticsProvider>(context, listen: false);
+      final status = await analyticsProvider.getGroupMemberActivityStatus(groupId);
+      
+      // Handle the response format correctly
+      final active = status['active'] is num ? (status['active'] as num).toInt() : 0;
+      final inactive = status['inactive'] is num ? (status['inactive'] as num).toInt() : 0;
+      
+      return {
+        'active': active,
+        'inactive': inactive,
+      };
+    } catch (e) {
+      print('Error fetching group activity status: $e');
+      // Return default values on error
+      return {'active': 0, 'inactive': 0};
+    }
+  }
+  
   void _showCreateGroupDialog(BuildContext context) {
     final TextEditingController nameController = TextEditingController();
     final TextEditingController descriptionController = TextEditingController();
-    String? selectedAdminId;
-    List<UserModel> availableAdmins = [];
-    bool isLoadingAdmins = true;
-    
-    // Load available admins
-    Future<void> loadAdmins() async {
-      try {
-        final userProvider = Provider.of<UserProvider>(context, listen: false);
-        final users = await userProvider.getUsersByRegion(widget.regionId);
-        // Filter users with admin role
-        availableAdmins = users.where((user) => user.role == 'admin').toList();
-        isLoadingAdmins = false;
-      } catch (e) {
-        print('Error loading admins: $e');
-        isLoadingAdmins = false;
-      }
-    }
     
     showDialog(
       context: context,
       builder: (dialogContext) {
-        // Start loading admins
-        loadAdmins();
-        
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: const Text('Create New Group'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: nameController,
-                      decoration: const InputDecoration(labelText: 'Group Name'),
-                    ),
-                    TextField(
-                      controller: descriptionController,
-                      decoration: const InputDecoration(labelText: 'Description'),
-                      maxLines: 3,
-                    ),
-                    const SizedBox(height: 16),
-                    isLoadingAdmins
-                        ? const Center(child: CircularProgressIndicator())
-                        : availableAdmins.isEmpty
-                            ? const Text('No group leaders available in this region')
-                            : DropdownButtonFormField<String>(
-                                value: selectedAdminId,
-                                decoration: const InputDecoration(labelText: 'Group Leader'),
-                                hint: const Text('Select Group Leader'),
-                                items: availableAdmins.map((admin) {
-                                  return DropdownMenuItem<String>(
-                                    value: admin.id,
-                                    child: Text(admin.fullName),
-                                  );
-                                }).toList(),
-                                onChanged: (value) {
-                                  setState(() {
-                                    selectedAdminId = value;
-                                  });
-                                },
-                              ),
-                  ],
+        return AlertDialog(
+          title: Row(
+            children: [
+              const Icon(Icons.group_add, color: AppColors.primaryColor),
+              const SizedBox(width: 8),
+              const Text('Create New Group'),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Group Information',
+                  style: TextStyles.heading2.copyWith(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: nameController,
+                  decoration: InputDecoration(
+                    labelText: 'Group Name',
+                    prefixIcon: const Icon(Icons.group),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 ),
-                ElevatedButton(
-                  onPressed: () async {
-                    if (nameController.text.isEmpty) {
-                      _showError('Group name is required');
-                      return;
-                    }
-
-                    try {
-                      final groupProvider = Provider.of<GroupProvider>(context, listen: false);
-                      final success = await groupProvider.createGroup(
-                        nameController.text.trim(),
-                        descriptionController.text.trim(),
-                        selectedAdminId ?? '',
-                        widget.regionId,
-                      );
-
-                      if (success) {
-                        _showSuccess('Group created successfully');
-                        Navigator.pop(context);
-                        _loadGroups(); // Refresh the group list
-                      } else {
-                        _showError('Failed to create group');
-                      }
-                    } catch (e) {
-                      _showError('Failed to create group: ${e.toString()}');
-                    }
-                  },
-                  child: const Text('Create'),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: descriptionController,
+                  decoration: InputDecoration(
+                    labelText: 'Description',
+                    prefixIcon: const Icon(Icons.description),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  maxLines: 3,
                 ),
               ],
-            );
-          },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.grey[600],
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (nameController.text.isEmpty) {
+                  _showError('Group name is required');
+                  return;
+                }
+
+                try {
+                  final groupProvider = Provider.of<GroupProvider>(context, listen: false);
+                  final success = await groupProvider.createGroup(
+                    nameController.text.trim(),
+                    descriptionController.text.trim(),
+                    '', // Empty admin ID for now
+                    widget.regionId,
+                  );
+
+                  if (success) {
+                    _showSuccess('Group created successfully');
+                    Navigator.pop(context);
+                    _loadGroups(); // Refresh the group list
+                  } else {
+                    _showError('Failed to create group');
+                  }
+                } catch (e) {
+                  _showError('Failed to create group: ${e.toString()}');
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryColor,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text('Create Group'),
+            ),
+          ],
         );
       },
     );
@@ -667,6 +704,19 @@ class _RegionGroupAdministrationTabState extends State<RegionGroupAdministration
     );
   }
   
+  void _showAssignAdminDialog(BuildContext context, GroupModel group) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => _AssignAdminDialog(
+        regionId: widget.regionId,
+        group: group,
+        onSuccess: () {
+          _loadGroups(); // Refresh the group list
+        },
+      ),
+    );
+  }
+  
   void _showDeleteGroupDialog(BuildContext context, GroupModel group) {
     showDialog(
       context: context,
@@ -700,6 +750,287 @@ class _RegionGroupAdministrationTabState extends State<RegionGroupAdministration
           ),
         ],
       ),
+    );
+  }
+}
+
+class _AssignAdminDialog extends StatefulWidget {
+  final String regionId;
+  final GroupModel group;
+  final VoidCallback onSuccess;
+
+  const _AssignAdminDialog({
+    required this.regionId,
+    required this.group,
+    required this.onSuccess,
+  });
+
+  @override
+  State<_AssignAdminDialog> createState() => _AssignAdminDialogState();
+}
+
+class _AssignAdminDialogState extends State<_AssignAdminDialog> {
+  String? selectedAdminId;
+  List<UserModel> availableAdmins = [];
+  bool isLoadingAdmins = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAdmins();
+  }
+
+  Future<void> _loadAdmins() async {
+    print('Starting to load admins for region: ${widget.regionId}');
+    
+    try {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      print('Fetching users from region...');
+      final users = await userProvider.getUsersByRegion(widget.regionId);
+      print('Found ${users.length} total users in region');
+      
+      // Filter users with admin role and log their details
+      final admins = users.where((user) {
+        final hasAdminRole = user.role.toLowerCase() == 'admin' || 
+                            user.role.toLowerCase() == 'group_leader' ||
+                            user.role.toLowerCase() == 'regional_manager';
+        if (hasAdminRole) {
+          print('Found potential admin: ${user.fullName} (${user.email}) with role: ${user.role}');
+        }
+        return hasAdminRole;
+      }).toList();
+      
+      print('Found ${admins.length} users with admin roles');
+      print('Available admins:');
+      for (var admin in admins) {
+        print('- ${admin.fullName} (${admin.email}) - Role: ${admin.role}');
+      }
+
+      if (mounted) {
+        setState(() {
+          availableAdmins = admins;
+          isLoadingAdmins = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading admins: $e');
+      if (mounted) {
+        setState(() {
+          isLoadingAdmins = false;
+        });
+      }
+      _showError('Failed to load group leaders: ${e.toString()}');
+    }
+  }
+
+  void _showError(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.error,
+    );
+  }
+
+  void _showSuccess(String message) {
+    CustomNotification.show(
+      context: context,
+      message: message,
+      type: NotificationType.success,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Row(
+        children: [
+          const Icon(Icons.person_add, color: AppColors.primaryColor),
+          const SizedBox(width: 8),
+          Text('Assign Admin to ${widget.group.name}'),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (isLoadingAdmins)
+              const Center(child: CircularProgressIndicator())
+            else if (availableAdmins.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.info_outline, color: Colors.orange),
+                        const SizedBox(width: 8),
+                        Text(
+                          'No Group Leaders Available',
+                          style: TextStyles.bodyText.copyWith(
+                            color: Colors.orange[800],
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'You need to assign an admin role to users before they can be selected as group leaders.',
+                      style: TextStyles.bodyText.copyWith(
+                        color: AppColors.textColor.withOpacity(0.7),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        // Navigate to user management tab
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => RegionUserManagementTab(regionId: widget.regionId),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.people),
+                      label: const Text('Manage Users'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.primaryColor,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey[300]!),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: DropdownButtonFormField<String>(
+                  value: selectedAdminId,
+                  decoration: const InputDecoration(
+                    labelText: 'Select Group Leader',
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                  ),
+                  items: availableAdmins.map((admin) {
+                    return DropdownMenuItem<String>(
+                      value: admin.id,
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 16,
+                            backgroundColor: AppColors.primaryColor.withOpacity(0.2),
+                            child: Text(
+                              admin.fullName.isNotEmpty ? admin.fullName[0].toUpperCase() : '?',
+                              style: const TextStyle(
+                                color: AppColors.primaryColor,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                admin.fullName,
+                                style: TextStyles.bodyText.copyWith(
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              Text(
+                                admin.email,
+                                style: TextStyles.bodyText.copyWith(
+                                  fontSize: 12,
+                                  color: AppColors.textColor.withOpacity(0.7),
+                                ),
+                              ),
+                              Text(
+                                'Role: ${admin.role}',
+                                style: TextStyles.bodyText.copyWith(
+                                  fontSize: 12,
+                                  color: AppColors.textColor.withOpacity(0.7),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    print('Selected admin ID: $value');
+                    setState(() {
+                      selectedAdminId = value;
+                    });
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+          style: TextButton.styleFrom(
+            foregroundColor: Colors.grey[600],
+          ),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            if (selectedAdminId == null) {
+              _showError('Please select a group leader');
+              return;
+            }
+
+            print('Attempting to assign admin $selectedAdminId to group ${widget.group.id}');
+            try {
+              final updatedGroup = GroupModel(
+                id: widget.group.id,
+                name: widget.group.name,
+                description: widget.group.description,
+                group_admin: selectedAdminId!,
+                region_id: widget.group.region_id,
+              );
+
+              final groupProvider = Provider.of<GroupProvider>(context, listen: false);
+              print('Updating group with new admin...');
+              final success = await groupProvider.updateGroup(updatedGroup);
+
+              if (success) {
+                print('Successfully assigned admin to group');
+                _showSuccess('Group leader assigned successfully');
+                Navigator.pop(context);
+                widget.onSuccess();
+              } else {
+                print('Failed to assign admin to group');
+                _showError('Failed to assign group leader');
+              }
+            } catch (e) {
+              print('Error assigning admin: $e');
+              _showError('Failed to assign group leader: ${e.toString()}');
+            }
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primaryColor,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          child: const Text('Assign Leader'),
+        ),
+      ],
     );
   }
 }

@@ -10,9 +10,9 @@ class RegionUserManagementTab extends StatefulWidget {
   final String regionId;
 
   const RegionUserManagementTab({
-    Key? key,
+    super.key,
     required this.regionId,
-  }) : super(key: key);
+  });
 
   @override
   State<RegionUserManagementTab> createState() => _RegionUserManagementTabState();
@@ -155,40 +155,19 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
       children: [
         Padding(
           padding: const EdgeInsets.all(16.0),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: 'Search users...',
-                    prefixIcon: const Icon(Icons.search),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  onChanged: (value) {
-                    _filterUsers();
-                  },
-                ),
+          child: TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Search users...',
+              prefixIcon: const Icon(Icons.search),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
-              const SizedBox(width: 16),
-              ElevatedButton.icon(
-                onPressed: () {
-                  _showAddUserDialog();
-                },
-                icon: const Icon(Icons.person_add),
-                label: const Text('Add User'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryColor,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-            ],
+              contentPadding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+            onChanged: (value) {
+              _filterUsers();
+            },
           ),
         ),
         Padding(
@@ -328,189 +307,120 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
     );
   }
   
-  void _showAddUserDialog() {
-    final TextEditingController nameController = TextEditingController();
-    final TextEditingController emailController = TextEditingController();
-    final TextEditingController contactController = TextEditingController();
-    String selectedGender = 'Male';
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add New User'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: 'Full Name'),
-              ),
-              TextField(
-                controller: emailController,
-                decoration: const InputDecoration(labelText: 'Email'),
-                keyboardType: TextInputType.emailAddress,
-              ),
-              TextField(
-                controller: contactController,
-                decoration: const InputDecoration(labelText: 'Contact'),
-                keyboardType: TextInputType.phone,
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: selectedGender,
-                decoration: const InputDecoration(labelText: 'Gender'),
-                items: const [
-                  DropdownMenuItem(value: 'Male', child: Text('Male')),
-                  DropdownMenuItem(value: 'Female', child: Text('Female')),
-                  DropdownMenuItem(value: 'Other', child: Text('Other')),
-                ],
-                onChanged: (value) {
-                  if (value != null) {
-                    selectedGender = value;
-                  }
-                },
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (nameController.text.isEmpty || emailController.text.isEmpty || contactController.text.isEmpty) {
-                _showError('Please fill all required fields');
-                return;
-              }
-
-              try {
-                final userProvider = Provider.of<UserProvider>(context, listen: false);
-                final success = await userProvider.createUser(
-                  nameController.text.trim(),
-                  emailController.text.trim(),
-                  contactController.text.trim(),
-                  selectedGender,
-                  widget.regionId,
-                );
-
-                if (success) {
-                  _showSuccess('User created successfully');
-                  Navigator.pop(context);
-                  _loadUsers(); // Refresh the user list
-                } else {
-                  _showError('Failed to create user');
-                }
-              } catch (e) {
-                _showError('Failed to create user: ${e.toString()}');
-              }
-            },
-            child: const Text('Create'),
-          ),
-        ],
-      ),
-    );
-  }
-  
   void _showEditUserDialog(UserModel user) {
-    final TextEditingController nameController = TextEditingController(text: user.fullName);
-    final TextEditingController emailController = TextEditingController(text: user.email);
-    final TextEditingController contactController = TextEditingController(text: user.contact);
-    String selectedGender = user.gender;
     String selectedRole = user.role;
     
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Edit User'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: 'Full Name'),
+        title: Row(
+          children: [
+            const Icon(Icons.edit, color: AppColors.primaryColor),
+            const SizedBox(width: 8),
+            Text('Change Role for ${user.fullName}'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Current Role:',
+              style: TextStyles.bodyText.copyWith(
+                fontWeight: FontWeight.bold,
               ),
-              TextField(
-                controller: emailController,
-                decoration: const InputDecoration(labelText: 'Email'),
-                keyboardType: TextInputType.emailAddress,
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: _getRoleColor(user.role).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: _getRoleColor(user.role).withOpacity(0.3)),
               ),
-              TextField(
-                controller: contactController,
-                decoration: const InputDecoration(labelText: 'Contact'),
-                keyboardType: TextInputType.phone,
+              child: Text(
+                _getRoleDisplayName(user.role),
+                style: TextStyles.bodyText.copyWith(
+                  color: _getRoleColor(user.role),
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: selectedGender,
-                decoration: const InputDecoration(labelText: 'Gender'),
-                items: const [
-                  DropdownMenuItem(value: 'Male', child: Text('Male')),
-                  DropdownMenuItem(value: 'Female', child: Text('Female')),
-                  DropdownMenuItem(value: 'Other', child: Text('Other')),
-                ],
-                onChanged: (value) {
-                  if (value != null) {
-                    selectedGender = value;
-                  }
-                },
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Select New Role:',
+              style: TextStyles.bodyText.copyWith(
+                fontWeight: FontWeight.bold,
               ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: selectedRole,
-                decoration: const InputDecoration(labelText: 'Role'),
-                items: const [
-                  DropdownMenuItem(value: 'user', child: Text('Member')),
-                  DropdownMenuItem(value: 'admin', child: Text('Group Leader')),
-                  DropdownMenuItem(value: 'super_admin', child: Text('Super Admin')),
-                ],
-                onChanged: (value) {
-                  if (value != null) {
-                    selectedRole = value;
-                  }
-                },
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: selectedRole,
+              decoration: InputDecoration(
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
-            ],
-          ),
+              items: const [
+                DropdownMenuItem(
+                  value: 'user',
+                  child: Text('Member'),
+                ),
+                DropdownMenuItem(
+                  value: 'admin',
+                  child: Text('Group Leader'),
+                ),
+              ],
+              onChanged: (value) {
+                if (value != null) {
+                  selectedRole = value;
+                }
+              },
+            ),
+          ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.grey[600],
+            ),
           ),
           ElevatedButton(
             onPressed: () async {
-              if (nameController.text.isEmpty || emailController.text.isEmpty || contactController.text.isEmpty) {
-                _showError('Please fill all required fields');
-                return;
-              }
-
               try {
                 final updatedUser = UserModel(
                   id: user.id,
-                  fullName: nameController.text.trim(),
-                  email: emailController.text.trim(),
-                  contact: contactController.text.trim(),
+                  fullName: user.fullName,
+                  email: user.email,
+                  contact: user.contact,
                   nextOfKin: user.nextOfKin,
                   nextOfKinContact: user.nextOfKinContact,
                   role: selectedRole,
-                  gender: selectedGender,
+                  gender: user.gender,
+                  regionId: user.regionId,
                 );
 
                 final userProvider = Provider.of<UserProvider>(context, listen: false);
                 await userProvider.updateUser(updatedUser);
                 
-                _showSuccess('User updated successfully');
+                _showSuccess('User role updated successfully');
                 Navigator.pop(context);
                 _loadUsers(); // Refresh the user list
               } catch (e) {
-                _showError('Failed to update user: ${e.toString()}');
+                _showError('Failed to update user role: ${e.toString()}');
               }
             },
-            child: const Text('Update'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryColor,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Update Role'),
           ),
         ],
       ),
@@ -551,5 +461,31 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
         ],
       ),
     );
+  }
+
+  Color _getRoleColor(String role) {
+    switch (role.toLowerCase()) {
+      case 'super_admin':
+        return AppColors.primaryColor;
+      case 'admin':
+        return AppColors.secondaryColor;
+      case 'user':
+        return AppColors.accentColor;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _getRoleDisplayName(String role) {
+    switch (role.toLowerCase()) {
+      case 'super_admin':
+        return 'Super Admin';
+      case 'admin':
+        return 'Group Leader';
+      case 'user':
+        return 'Member';
+      default:
+        return 'Unknown';
+    }
   }
 }

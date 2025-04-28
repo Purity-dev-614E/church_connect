@@ -5,13 +5,14 @@ import 'package:group_management_church_app/data/providers/auth_provider.dart';
 import 'package:group_management_church_app/data/providers/region_provider.dart';
 import 'package:group_management_church_app/data/services/auth_services.dart';
 import 'package:group_management_church_app/features/region_manager/region_dashboard.dart';
+import 'package:group_management_church_app/features/region_manager/region_details_screen.dart';
 import 'package:group_management_church_app/widgets/custom_app_bar.dart';
 import 'package:group_management_church_app/widgets/custom_button.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
 import 'package:provider/provider.dart';
 
 class RegionManagerScreen extends StatefulWidget {
-  const RegionManagerScreen({Key? key}) : super(key: key);
+  const RegionManagerScreen({super.key});
 
   @override
   State<RegionManagerScreen> createState() => _RegionManagerScreenState();
@@ -40,10 +41,6 @@ class _RegionManagerScreenState extends State<RegionManagerScreen> {
       final authServices = AuthServices();
       final userId = authServices.getUserId();
 
-      if (userId == null) {
-        throw Exception('User ID is null');
-      }
-
       // Get the regions managed by this user
       final regionProvider = Provider.of<RegionProvider>(context, listen: false);
       await regionProvider.loadRegions();
@@ -70,7 +67,7 @@ class _RegionManagerScreenState extends State<RegionManagerScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => RegionDashboard(regionId: region.id),
+        builder: (context) => RegionDetailsScreen(regionId: region.id),
       ),
     );
   }

@@ -1,14 +1,16 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:group_management_church_app/core/constants/colors.dart';
 import 'package:group_management_church_app/core/constants/text_styles.dart';
 import 'package:group_management_church_app/data/models/group_model.dart';
 import 'package:group_management_church_app/data/models/user_model.dart';
 import 'package:group_management_church_app/data/models/region_model.dart';
+import 'package:group_management_church_app/data/models/regional_analytics_model.dart';
+import 'package:group_management_church_app/data/services/analytics_services/regional_manager_analytics_service.dart';
+import 'package:group_management_church_app/data/services/user_services.dart';
 import 'package:group_management_church_app/features/profile_screen.dart';
-import 'package:group_management_church_app/features/region_manager/region_analytics_tab.dart';
 import 'package:group_management_church_app/features/region_manager/region_user_management_tab.dart';
 import 'package:group_management_church_app/features/region_manager/region_group_administration_tab.dart';
+import 'package:group_management_church_app/features/region_manager/screens/analytics_screen.dart';
 import 'package:group_management_church_app/widgets/custom_app_bar.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -22,16 +24,18 @@ import '../../data/providers/group_provider.dart';
 import '../../data/providers/user_provider.dart';
 import '../../data/providers/region_provider.dart';
 import '../../data/services/event_services.dart';
-import '../../data/services/analytics_services.dart';
-import '../../data/providers/auth_provider.dart';
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import 'package:group_management_church_app/data/services/auth_services.dart';
 
 class RegionDashboard extends StatefulWidget {
   final String regionId;
   
   const RegionDashboard({
-    Key? key,
+    super.key,
     required this.regionId,
-  }) : super(key: key);
+  });
 
   @override
   State<RegionDashboard> createState() => _RegionDashboardState();
@@ -42,15 +46,14 @@ class _RegionDashboardState extends State<RegionDashboard> {
   final PageController _pageController = PageController();
 
   // Data from providers
-  late AnalyticsServices _analyticsServices;
+  late RegionAnalyticsService _analyticsServices;
   late EventServices _eventServices;
   List<UserModel> _regionUsers = [];
   List<GroupModel> _regionGroups = [];
   List<EventModel> _upcomingEvents = [];
-  Map<String, dynamic> _dashboardSummary = {};
+  DashboardSummary? _dashboardSummary;
   Map<String, dynamic> _attendanceTrends = {};
-  Map<String, dynamic> _groupGrowthTrends = {};
-  Map<String, dynamic> _memberParticipationStats = {};
+  RegionGrowthAnalytics? _growthTrends;
   RegionModel? _region;
   bool _isLoading = true;
   String? _errorMessage;
@@ -58,11 +61,11 @@ class _RegionDashboardState extends State<RegionDashboard> {
   // Settings state
   bool _notificationsEnabled = true;
   bool _darkModeEnabled = false;
-  String _selectedDateRange = 'Last 6 Months';
-  List<String> _availableDateRanges = ['Last Month', 'Last 3 Months', 'Last 6 Months', 'Last Year'];
+  final String _selectedDateRange = 'Last 6 Months';
+  final List<String> _availableDateRanges = ['Last Month', 'Last 3 Months', 'Last 6 Months', 'Last Year'];
   
   // Export options
-  List<String> _exportFormats = ['CSV', 'PDF', 'Excel'];
+  final List<String> _exportFormats = ['CSV', 'PDF', 'Excel'];
   String _selectedExportFormat = 'CSV';
   
   // Chart data
@@ -72,22 +75,26 @@ class _RegionDashboardState extends State<RegionDashboard> {
   @override
   void initState() {
     super.initState();
-    _analyticsServices = AnalyticsServices();
-    _eventServices = EventServices();
+    try {
+      _analyticsServices = RegionAnalyticsService(
+        baseUrl: 'https://safari-backend-production-bf65.up.railway.app/api'
+      );
+      _eventServices = EventServices();
 
-    // Use Future.microtask to avoid calling setState during build
-    Future.microtask(() {
-      _initializeData();
-      _requestPermissions();
-    });
+      // Use Future.microtask to avoid calling setState during build
+      Future.microtask(() {
+        _checkAuthAndLoadData();
+      });
+    } catch (e) {
+      print('Error initializing services: $e');
+      setState(() {
+        _errorMessage = 'Failed to initialize dashboard services';
+        _isLoading = false;
+      });
+    }
   }
   
-  Future<void> _requestPermissions() async {
-    // Request storage permissions for exporting data
-    await Permission.storage.request();
-  }
-
-  Future<void> _initializeData() async {
+  Future<void> _checkAuthAndLoadData() async {
     if (!mounted) return;
 
     setState(() {
@@ -96,6 +103,27 @@ class _RegionDashboardState extends State<RegionDashboard> {
     });
 
     try {
+      // Check if user is authenticated
+      final authServices = AuthServices();
+      final isLoggedIn = await authServices.isLoggedIn();
+      
+      if (!isLoggedIn) {
+        throw Exception('You must be logged in to access this dashboard');
+      }
+
+      // Get current user's role
+      final userId = await authServices.getUserId();
+      
+      if (userId == null) {
+        throw Exception('User ID not found');
+      }
+
+      final userData = await UserServices().fetchCurrentUser(userId);
+      
+      if (userData == null) {
+        throw Exception('User data not found');
+      }
+
       // Load region data
       final regionProvider = Provider.of<RegionProvider>(context, listen: false);
       _region = await regionProvider.getRegionById(widget.regionId);
@@ -104,30 +132,13 @@ class _RegionDashboardState extends State<RegionDashboard> {
         throw Exception('Region not found');
       }
 
-      // Fetch data separately to handle errors more gracefully
-      try {
-        await _loadRegionUsers();
-      } catch (e) {
-        print('Error fetching region users: $e');
-      }
-
-      try {
-        await _loadRegionGroups();
-      } catch (e) {
-        print('Error fetching region groups: $e');
-      }
-
-      try {
-        await _loadRegionEvents();
-      } catch (e) {
-        print('Error fetching region events: $e');
-      }
-
-      try {
-        await _loadRegionAnalytics();
-      } catch (e) {
-        print('Error fetching region analytics: $e');
-      }
+      // Fetch data in parallel
+      await Future.wait([
+        _loadRegionUsers(),
+        _loadRegionGroups(),
+        _loadRegionEvents(),
+        _loadRegionAnalytics()
+      ]);
 
       // Set final loading state
       if (mounted) {
@@ -139,88 +150,115 @@ class _RegionDashboardState extends State<RegionDashboard> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Failed to load dashboard data: $e';
+          _errorMessage = e.toString();
         });
       }
     }
   }
   
   Future<void> _loadRegionUsers() async {
-    final userProvider = Provider.of<UserProvider>(context, listen: false);
-    final users = await userProvider.getUsersByRegion(widget.regionId);
-    
-    if (mounted) {
-      setState(() {
-        _regionUsers = users;
-      });
+    try {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final users = await userProvider.getUsersByRegion(widget.regionId);
+      
+      if (mounted) {
+        setState(() {
+          _regionUsers = users;
+        });
+      }
+    } catch (e) {
+      print('Error loading region users: $e');
+      // Continue without users data
     }
   }
   
   Future<void> _loadRegionGroups() async {
-    final groupProvider = Provider.of<GroupProvider>(context, listen: false);
-    final groups = await groupProvider.getGroupsByRegion(widget.regionId);
-    
-    if (mounted) {
-      setState(() {
-        _regionGroups = groups;
-      });
+    try {
+      final groupProvider = Provider.of<GroupProvider>(context, listen: false);
+      final groups = await groupProvider.getGroupsByRegion(widget.regionId);
+      
+      if (mounted) {
+        setState(() {
+          _regionGroups = groups;
+        });
+      }
+    } catch (e) {
+      print('Error loading region groups: $e');
+      // Continue without groups data
     }
   }
   
   Future<void> _loadRegionEvents() async {
-    final eventProvider = Provider.of<EventProvider>(context, listen: false);
-    final events = await eventProvider.getEventsByRegion(widget.regionId);
-    
-    if (mounted) {
-      setState(() {
-        _upcomingEvents = events;
-      });
+    try {
+      final eventProvider = Provider.of<EventProvider>(context, listen: false);
+      final events = await eventProvider.getEventsByRegion(widget.regionId);
+      
+      if (mounted) {
+        setState(() {
+          _upcomingEvents = events;
+        });
+      }
+    } catch (e) {
+      print('Error loading region events: $e');
+      // Continue without events data
     }
   }
   
   Future<void> _loadRegionAnalytics() async {
     try {
       // Load region dashboard summary
-      final summary = await _analyticsServices.getRegionDashboardSummary(widget.regionId);
+      final summary = await _analyticsServices.getDashboardSummaryForRegion(widget.regionId);
       
       if (mounted) {
         setState(() {
           _dashboardSummary = summary;
         });
       }
-      
+
       // Load region attendance trends
-      final attendanceTrends = await _analyticsServices.getRegionAttendanceTrends(widget.regionId);
-      
+      final attendanceTrends = await _analyticsServices.getRegionAttendanceStats(widget.regionId);
+
       if (mounted) {
         setState(() {
-          _attendanceTrends = attendanceTrends;
+          // Convert RegionAttendanceStats to Map<String, dynamic> for chart processing
+          _attendanceTrends = {
+            'trend_data': attendanceTrends.eventStats.map((stat) => {
+              'month': stat.eventDate.month.toString(),
+              'attendance_rate': stat.attendanceRate
+            }).toList(),
+            'overall_stats': {
+              'total_events': attendanceTrends.overallStats.totalEvents,
+              'total_members': attendanceTrends.overallStats.totalMembers,
+              'present_members': attendanceTrends.overallStats.presentMembers,
+              'attendance_rate': attendanceTrends.overallStats.attendanceRate
+            }
+          };
           _processAttendanceChartData();
         });
       }
-      
+
       // Load region growth trends
-      final growthTrends = await _analyticsServices.getRegionGrowth(widget.regionId);
-      
+      final growthTrends = await _analyticsServices.getRegionGrowthAnalytics(widget.regionId);
+
       if (mounted) {
         setState(() {
-          _groupGrowthTrends = growthTrends;
+          _growthTrends = growthTrends;
         });
       }
     } catch (e) {
       print('Error loading region analytics: $e');
-      throw e;
+      // Continue without analytics data
     }
   }
-  
+
   void _processAttendanceChartData() {
     _attendanceSpots = [];
     _attendanceLabels = [];
-    
+
     try {
       if (_attendanceTrends.containsKey('trend_data')) {
         final trendData = _attendanceTrends['trend_data'] as List;
-        
+
         for (int i = 0; i < trendData.length; i++) {
           final item = trendData[i];
           final rate = item['attendance_rate'] as double? ?? 0.0;
@@ -321,8 +359,7 @@ class _RegionDashboardState extends State<RegionDashboard> {
         dataType = 'region_attendance';
       }
       
-      // Call the export API
-      final exportData = await _analyticsServices.exportRegionReport(widget.regionId);
+
       
       // Get the app's temporary directory
       final directory = await getTemporaryDirectory();
@@ -330,10 +367,7 @@ class _RegionDashboardState extends State<RegionDashboard> {
       final fileName = 'region_report_$timestamp.$formatLower';
       final filePath = '${directory.path}/$fileName';
       
-      // Write the data to a file
-      final file = File(filePath);
-      await file.writeAsString(exportData.toString());
-      
+
       // Share the file
       await Share.shareFiles([filePath], text: 'Region Report');
       
@@ -370,7 +404,7 @@ class _RegionDashboardState extends State<RegionDashboard> {
           _buildDashboardTab(),
           RegionUserManagementTab(regionId: widget.regionId),
           RegionGroupAdministrationTab(regionId: widget.regionId),
-          RegionAnalyticsTab(regionId: widget.regionId),
+          _buildAnalyticsTab(),
           _buildSettingsTab(),
         ],
       ),
@@ -439,7 +473,7 @@ class _RegionDashboardState extends State<RegionDashboard> {
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
-              onPressed: _initializeData,
+              onPressed: _checkAuthAndLoadData,
               icon: const Icon(Icons.refresh),
               label: const Text('Retry'),
               style: ElevatedButton.styleFrom(
@@ -453,7 +487,7 @@ class _RegionDashboardState extends State<RegionDashboard> {
     }
 
     return RefreshIndicator(
-      onRefresh: _initializeData,
+      onRefresh: _checkAuthAndLoadData,
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -604,13 +638,13 @@ class _RegionDashboardState extends State<RegionDashboard> {
 
   Widget _buildStatisticsGrid() {
     // Get data from dashboard summary
-    String totalUsers = _dashboardSummary['total_users']?.toString() ?? _regionUsers.length.toString();
-    String totalGroups = _dashboardSummary['total_groups']?.toString() ?? _regionGroups.length.toString();
-    String activeEvents = _dashboardSummary['active_events']?.toString() ?? _upcomingEvents.length.toString();
+    String totalUsers = _dashboardSummary?.userCount.toString() ?? _regionUsers.length.toString();
+    String totalGroups = _dashboardSummary?.groupCount.toString() ?? _regionGroups.length.toString();
+    String activeEvents = _dashboardSummary?.eventCount.toString() ?? _upcomingEvents.length.toString();
     
     // Format attendance rate with percentage
-    final attendanceRate = _dashboardSummary['overall_attendance_rate'] ?? 0.0;
-    String formattedAttendance = '${attendanceRate.toStringAsFixed(1)}%';
+    final attendanceRate = _dashboardSummary?.attendanceCount ?? 0;
+    String formattedAttendance = '${(attendanceRate / 100).toStringAsFixed(1)}%';
 
     return GridView.count(
       crossAxisCount: 2,
@@ -735,10 +769,10 @@ class _RegionDashboardState extends State<RegionDashboard> {
                 const SizedBox(height: 8),
                 ElevatedButton(
                   onPressed: () => _onItemTapped(1),
-                  child: const Text('Add Users'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryColor,
                   ),
+                  child: const Text('Add Users'),
                 ),
               ],
             ),
@@ -821,10 +855,10 @@ class _RegionDashboardState extends State<RegionDashboard> {
                 const SizedBox(height: 8),
                 ElevatedButton(
                   onPressed: () => _onItemTapped(2),
-                  child: const Text('Add Groups'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryColor,
                   ),
+                  child: const Text('Add Groups'),
                 ),
               ],
             ),
@@ -976,239 +1010,7 @@ class _RegionDashboardState extends State<RegionDashboard> {
 
   // ANALYTICS TAB
   Widget _buildAnalyticsTab() {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Region Analytics',
-            style: TextStyles.heading1.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Detailed analytics for ${_region?.name ?? 'your region'}',
-            style: TextStyles.bodyText,
-          ),
-          const SizedBox(height: 24),
-          
-          // Date range selector
-          Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Date Range',
-                    style: TextStyles.heading2.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          value: _selectedDateRange,
-                          decoration: InputDecoration(
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          ),
-                          items: _availableDateRanges.map((range) {
-                            return DropdownMenuItem(
-                              value: range,
-                              child: Text(range),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            if (value != null) {
-                              setState(() {
-                                _selectedDateRange = value;
-                              });
-                            }
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      ElevatedButton(
-                        onPressed: () {
-                          // Apply date range filter
-                        },
-                        child: const Text('Apply'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primaryColor,
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          
-          // Attendance analytics
-          Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Attendance Analytics',
-                    style: TextStyles.heading2.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    height: 250,
-                    child: LineChart(
-                      LineChartData(
-                        gridData: FlGridData(show: false),
-                        titlesData: FlTitlesData(
-                          leftTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                              showTitles: true,
-                              reservedSize: 30,
-                              getTitlesWidget: (value, meta) {
-                                return Text(
-                                  '${value.toInt()}%',
-                                  style: TextStyles.bodyText.copyWith(
-                                    color: AppColors.textColor.withOpacity(0.7),
-                                    fontSize: 12,
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          bottomTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                              showTitles: true,
-                              getTitlesWidget: (value, meta) {
-                                if (value.toInt() >= 0 && value.toInt() < _attendanceLabels.length) {
-                                  return Padding(
-                                    padding: const EdgeInsets.only(top: 8.0),
-                                    child: Text(
-                                      _attendanceLabels[value.toInt()],
-                                      style: TextStyles.bodyText.copyWith(
-                                        color: AppColors.textColor.withOpacity(0.7),
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  );
-                                }
-                                return const Text('');
-                              },
-                            ),
-                          ),
-                          rightTitles: AxisTitles(
-                            sideTitles: SideTitles(showTitles: false),
-                          ),
-                          topTitles: AxisTitles(
-                            sideTitles: SideTitles(showTitles: false),
-                          ),
-                        ),
-                        borderData: FlBorderData(show: false),
-                        lineBarsData: [
-                          LineChartBarData(
-                            spots: _attendanceSpots,
-                            isCurved: true,
-                            color: AppColors.primaryColor,
-                            barWidth: 4,
-                            isStrokeCapRound: true,
-                            dotData: FlDotData(show: true),
-                            belowBarData: BarAreaData(
-                              show: true,
-                              color: AppColors.primaryColor.withOpacity(0.2),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: () => _exportAnalyticsData('PDF'),
-                        icon: const Icon(Icons.download),
-                        label: const Text('Export'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.primaryColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          
-          // Growth analytics
-          Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Growth Analytics',
-                    style: TextStyles.heading2.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Region growth over time',
-                    style: TextStyles.bodyText.copyWith(
-                      color: AppColors.textColor.withOpacity(0.7),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  // Growth chart would go here
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: () => _exportAnalyticsData('PDF'),
-                        icon: const Icon(Icons.download),
-                        label: const Text('Export'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.primaryColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+    return RegionManagerAnalyticsScreen(regionId: widget.regionId);
   }
 
   // SETTINGS TAB
@@ -1344,11 +1146,11 @@ class _RegionDashboardState extends State<RegionDashboard> {
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () => _exportAnalyticsData(_selectedExportFormat),
-                      child: const Text('Export Region Report'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primaryColor,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
+                      child: const Text('Export Region Report'),
                     ),
                   ),
                 ],

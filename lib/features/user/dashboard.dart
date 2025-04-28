@@ -13,6 +13,8 @@ import 'package:group_management_church_app/widgets/custom_app_bar.dart';
 import 'package:group_management_church_app/widgets/event_card.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
 import 'package:provider/provider.dart';
+import 'package:group_management_church_app/features/auth/login.dart';
+import 'package:group_management_church_app/features/user/no_group_screen.dart';
 
 class UserDashboard extends StatefulWidget {
   final String groupId;
@@ -28,6 +30,7 @@ class UserDashboard extends StatefulWidget {
 
 class _UserDashboardState extends State<UserDashboard> {
   int _selectedIndex = 0;
+  String? _currentGroupId;
 
   // State variables
   String _userName = 'User';
@@ -63,10 +66,55 @@ class _UserDashboardState extends State<UserDashboard> {
   Future<void> _loadData() async {
     print('Starting _loadData');
     try {
-      // Load data sequentially to avoid concurrent provider updates
+      // First check authentication
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final userId = authProvider.currentUser?.id;
+      
+      if (userId == null) {
+        print('User not authenticated, redirecting to login');
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const LoginScreen()),
+          );
+        }
+        return;
+      }
+
+      print('User authenticated with ID: $userId');
+      
+      // Load user data first
       await _loadUserData();
+      
+      // Get user's groups
+      final groupProvider = Provider.of<GroupProvider>(context, listen: false);
+      print('Fetching user groups for ID: $userId');
+      final userGroups = await groupProvider.getUserGroups(userId);
+      
+      if (userGroups.isEmpty) {
+        print('No groups found for user, redirecting to no group screen');
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const NoGroupScreen()),
+          );
+        }
+        return;
+      }
+      
+      // Use the first group if no specific group is provided
+      final groupId = widget.groupId == 'default' ? userGroups.first.id : widget.groupId;
+      print('Using group ID: $groupId');
+      
+      // Update the current group ID
+      if (mounted) {
+        setState(() {
+          _currentGroupId = groupId;
+        });
+      }
+      
+      // Load group and event data
       await _loadGroupData();
       await _loadEventData();
+      
       print('All data loaded successfully');
     } catch (e) {
       print('Error loading data: $e');
@@ -158,7 +206,7 @@ class _UserDashboardState extends State<UserDashboard> {
 
   // Load group data
   Future<void> _loadGroupData() async {
-    print('Starting _loadGroupData with groupId: ${widget.groupId}');
+    print('Starting _loadGroupData with groupId: ${_currentGroupId ?? widget.groupId}');
     // Only set loading state if the widget is still mounted
     if (!mounted) {
       print('Widget not mounted in _loadGroupData');
@@ -172,11 +220,39 @@ class _UserDashboardState extends State<UserDashboard> {
     try {
       // Get the provider outside of the build context
       final groupProvider = Provider.of<GroupProvider>(context, listen: false);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
       
-      // Fetch the group data
-      print('Fetching group with ID: ${widget.groupId}');
-      final group = await groupProvider.getGroupById(widget.groupId);
-      print('Group loaded: ${group?.name}');
+      // Get current user ID
+      final userId = authProvider.currentUser?.id;
+      print('Current user ID: $userId');
+      
+      if (userId == null) {
+        print('No user ID found, cannot fetch groups');
+        throw Exception('User not authenticated');
+      }
+      
+      // Fetch user's groups
+      print('Fetching user groups for user ID: $userId');
+      final userGroups = await groupProvider.getUserGroups(userId);
+      print('User groups fetched: ${userGroups.length} groups found');
+      
+      if (userGroups.isEmpty) {
+        print('No groups found for user');
+        throw Exception('User is not a member of any group');
+      }
+      
+      // Find the group with matching ID
+      final groupId = _currentGroupId ?? widget.groupId;
+      print('Looking for group with ID: $groupId');
+      final group = userGroups.firstWhere(
+        (g) => g.id == groupId,
+        orElse: () {
+          print('Group not found in user groups');
+          throw Exception('Group not found');
+        },
+      );
+      
+      print('Group found: ${group.name} (${group.id})');
 
       // Only update state if the widget is still mounted
       if (mounted && group != null) {
@@ -221,10 +297,11 @@ class _UserDashboardState extends State<UserDashboard> {
       final eventProvider = Provider.of<EventProvider>(context, listen: false);
 
       // Set current group in provider
-      eventProvider.setCurrentGroup(widget.groupId);
+      final groupId = _currentGroupId ?? widget.groupId;
+      eventProvider.setCurrentGroup(groupId);
 
       // Load upcoming events
-      await eventProvider.fetchUpcomingEvents(widget.groupId);
+      await eventProvider.fetchUpcomingEvents(groupId);
 
       // Get the current date
       final now = DateTime.now();
@@ -622,98 +699,222 @@ class _UserDashboardState extends State<UserDashboard> {
   }
 
   Widget _buildAllEventsTab() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            children: [
-              Text(
-                'All Upcoming Events',
-                style: TextStyles.heading2.copyWith(
-                  fontSize: 22,
-                  color: AppColors.textColor,
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              children: [
+                Text(
+                  'Events',
+                  style: TextStyles.heading2.copyWith(
+                    fontSize: 22,
+                    color: AppColors.textColor,
+                  ),
                 ),
-              ),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.refresh),
-                onPressed: () {
-                  // Ensure we're not in the build phase when refreshing
-                  Future.microtask(() => _loadEventData());
-                },
-                tooltip: 'Refresh events',
-              ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: () {
+                    Future.microtask(() => _loadEventData());
+                  },
+                  tooltip: 'Refresh events',
+                ),
+              ],
+            ),
+          ),
+          TabBar(
+            labelColor: AppColors.primaryColor,
+            unselectedLabelColor: AppColors.textColor.withOpacity(0.5),
+            indicatorColor: AppColors.primaryColor,
+            tabs: const [
+              Tab(text: 'Upcoming'),
+              Tab(text: 'Past'),
             ],
           ),
-        ),
-        _isLoadingEvents
-            ? Expanded(
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const CircularProgressIndicator(),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Loading events...',
-                        style: TextStyles.bodyText.copyWith(
-                          color: AppColors.textColor.withOpacity(0.7),
-                        ),
-                      ),
-                    ],
+          Expanded(
+            child: TabBarView(
+              children: [
+                _buildUpcomingEventsTab(),
+                _buildPastEventsTab(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUpcomingEventsTab() {
+    return _isLoadingEvents
+        ? Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 16),
+                Text(
+                  'Loading events...',
+                  style: TextStyles.bodyText.copyWith(
+                    color: AppColors.textColor.withOpacity(0.7),
                   ),
                 ),
+              ],
+            ),
+          )
+        : _allEvents.isEmpty
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.event_busy,
+                      size: 64,
+                      color: AppColors.textColor.withOpacity(0.5),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No upcoming events',
+                      style: TextStyles.bodyText.copyWith(
+                        color: AppColors.textColor.withOpacity(0.7),
+                      ),
+                    ),
+                  ],
+                ),
               )
-            : _allEvents.isEmpty
-                ? Expanded(
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.event_busy,
-                            size: 64,
-                            color: AppColors.textColor.withOpacity(0.5),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No upcoming events',
-                            style: TextStyles.bodyText.copyWith(
-                              color: AppColors.textColor.withOpacity(0.7),
-                            ),
-                          ),
-                        ],
+            : RefreshIndicator(
+                onRefresh: () async {
+                  await Future.microtask(() => _loadEventData());
+                },
+                child: ListView.builder(
+                  itemCount: _allEvents.length,
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  itemBuilder: (context, index) {
+                    final event = _allEvents[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12.0),
+                      child: EventCard(
+                        eventTitle: event.title,
+                        eventDate: _formatEventDate(event.dateTime),
+                        eventLocation: event.location,
+                        onTap: () => _navigateToEventDetails(event),
                       ),
-                    ),
-                  )
-                : Expanded(
-                    child: RefreshIndicator(
-                      onRefresh: () async {
-                        // Ensure we're not in the build phase when refreshing
-                        await Future.microtask(() => _loadEventData());
-                      },
-                      child: ListView.builder(
-                        itemCount: _allEvents.length,
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                        itemBuilder: (context, index) {
-                          final event = _allEvents[index];
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 12.0),
-                            child: EventCard(
-                              eventTitle: event.title,
-                              eventDate: _formatEventDate(event.dateTime),
-                              eventLocation: event.location,
-                              onTap: () => _navigateToEventDetails(event),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
+                    );
+                  },
+                ),
+              );
+  }
+
+  Widget _buildPastEventsTab() {
+    final now = DateTime.now();
+    final pastEvents = _allEvents.where((event) => event.dateTime.isBefore(now)).toList();
+
+    return _isLoadingEvents
+        ? Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 16),
+                Text(
+                  'Loading events...',
+                  style: TextStyles.bodyText.copyWith(
+                    color: AppColors.textColor.withOpacity(0.7),
                   ),
-      ],
-    );
+                ),
+              ],
+            ),
+          )
+        : pastEvents.isEmpty
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.event_busy,
+                      size: 64,
+                      color: AppColors.textColor.withOpacity(0.5),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No past events',
+                      style: TextStyles.bodyText.copyWith(
+                        color: AppColors.textColor.withOpacity(0.7),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : RefreshIndicator(
+                onRefresh: () async {
+                  await Future.microtask(() => _loadEventData());
+                },
+                child: ListView.builder(
+                  itemCount: pastEvents.length,
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  itemBuilder: (context, index) {
+                    final event = pastEvents[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12.0),
+                      child: Card(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 2,
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.all(16),
+                          title: Text(
+                            event.title,
+                            style: TextStyles.heading2.copyWith(
+                              fontSize: 18,
+                              color: AppColors.textColor,
+                            ),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 8),
+                              Text(
+                                _formatEventDate(event.dateTime),
+                                style: TextStyles.bodyText.copyWith(
+                                  color: AppColors.textColor.withOpacity(0.7),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                event.location,
+                                style: TextStyles.bodyText.copyWith(
+                                  color: AppColors.textColor.withOpacity(0.7),
+                                ),
+                              ),
+                            ],
+                          ),
+                          trailing: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              'Past Event',
+                              style: TextStyles.bodyText.copyWith(
+                                color: Colors.grey,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          onTap: () => _navigateToEventDetails(event),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              );
   }
 }
 
