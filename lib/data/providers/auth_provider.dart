@@ -320,31 +320,36 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> uploadProfileImage(String userId, String base64Image) async {
     try {
       // Get token from secure storage
-      final token = await _secureStorage.read(key: 'token');
+      final token = await _secureStorage.read(key: AuthServices.accessTokenKey);
       if (token == null) {
         throw Exception('No authentication token found');
       }
 
       // Make API request to upload profile image
-      final response = await http.post(
-        Uri.parse('$_baseUrl/api/users/$userId/profile-image'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
+      final url = Uri.parse('${ApiEndpoints.baseUrl}/users/$userId/uploadimage');
+      print('Request Body: ${jsonEncode({
+        'image': base64Image,
+      })}');
+
+     final response = await http.put(
+      url,
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
         body: jsonEncode({
-          'image': base64Image,
+        'image': base64Image,
         }),
       );
 
       if (response.statusCode == 200) {
-        return true;
+      return true;
       } else {
-        throw Exception('Failed to upload profile image: ${response.body}');
+      throw Exception('Failed to upload profile image: ${response.body}');
       }
     } catch (e) {
-      print('Error uploading profile image: $e');
-      return false;
-    }
+    print('Error uploading profile image: $e');
+    return false;
   }
+}
 }

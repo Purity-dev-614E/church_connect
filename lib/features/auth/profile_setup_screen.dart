@@ -168,20 +168,20 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     super.dispose();
   }
 
-  // Validate phone number format
-  String? _validatePhoneNumber(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Phone number is required';
-    }
-    
-    // Simple validation for phone number format
-    final phoneRegExp = RegExp(r'^\+?[0-9]{10,15}$');
-    if (!phoneRegExp.hasMatch(value)) {
-      return 'Enter a valid phone number';
-    }
-    
-    return null;
+// Validate phone number format
+String? _validatePhoneNumber(String? value) {
+  if (value == null || value.isEmpty) {
+    return 'Phone number is required';
   }
+
+  // Ensure the phone number starts with '254' and matches the format
+  final phoneRegExp = RegExp(r'^254[0-9]{9}$');
+  if (!phoneRegExp.hasMatch(value)) {
+    return 'Enter a valid phone number starting with 254';
+  }
+
+  return null;
+}
 
   // Validate full name
   String? _validateFullName(String? value) {
@@ -297,8 +297,15 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     });
 
     try {
+      String tobase64Url(Uint8List bytes) {
+        return base64Encode(bytes)
+            .replaceAll('+', '-')
+            .replaceAll('/', '_')
+            .replaceAll(RegExp('=+\$'), '');
+      }
       // Convert image bytes to base64
-      final base64Image = base64Encode(_profileImageBytes!);
+    final base64Image = tobase64Url(_profileImageBytes!);
+    print('Base64 Image: $base64Image');
       
       // Get auth provider for token
       final authProvider = Provider.of<AuthProvider>(context, listen: false);

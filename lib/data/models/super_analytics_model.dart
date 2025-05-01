@@ -14,7 +14,7 @@ class GenderDistribution {
   factory GenderDistribution.fromJson(Map<String, dynamic> json) {
     return GenderDistribution(
       gender: json['gender'] ?? 'Unknown',
-      count: json['count'] ?? 0,
+      count: int.tryParse(json['count']?.toString() ?? '0') ?? 0,
     );
   }
 }
@@ -31,7 +31,7 @@ class RoleDistribution {
   factory RoleDistribution.fromJson(Map<String, dynamic> json) {
     return RoleDistribution(
       role: json['role'] ?? 'Unknown',
-      count: json['count'] ?? 0,
+      count: int.tryParse(json['count']?.toString() ?? '0') ?? 0,
     );
   }
 }

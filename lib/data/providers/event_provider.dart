@@ -3,6 +3,8 @@ import 'package:group_management_church_app/data/models/event_model.dart';
 import 'package:group_management_church_app/data/models/user_model.dart';
 import 'package:group_management_church_app/data/services/event_services.dart';
 
+import '../models/attendance_model.dart';
+
 class EventProvider extends ChangeNotifier {
   // Private fields
   final EventServices _eventServices = EventServices();
@@ -72,6 +74,8 @@ class EventProvider extends ChangeNotifier {
    try {
      _events = await _eventServices.getEventsByGroup(groupId);
      _errorMessage = null;
+     print("Fetched events: ${_events.length}");
+     print('Fetched events: $_events');
      return _events;
    } catch (error) {
      _handleError('fetching events', error);
@@ -295,13 +299,16 @@ class EventProvider extends ChangeNotifier {
  }
 
   /// Fetch attendance details for an event
-  Future<void> fetchEventAttendance(String eventId) async {
+  Future<List<AttendanceModel>> fetchEventAttendance(String eventId) async {
     _setLoading(true);
     try {
-      _eventAttendance = await _eventServices.getEventAttendance(eventId);
+      final attendanceData = await _eventServices.getEventAttendance(eventId);
       _errorMessage = null;
+      print('fetched Event Attendance Data: $attendanceData');
+      return attendanceData;
     } catch (error) {
       _handleError('fetching event attendance', error);
+      return [];
     } finally {
       _setLoading(false);
     }

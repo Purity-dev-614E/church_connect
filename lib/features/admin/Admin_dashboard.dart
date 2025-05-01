@@ -313,9 +313,32 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       // Get members
       final members = await groupProvider.getGroupMembers(widget.groupId);
       
+      // Convert members to UserModel
+      final userModels = members.map((member) {
+        if (member is UserModel) {
+          return member;
+        } else if (member is Map<String, dynamic>) {
+          return UserModel.fromJson(member);
+        } else {
+          print('Invalid member data type: ${member.runtimeType}');
+          // Return a default UserModel for invalid data
+          return UserModel(
+            id: 'unknown',
+            fullName: 'Unknown Member',
+            email: '',
+            contact: '',
+            nextOfKin: '',
+            nextOfKinContact: '',
+            role: 'user',
+            gender: '',
+            regionId: '',
+          );
+        }
+      }).toList();
+      
       if (mounted) {
         setState(() {
-          _groupMembers = members.cast<UserModel>();
+          _groupMembers = userModels;
         });
       }
     } catch (e) {

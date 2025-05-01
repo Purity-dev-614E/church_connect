@@ -737,7 +737,7 @@ class _RegionDashboardState extends State<RegionDashboard> {
                 ),
                 const SizedBox(height: 8),
                 ElevatedButton(
-                  onPressed: () => _onItemTapped(2),
+                  onPressed: () => _showCreateGroupDialog(),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryColor,
                   ),
@@ -750,48 +750,113 @@ class _RegionDashboardState extends State<RegionDashboard> {
       );
     }
 
-    // Show only the first 5 groups
     final displayGroups = _regionGroups.length > 5 ? _regionGroups.sublist(0, 5) : _regionGroups;
 
-    return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: ListView.separated(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: displayGroups.length,
-        separatorBuilder: (context, index) => const Divider(),
-        itemBuilder: (context, index) {
-          final group = displayGroups[index];
-          return ListTile(
-            leading: CircleAvatar(
-              backgroundColor: AppColors.secondaryColor.withOpacity(0.2),
-              child: const Icon(
-                Icons.groups,
-                color: AppColors.secondaryColor,
-              ),
-            ),
-            title: Text(
-              group.name,
-              style: TextStyles.bodyText.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            subtitle: Text(
-              'Members: ${group.members?.length ?? 0}',
-              style: TextStyles.bodyText.copyWith(
-                fontSize: 12,
-                color: AppColors.textColor.withOpacity(0.7),
-              ),
-            ),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              // Navigate to group details
+    return Column(
+      children: [
+        Card(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: displayGroups.length,
+            separatorBuilder: (context, index) => const Divider(),
+            itemBuilder: (context, index) {
+              final group = displayGroups[index];
+              return ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: AppColors.secondaryColor.withOpacity(0.2),
+                  child: const Icon(
+                    Icons.groups,
+                    color: AppColors.secondaryColor,
+                  ),
+                ),
+                title: Text(
+                  group.name,
+                  style: TextStyles.bodyText.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                subtitle: Text(
+                  'Members: ${group.members?.length ?? 0}',
+                  style: TextStyles.bodyText.copyWith(
+                    fontSize: 12,
+                    color: AppColors.textColor.withOpacity(0.7),
+                  ),
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  // Navigate to group details
+                },
+              );
             },
-          );
-        },
-      ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        ElevatedButton.icon(
+          onPressed: () => _showCreateGroupDialog(),
+          icon: const Icon(Icons.add),
+          label: const Text('Add New Group'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primaryColor,
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showCreateGroupDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final nameController = TextEditingController();
+        final descriptionController = TextEditingController();
+
+        return AlertDialog(
+          title: const Text('Create New Group'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: 'Group Name'),
+              ),
+              TextField(
+                controller: descriptionController,
+                decoration: const InputDecoration(labelText: 'Description'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final groupProvider = Provider.of<GroupProvider>(context, listen: false);
+                final success = await groupProvider.createGroup(
+                  nameController.text,
+                  descriptionController.text,
+                  'adminId', // Replace with actual adminId
+                  widget.regionId,
+                );
+
+                if (success) {
+                  _showSuccess('Group created successfully');
+                } else {
+                  _showError('Failed to create group');
+                }
+
+                Navigator.pop(context);
+              },
+              child: const Text('Create'),
+            ),
+          ],
+        );
+      },
     );
   }
 

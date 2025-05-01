@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:group_management_church_app/core/constants/colors.dart';
 import 'package:group_management_church_app/core/constants/text_styles.dart';
 import 'package:group_management_church_app/data/models/user_model.dart';
+import 'package:group_management_church_app/data/providers/group_provider.dart';
 import 'package:group_management_church_app/data/providers/user_provider.dart';
+import 'package:group_management_church_app/features/member/member_attendance_screen.dart';
 import 'package:group_management_church_app/features/super_admin/user_role_management.dart';
 import 'package:provider/provider.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
@@ -64,6 +66,22 @@ class _UserManagementTabState extends State<UserManagementTab> {
       }
     }
   }
+  Future<String?> _getUserGroupDetails(String userId) async {
+    try {
+      final userGroups = await GroupProvider().getUserGroups(userId);
+      if (userGroups.isNotEmpty) {
+        return userGroups.first.id; // Return the first group ID
+      } else {
+        print('No groups found for user $userId');
+        return null;
+      }
+    } catch (error) {
+      _showError('Failed to fetch group details for user $userId');
+      return null;
+    }
+  }
+
+
   
   void _filterUsers() {
     final query = _searchController.text.toLowerCase();
@@ -79,7 +97,7 @@ class _UserManagementTabState extends State<UserManagementTab> {
         final matchesRole = _selectedRole == 'All' || 
             (_selectedRole == 'Members' && user.role.toLowerCase() == 'user') ||
             (_selectedRole == 'Group Leaders' && user.role.toLowerCase() == 'admin') ||
-            (_selectedRole == 'Admins' && user.role.toLowerCase() == 'super_admin');
+            (_selectedRole == 'Admins' && user.role.toLowerCase() == 'super admin');
             
         return matchesQuery && matchesRole;
       }).toList();
@@ -293,7 +311,7 @@ class _UserManagementTabState extends State<UserManagementTab> {
           children: [
             const SizedBox(height: 4),
             Text(
-              user.email,
+              'Phone Number: +${user.contact}',
               style: TextStyles.bodyText.copyWith(
                 color: AppColors.textColor.withOpacity(0.7),
               ),
@@ -317,7 +335,22 @@ class _UserManagementTabState extends State<UserManagementTab> {
             ),
           ],
         ),
-     
+        onTap: () async {
+          final groupId = await _getUserGroupDetails(user.id);
+          // Navigate to user details or edit screen
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => MemberAttendanceScreen(
+                  userId: user.id,
+                  groupId: groupId ?? '',
+              ),
+            ),
+          ).then((_) {
+            // Refresh the user list when returning from the details screen
+            _loadUsers();
+          });
+        },
       ),
     );
   }

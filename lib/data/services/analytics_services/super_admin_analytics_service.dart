@@ -69,6 +69,7 @@ class SuperAdminAnalyticsService {
     });
 
     final data = json.decode(response.body);
+    print("Demos: $data");
     return GroupDemographics.fromJson(data);
   }
 

@@ -11,8 +11,11 @@ import 'package:group_management_church_app/data/providers/group_provider.dart';
 import 'package:group_management_church_app/data/services/analytics_services/admin_analytics_service.dart';
 import 'package:group_management_church_app/data/services/auth_services.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
+import 'package:intl/intl.dart';
 import 'package:supabase/supabase.dart';
 
+import '../../../core/constants/colors.dart';
+import '../../../core/constants/text_styles.dart';
 import '../../../data/models/event_model.dart';
 
 class AdminAnalyticsScreen extends StatefulWidget {
@@ -34,7 +37,7 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
   final AdminAnalyticsProvider _adminProvider = AdminAnalyticsProvider();
 
   String _selectedPeriod = 'weekly';
-  bool _isLoading = true;
+  bool _isLoading = false;
   String? _errorMessage;
   bool _showLineChart = true;
 
@@ -50,66 +53,67 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
   }
 
   Future<void> _loadAnalytics() async {
-    if (_isLoading) return;
+    // Don't start loading if already loading
+    if (_isLoading && mounted) return;
 
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
 
     try {
       await Future.wait([
         _loadEventAttendance(),
-        _loadGroupAttendanceTrends(),
         _loadGroupActivityStatus(),
+        groupDemographics()
+
       ]);
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to load analytics: ${e.toString()}';
-      });
       print('Error loading analytics: $e');
       print('Error stack trace: ${StackTrace.current}');
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Failed to load analytics: ${e.toString()}';
+        });
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
-  Future<void> _loadEventAttendance() async {
+  Future<Map<String, List<dynamic>>> _loadEventAttendance() async {
     try {
-      final events = await _eventProvider.fetchEventsByGroup(widget.groupId);
-      final Map<String, List<double>> attendance = {};
+      final allevents = await _eventProvider.fetchEventsByGroup(widget.groupId);
 
-      for (var event in events) {
-        final attendedMembers = await _eventProvider.fetchAttendedMembers(event.id);
-        attendance[event.title] = [attendedMembers.length.toDouble()];
+      if (allevents.isNotEmpty) {
+        List<dynamic> attended = [];
+        List<dynamic> absent = [];
+
+        for (var event in allevents) {
+          final attendance = await _eventProvider.fetchEventAttendance(event.id);
+          if (attendance != null) {
+            attended.addAll(attendance.where((record) => record.isPresent == true).toList());
+            absent.addAll(attendance.where((record) => record.isPresent == false).toList());
+          }
+        }
+
+        return {'attended': attended, 'absent': absent};
+      } else {
+        print('No events found for the group');
+        return {'attended': [], 'absent': []};
       }
-
-      setState(() {
-        _eventAttendance = attendance;
-      });
     } catch (e) {
       print('Error loading event attendance: $e');
-      throw Exception('Failed to load event attendance: ${e.toString()}');
-    }
-  }
-
-  Future<void> _loadGroupAttendanceTrends() async {
-    try {
-      final trends = await _adminProvider.getGroupAttendanceByPeriod(widget.groupId, _selectedPeriod);
-      
-      if (trends != null) {
+      if (mounted) {
         setState(() {
-          _eventComparison = {
-            'eventStats': trends['eventStats'] as Map<String, int>,
-            'dailyStats': trends['dailyStats'] as Map<String, int>,
-          };
+          _errorMessage = 'Failed to load event attendance: ${e.toString()}';
         });
-      } else {
-        throw Exception('No attendance trends data available');
       }
-    } catch (e) {
-      print('Error loading group attendance trends: $e');
-      throw Exception('Failed to load group attendance trends: ${e.toString()}');
+      return {'attended': [], 'absent': []};
     }
   }
 
@@ -118,18 +122,35 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
       final groupActivityStatus = await _adminProvider.getGroupMemberActivityStatus(widget.groupId);
       
       if (groupActivityStatus != null) {
-        setState(() {
-          _activityStatus = {
-            'active': (groupActivityStatus['status_summary']['Active'] ?? 0).toDouble(),
-            'inactive': (groupActivityStatus['status_summary']['Inactive'] ?? 0).toDouble(),
-          };
-        });
+        if (mounted) {
+          setState(() {
+            _activityStatus = {
+              'active': (groupActivityStatus['status_summary']?['Active'] ?? 0).toDouble(),
+              'inactive': (groupActivityStatus['status_summary']?['Inactive'] ?? 0).toDouble(),
+            };
+          });
+        }
       } else {
-        throw Exception('No group activity status data available');
+        print('No group activity status data available, using default values');
+        if (mounted) {
+          setState(() {
+            _activityStatus = {
+              'active': 0.0,
+              'inactive': 0.0,
+            };
+          });
+        }
       }
     } catch (e) {
       print('Error loading group activity status: $e');
-      throw Exception('Failed to load group activity status: ${e.toString()}');
+      if (mounted) {
+        setState(() {
+          _activityStatus = {
+            'active': 0.0,
+            'inactive': 0.0,
+          };
+        });
+      }
     }
   }
 
@@ -160,15 +181,15 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
     }
   }
 
-  Future<List<dynamic>> groupDemographics() async {
+  Future<List<GenderDistribution>> groupDemographics() async {
     try {
       final groupDemographics = await _superProvider.getGroupDemographics(widget.groupId);
-      
+
       if (groupDemographics == null || groupDemographics.genderDistribution == null) {
         throw Exception('No demographics data available');
       }
 
-      return groupDemographics.genderDistribution;
+      return groupDemographics.genderDistribution.cast<GenderDistribution>();
     } catch (e) {
       print('Error loading group demographics: $e');
       throw Exception('Failed to load group demographics: ${e.toString()}');
@@ -247,25 +268,7 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
                   );
                 } else if (snapshot.hasData) {
                   final data = snapshot.data!.toList();
-                  return Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Event: ${data[0]}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 8),
-                          Text('Date: ${data[1]}'),
-                          const SizedBox(height: 8),
-                          Text('Total Participants: ${data[2]}'),
-                          const SizedBox(height: 8),
-                          Text('Present Count: ${data[3]}'),
-                          const SizedBox(height: 8),
-                          Text('Attendance Rate: ${data[4]}%'),
-                        ],
-                      ),
-                    ),
-                  );
+                  return _buildQuickStatsCard(snapshot.data!);
                 } else {
                   return const Center(child: Text('No quick stats available.'));
                 }
@@ -280,8 +283,6 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
                   _buildEventAttendanceChart(),
                   const SizedBox(height: 16),
                   _buildDemographicsPieChart(),
-                  const SizedBox(height: 16),
-                  _buildActivityStatusCard(),
                   const SizedBox(height: 16),
                 ],
               ),
@@ -312,94 +313,77 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
     );
   }
 
-  Widget _buildChartToggle() {
-    return Row(
-      children: [
-        const Text('Chart Type: '),
-        Switch(
-          value: _showLineChart,
-          onChanged: (value) {
-            setState(() => _showLineChart = value);
-          },
-        ),
-        Text(_showLineChart ? 'Line Chart' : 'Bar Chart'),
-      ],
-    );
-  }
-
-  Widget _buildEventAttendanceChart() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Event Attendance', style: TextStyle(fontSize: 18)),
-            const SizedBox(height: 16),
-            _buildPeriodSelector(),
-            const SizedBox(height: 16),
-            FutureBuilder<Map<String, dynamic>>(
-              future: Future.value(_eventComparison),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                } else if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
-                } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-                  final eventStats = snapshot.data!['eventStats'] as Map<String, dynamic>;
-                  return SizedBox(
-                    height: 300,
-                    child: LineChart(
-                      LineChartData(
-                        gridData: const FlGridData(show: true),
-                        titlesData: FlTitlesData(
-                          leftTitles: const AxisTitles(
-                            sideTitles: SideTitles(showTitles: true),
-                          ),
+ Widget _buildEventAttendanceChart() {
+   return Card(
+     child: Padding(
+       padding: const EdgeInsets.all(16),
+       child: Column(
+         crossAxisAlignment: CrossAxisAlignment.start,
+         children: [
+           const Text('Event Attendance', style: TextStyle(fontSize: 18)),
+           const SizedBox(height: 16),
+           _buildPeriodSelector(),
+           const SizedBox(height: 16),
+           FutureBuilder<Map<String, dynamic>>(
+             future: Future.value(_eventComparison),
+             builder: (context, snapshot) {
+               if (snapshot.connectionState == ConnectionState.waiting) {
+                 return const Center(child: CircularProgressIndicator());
+               } else if (snapshot.hasError) {
+                 return Center(child: Text('Error: ${snapshot.error}'));
+               } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+                 final eventStats = snapshot.data!['eventStats'] as Map<String, dynamic>;
+                 return SizedBox(
+                   height: 300,
+                   child: BarChart(
+                     BarChartData(
+                       alignment: BarChartAlignment.spaceAround,
+                       borderData: FlBorderData(show: true),
+                       barGroups: eventStats.entries.map((entry) {
+                         final index = eventStats.keys.toList().indexOf(entry.key);
+                         return BarChartGroupData(
+                           x: index,
+                           barRods: [
+                             BarChartRodData(
+                               toY: (entry.value as num).toDouble(),
+                               color: Colors.blue,
+                               width: 16,
+                             ),
+                           ],
+                         );
+                       }).toList(),
+                       titlesData: FlTitlesData(
+                         leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true)),
                           bottomTitles: AxisTitles(
                             sideTitles: SideTitles(
-                              showTitles: true,
-                              getTitlesWidget: (value, meta) {
-                                final index = value.toInt();
-                                if (index >= 0 && index < eventStats.keys.length) {
-                                  return Text(eventStats.keys.elementAt(index));
-                                }
-                                return const Text('');
-                              },
-                            ),
-                          ),
+                          showTitles: true,
+                          getTitlesWidget: (value, meta) {
+                            final index = value.toInt();
+                            if (index >= 0 && index < eventStats.keys.length) {
+                              return Text(eventStats.keys.elementAt(index));
+                            }
+                            return const Text('');
+                          },
                         ),
-                        borderData: FlBorderData(show: true),
-                        lineBarsData: [
-                          LineChartBarData(
-                            spots: eventStats.entries.map((entry) {
-                              final index = eventStats.keys.toList().indexOf(entry.key);
-                              return FlSpot(index.toDouble(), (entry.value as num).toDouble());
-                            }).toList(),
-                            isCurved: true,
-                            color: Colors.blue,
-                            barWidth: 3,
-                            isStrokeCapRound: true,
-                            dotData: const FlDotData(show: false),
-                            belowBarData: BarAreaData(show: false),
-                          ),
-                        ],
                       ),
-                    ),
-                  );
-                } else {
-                  return const Center(child: Text('No attendance data available.'));
-                }
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+
+                     ),
+                   ),
+                  )
+                 );
+               } else {
+                 return const Center(child: Text('No attendance data available.'));
+               }
+             },
+           ),
+         ],
+       ),
+     ),
+   );
+ }
 
  Widget _buildDemographicsPieChart() {
-   return FutureBuilder<List<dynamic>>(
+   return FutureBuilder<List<GenderDistribution>>(
      future: groupDemographics(),
      builder: (context, snapshot) {
        if (snapshot.connectionState == ConnectionState.waiting) {
@@ -410,7 +394,7 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
          final genderData = snapshot.data!;
          final total = genderData.fold<int>(
            0,
-           (sum, item) => sum + int.parse(item['count']),
+           (sum, item) => sum + item.count,
          );
 
          return Card(
@@ -426,11 +410,11 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
                    child: PieChart(
                      PieChartData(
                        sections: genderData.map((item) {
-                         final percentage = (int.parse(item['count']) / total) * 100;
+                         final percentage = (item.count / total) * 100;
                          return PieChartSectionData(
                            value: percentage,
                            title: '${percentage.toStringAsFixed(1)}%',
-                           color: item['gender'] == 'female' ? Colors.pink : Colors.blue,
+                           color: item.gender == 'female' ? Colors.pink : Colors.blue,
                          );
                        }).toList(),
                        sectionsSpace: 2,
@@ -449,37 +433,163 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
    );
  }
 
- Widget _buildActivityStatusCard() {
-   return FutureBuilder<Map<String, double>>(
-     future: Future.value(_activityStatus),
-     builder: (context, snapshot) {
-       if (snapshot.connectionState == ConnectionState.waiting) {
-         return const Center(child: CircularProgressIndicator());
-       } else if (snapshot.hasError) {
-         return Center(child: Text('Error: ${snapshot.error}'));
-       } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-         final active = snapshot.data!['active'] ?? 0;
-         final inactive = snapshot.data!['inactive'] ?? 0;
+ // Widget _buildActivityStatusCard() {
+ //   return FutureBuilder<Map<String, double>>(
+ //     future: Future.value(_activityStatus),
+ //     builder: (context, snapshot) {
+ //       if (snapshot.connectionState == ConnectionState.waiting) {
+ //         return const Center(child: CircularProgressIndicator());
+ //       } else if (snapshot.hasError) {
+ //         return Center(child: Text('Error: ${snapshot.error}'));
+ //       } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+ //         final active = snapshot.data!['active'] ?? 0;
+ //         final inactive = snapshot.data!['inactive'] ?? 0;
+ //
+ //         return Card(
+ //           child: Padding(
+ //             padding: const EdgeInsets.all(16),
+ //             child: Column(
+ //               crossAxisAlignment: CrossAxisAlignment.start,
+ //               children: [
+ //                 const Text('Group Activity Status', style: TextStyle(fontSize: 18)),
+ //                 const SizedBox(height: 16),
+ //                 Text('Active Members: $active', style: const TextStyle(fontSize: 16)),
+ //                 const SizedBox(height: 8),
+ //                 Text('Inactive Members: $inactive', style: const TextStyle(fontSize: 16)),
+ //               ],
+ //             ),
+ //           ),
+ //         );
+ //       } else {
+ //         return const Center(child: Text('No activity status data available.'));
+ //       }
+ //     },
+ //   );
+ // }
 
-         return Card(
-           child: Padding(
-             padding: const EdgeInsets.all(16),
-             child: Column(
-               crossAxisAlignment: CrossAxisAlignment.start,
-               children: [
-                 const Text('Group Activity Status', style: TextStyle(fontSize: 18)),
-                 const SizedBox(height: 16),
-                 Text('Active Members: $active', style: const TextStyle(fontSize: 16)),
-                 const SizedBox(height: 8),
-                 Text('Inactive Members: $inactive', style: const TextStyle(fontSize: 16)),
-               ],
-             ),
+ Widget _buildQuickStatsCard(Set<Object> quickStats) {
+   final stats = quickStats.toList();
+   // Ensure we have at least 4 elements, pad with 0 if needed
+   while (stats.length <= 4) {
+     stats.add(0);
+   }
+   
+   return Card(
+     elevation: 4,
+     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+     child: Padding(
+       padding: const EdgeInsets.all(16),
+       child: Column(
+         crossAxisAlignment: CrossAxisAlignment.start,
+         children: [
+           Row(
+             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+             children: [
+               Text(
+                 'Quick Stats of the last event',
+                 style: TextStyles.heading1.copyWith(
+                   fontSize: 24,
+                   fontWeight: FontWeight.bold,
+                 ),
+               ),
+               IconButton(
+                 icon: const Icon(Icons.refresh),
+                 onPressed: _loadAnalytics,
+                 tooltip: 'Refresh Data',
+               ),
+             ],
            ),
-         );
-       } else {
-         return const Center(child: Text('No activity status data available.'));
-       }
-     },
+           const SizedBox(height: 24),
+           Row(
+             children: [
+               Expanded(
+                 child: _buildStatCard(
+                   'Event Name',
+                   stats[0].toString(),
+                   Icons.group_work,
+                   AppColors.primaryColor,
+                 ),
+               ),
+               const SizedBox(width: 16),
+               Expanded(
+                 child: _buildStatCard(
+                   'Event Date',
+                   DateFormat('yyyy-MM-dd').format(DateTime.parse(stats[1].toString())),
+                   Icons.event,
+                   AppColors.secondaryColor,
+                 ),
+               ),
+             ],
+           ),
+           const SizedBox(height: 16),
+           Row(
+             children: [
+               Expanded(
+                 child: _buildStatCard(
+                   'Total Participants',
+                   stats[2].toString(),
+                   Icons.people,
+                   AppColors.accentColor,
+                 ),
+               ),
+               const SizedBox(width: 16),
+               Expanded(
+                 child: _buildStatCard(
+                   'Members Present',
+                   stats[3].toString(),
+                   Icons.people,
+                   AppColors.accentColor,
+                 ),
+               ),
+               const SizedBox(width: 16),
+               Expanded(
+                 child: _buildStatCard(
+                   'Attendance Rate',
+                   '${stats[4].toString()}%',
+                   Icons.trending_up,
+                   AppColors.successColor,
+                 ),
+               ),
+             ],
+           ),
+         ],
+       ),
+     ),
    );
  }
+
+Widget _buildStatCard(String title, String value, IconData icon, Color color,) {
+  return Container(
+    decoration: BoxDecoration(
+      border: Border.all(color: Colors.grey, width: 1),
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 25, color: color),
+          const SizedBox(height: 8),
+          Text(
+            title,
+            style: TextStyles.heading2.copyWith(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: TextStyles.bodyText.copyWith(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    ),
+  );
+}
 }

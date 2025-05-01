@@ -28,10 +28,13 @@ class _RegionGroupAdministrationTabState extends State<RegionGroupAdministration
   bool _isLoading = false;
   String? _errorMessage;
   List<GroupModel> _groups = [];
+  List<GroupModel> _filteredGroups = [];
+  String _searchQuery = '';
   
   @override
   void initState() {
     super.initState();
+    _filteredGroups = _groups;
     _loadGroups();
   }
   
@@ -49,6 +52,7 @@ class _RegionGroupAdministrationTabState extends State<RegionGroupAdministration
       if (mounted) {
         setState(() {
           _groups = groups;
+          _filteredGroups = _groups;
           _errorMessage = null;
           _isLoading = false;
         });
@@ -88,55 +92,73 @@ class _RegionGroupAdministrationTabState extends State<RegionGroupAdministration
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Group Management',
-            style: TextStyles.heading1.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Manage all groups in this region. You can create, edit, and view details of each group.',
-            style: TextStyles.bodyText,
-          ),
-          const SizedBox(height: 24),
-          Expanded(
-            child: _isLoading 
-              ? const Center(child: CircularProgressIndicator())
-              : _errorMessage != null
-                ? _buildErrorView()
-                : _groups.isEmpty
-                  ? _buildEmptyView()
-                  : _buildGroupList(),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                _showCreateGroupDialog(context);
-              },
-              icon: const Icon(Icons.add),
-              label: const Text('Create New Group'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryColor,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+ Widget build(BuildContext context) {
+   return Padding(
+     padding: const EdgeInsets.all(16.0),
+     child: Column(
+       crossAxisAlignment: CrossAxisAlignment.start,
+       children: [
+         Text(
+           'Group Management',
+           style: TextStyles.heading1.copyWith(
+             fontWeight: FontWeight.bold,
+           ),
+         ),
+         const SizedBox(height: 16),
+         Text(
+           'Manage all groups in this region. You can create, edit, and view details of each group.',
+           style: TextStyles.bodyText,
+         ),
+         const SizedBox(height: 16),
+         TextField(
+           onChanged: (value) {
+             setState(() {
+               _searchQuery = value.trim().toLowerCase();
+               _filteredGroups = _groups
+                   .where((group) => group.name.toLowerCase().contains(_searchQuery))
+                   .toList();
+             });
+           },
+           decoration: InputDecoration(
+             labelText: 'Search Groups',
+             prefixIcon: const Icon(Icons.search),
+             border: OutlineInputBorder(
+               borderRadius: BorderRadius.circular(12),
+             ),
+           ),
+         ),
+         const SizedBox(height: 24),
+         Expanded(
+           child: _isLoading
+             ? const Center(child: CircularProgressIndicator())
+             : _errorMessage != null
+               ? _buildErrorView()
+               : _filteredGroups.isEmpty
+                 ? _buildEmptyView()
+                 : _buildGroupList(),
+         ),
+         const SizedBox(height: 16),
+         SizedBox(
+           width: double.infinity,
+           child: ElevatedButton.icon(
+             onPressed: () {
+               _showCreateGroupDialog(context);
+             },
+             icon: const Icon(Icons.add),
+             label: const Text('Create New Group'),
+             style: ElevatedButton.styleFrom(
+               backgroundColor: AppColors.primaryColor,
+               padding: const EdgeInsets.symmetric(vertical: 16),
+               shape: RoundedRectangleBorder(
+                 borderRadius: BorderRadius.circular(12),
+               ),
+             ),
+           ),
+         ),
+       ],
+     ),
+   );
+ }
   
   Widget _buildErrorView() {
     return Center(

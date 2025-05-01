@@ -612,18 +612,18 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
     if (adminId.isEmpty) {
       return "No admin assigned";
     }
-    
+
     try {
-      // Create a local instance of UserProvider to avoid state changes
       final userServices = UserServices();
       final adminUser = await userServices.fetchCurrentUser(adminId);
-      return adminUser.fullName.isNotEmpty ? adminUser.fullName : "Admin #$adminId";
+      final fullName = adminUser.fullName.isNotEmpty ? adminUser.fullName : "Admin #$adminId";
+      final phoneNumber = adminUser.contact.isNotEmpty ? adminUser.contact : "N/A";
+      return "$fullName : (+$phoneNumber)";
     } catch (e) {
       print('Error fetching admin name: $e');
-      return "Admin #$adminId";
+      return "Admin #$adminId (N/A)";
     }
   }
-  
   // Safely fetch group statistics without causing navigation
   Future<Map<String, dynamic>> _fetchGroupStats(String groupId) async {
     Map<String, dynamic> stats = {

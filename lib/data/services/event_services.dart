@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:group_management_church_app/core/constants/app_endpoints.dart';
+import 'package:group_management_church_app/data/models/attendance_model.dart';
 import 'package:group_management_church_app/data/models/event_model.dart';
 import 'package:group_management_church_app/data/models/user_model.dart';
 import 'package:group_management_church_app/data/services/auth_services.dart';
@@ -312,23 +313,22 @@ class EventServices {
   }
 
   /// Get attendance details for an event
-  ///
-  /// Returns attendance statistics and details for the specified event
-  Future<Map<String, dynamic>> getEventAttendance(String eventId) async {
-    try {
-      final response = await _httpClient.get(ApiEndpoints.getAttendanceByEvent(eventId));
+/// Returns attendance statistics and details for the specified event
+Future<List<AttendanceModel>> getEventAttendance(String eventId) async {
+  try {
+    final response = await _httpClient.get(ApiEndpoints.getAttendanceByEvent(eventId));
 
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      } else {
-        throw Exception(
-            'Failed to fetch event attendance: HTTP status ${response
-                .statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Failed to fetch event attendance: $e');
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      // Map the dynamic list to a list of AttendanceModel
+      return data.map((item) => AttendanceModel.fromJson(item)).toList();
+    } else {
+      throw Exception('Failed to fetch event attendance: HTTP status ${response.statusCode}');
     }
+  } catch (e) {
+    throw Exception('Failed to fetch event attendance: $e');
   }
+}
 
   /// Get attendance statistics for a group
   ///

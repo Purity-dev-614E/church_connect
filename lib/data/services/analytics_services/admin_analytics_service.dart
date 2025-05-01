@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:group_management_church_app/data/services/auth_services.dart';
 import 'package:http/http.dart' as http;
 
 class AdminAnalyticsService {
@@ -40,6 +42,7 @@ class AdminAnalyticsService {
       uri,
       headers: headers,
     );
+    print(response);
     return _handleResponse(response);
   }
 
@@ -112,7 +115,7 @@ class AdminAnalyticsService {
     if (startDate != null) queryParams['start_date'] = startDate;
     if (endDate != null) queryParams['end_date'] = endDate;
 
-    final uri = Uri.parse('$baseUrl/groups/$groupId/members/participation')
+    final uri = Uri.parse('$baseUrl/admin/analytics/groups/$groupId/members/participation')
         .replace(queryParameters: queryParams);
     
     final response = await http.get(
@@ -123,10 +126,15 @@ class AdminAnalyticsService {
   }
 
   Future<Map<String, dynamic>> getGroupMemberActivityStatus(String groupId) async {
+    final token = await FlutterSecureStorage().read(key: AuthServices.accessTokenKey);
     final response = await http.get(
-      Uri.parse('$baseUrl/groups/$groupId/members/activity-status'),
-      headers: headers,
+      Uri.parse('https://safari-backend-production-bf65.up.railway.app/api/admin/analytics/groups/$groupId/members/activity-status'),
+      headers: {
+        'Content-Type': 'application',
+        'Authorization': 'Bearer $token'
+      },
     );
+    print('Activity Status ${response.body}');
     return _handleResponse(response);
   }
 

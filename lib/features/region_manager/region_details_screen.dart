@@ -356,40 +356,44 @@ class _RegionDetailsScreenState extends State<RegionDetailsScreen> {
     );
   }
 
-  Widget _buildStatCard(
-    String title,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
-    return Card(
-      elevation: 3,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 32, color: color),
-            const SizedBox(height: 12),
-            Text(
-              value,
-              style: TextStyles.heading1.copyWith(
-                fontWeight: FontWeight.bold,
-                color: AppColors.textColor,
+ Widget _buildStatCard(
+   String title,
+   String value,
+   IconData icon,
+   Color color,
+   [VoidCallback? onTap]
+ ) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Card(
+        elevation: 3,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 32, color: color),
+              const SizedBox(height: 12),
+              Text(
+                value,
+                style: TextStyles.heading1.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textColor,
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              style: TextStyles.bodyText.copyWith(
-                color: AppColors.textColor.withOpacity(0.7),
+              const SizedBox(height: 8),
+              Text(
+                title,
+                style: TextStyles.bodyText.copyWith(
+                  color: AppColors.textColor.withOpacity(0.7),
+                ),
+                textAlign: TextAlign.center,
               ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

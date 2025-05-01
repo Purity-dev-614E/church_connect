@@ -8,7 +8,7 @@ class RegionModel {
     required this.id,
     required this.name,
     this.description,
-    this.isActive = true, // Default to true for backward compatibility
+    this.isActive = false, // Default to true for backward compatibility
   });
 
   factory RegionModel.fromJson(Map<String, dynamic> json) {

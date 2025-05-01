@@ -6,6 +6,7 @@ import 'package:group_management_church_app/data/models/user_model.dart';
 import 'package:group_management_church_app/data/models/region_model.dart';
 import 'package:group_management_church_app/features/profile_screen.dart';
 import 'package:group_management_church_app/features/super_admin/group_administration_tab.dart';
+import 'package:group_management_church_app/features/super_admin/region_management_tab.dart';
 import 'package:group_management_church_app/features/super_admin/screens/analytics_screen.dart';
 import 'package:group_management_church_app/features/super_admin/user_management_tab.dart';
 import 'package:group_management_church_app/features/region_manager/region_details_screen.dart';
@@ -213,6 +214,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           _buildDashboardTab(),
           _buildUserManagementTab(),
           _buildGroupAdministrationTab(),
+          _buildRegionManagerTab(),
           _buildAnalyticsTab(),
           _buildSettingsTab(),
         ],
@@ -226,6 +228,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           ),
           BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Users'),
           BottomNavigationBarItem(icon: Icon(Icons.groups), label: 'Groups'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.map),
+            label: 'Regions',
+          ),
           BottomNavigationBarItem(
             icon: Icon(Icons.analytics),
             label: 'Analytics',
@@ -348,6 +354,11 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   // GROUP ADMINISTRATION TAB
   Widget _buildGroupAdministrationTab() {
     return GroupAdministrationTab();
+  }
+
+  // REGION MANAGER TAB
+  Widget _buildRegionManagerTab() {
+    return RegionManagementTab();
   }
 
   // ANALYTICS TAB
@@ -814,11 +825,11 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   }
 
   Widget _buildStatCard(
-    String title,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
+      String title,
+      String value,
+      IconData icon,
+      Color color,
+      ) {
     return Card(
       elevation: 3,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -851,10 +862,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   }
 
   Widget _buildSectionHeader(
-    String title,
-    IconData icon,
-    VoidCallback onViewAll,
-  ) {
+      String title,
+      IconData icon,
+      VoidCallback onViewAll,
+      ) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [

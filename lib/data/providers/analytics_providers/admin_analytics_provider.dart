@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
-
+import 'package:group_management_church_app/data/services/auth_services.dart';
+import '../../../core/constants/app_endpoints.dart';
 import '../../services/analytics_services/admin_analytics_service.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 // Parameter classes
 class GroupPeriodParams {
@@ -79,13 +81,17 @@ class AdminAnalyticsProvider extends ChangeNotifier {
   // Getters
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
-  
-  AdminAnalyticsProvider({String baseUrl = 'YOUR_API_BASE_URL', String token = 'YOUR_AUTH_TOKEN'}) 
+
+  AdminAnalyticsProvider({
+    String baseUrl = ApiEndpoints.baseUrl,
+    String token = AuthServices.accessTokenKey,
+  })
+
       : _analyticsService = AdminAnalyticsService(
           baseUrl: baseUrl,
           token: token,
         );
-  
+
   // Helper methods
   void _setLoading(bool loading) {
     _isLoading = loading;
