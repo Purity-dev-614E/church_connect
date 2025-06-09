@@ -128,7 +128,7 @@ class AdminAnalyticsService {
   Future<Map<String, dynamic>> getGroupMemberActivityStatus(String groupId) async {
     final token = await FlutterSecureStorage().read(key: AuthServices.accessTokenKey);
     final response = await http.get(
-      Uri.parse('https://safari-backend-production-bf65.up.railway.app/api/admin/analytics/groups/$groupId/members/activity-status'),
+      Uri.parse('https://safari-backend-fgl3.onrender.com/api/admin/analytics/groups/$groupId/members/activity-status'),
       headers: {
         'Content-Type': 'application',
         'Authorization': 'Bearer $token'

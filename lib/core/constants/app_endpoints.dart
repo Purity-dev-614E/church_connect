@@ -1,5 +1,5 @@
 class ApiEndpoints {
-  static const String baseUrl = 'https://safari-backend-production-bf65.up.railway.app/api';
+  static const String baseUrl = 'https://safari-backend-fgl3.onrender.com/api';
 
   // Authentication Endpoints
   static const String auth = '$baseUrl/auth';

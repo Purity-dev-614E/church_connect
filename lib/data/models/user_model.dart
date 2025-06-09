@@ -1,3 +1,5 @@
+import '../../core/constants/app_endpoints.dart';
+
 class UserModel{
   final String id;
   final String fullName;
@@ -27,6 +29,36 @@ class UserModel{
     this.profileImageUrl,
   });
 
+  UserModel copyWith({
+    String? id,
+    String? fullName,
+    String? email,
+    String? contact,
+    String? nextOfKin,
+    String? nextOfKinContact,
+    String? role,
+    String? gender,
+    String? regionId,
+    String? regionName,
+    String? createdAt,
+    String? profileImageUrl,
+  }) {
+    return UserModel(
+      id: id ?? this.id,
+      fullName: fullName ?? this.fullName,
+      email: email ?? this.email,
+      contact: contact ?? this.contact,
+      nextOfKin: nextOfKin ?? this.nextOfKin,
+      nextOfKinContact: nextOfKinContact ?? this.nextOfKinContact,
+      role: role ?? this.role,
+      gender: gender ?? this.gender,
+      regionId: regionId ?? this.regionId,
+      regionName: regionName ?? this.regionName,
+      createdAt: createdAt ?? this.createdAt,
+      profileImageUrl: profileImageUrl ?? this.profileImageUrl,
+    );
+  }
+
   factory UserModel.fromJson(Map<String, dynamic> json) {
     // Get the user ID from various possible fields
     String userId = '';
@@ -53,6 +85,20 @@ class UserModel{
       role = 'user';
     }
 
+    // Handle profile picture URL
+    String? profileImageUrl;
+    final rawProfilePicture = json['profile_picture'] ?? json['profileImageUrl'];
+    if (rawProfilePicture != null && rawProfilePicture.isNotEmpty) {
+      // If the URL is already absolute (starts with http), use it as is
+      // Otherwise, construct the full URL by combining with the base URL
+      // Remove /api from the base URL when constructing the uploads URL
+      final baseUrl = ApiEndpoints.baseUrl.replaceAll('/api', '');
+      profileImageUrl = rawProfilePicture.startsWith('http')
+          ? rawProfilePicture
+          : '$baseUrl/uploads/$rawProfilePicture';
+      print('Profile image URL constructed: $profileImageUrl');
+    }
+
     return UserModel(
       id: userId,
       fullName: json['full_name'] ?? json['fullName'] ?? '',
@@ -65,11 +111,19 @@ class UserModel{
       regionId: json['region_id'] ?? json['regionId'] ?? '',
       regionName: json['location'] ?? json['regionName'] ?? '',
       createdAt: json['created_at'] ?? json['createdAt'],
-      profileImageUrl: json['profile_picture'] ?? json['profile_picture'] ?? ''
+      profileImageUrl: profileImageUrl,
     );
   }
 
   Map<String, dynamic> toJson(){
+    // When converting to JSON, store only the filename part of the profile picture URL
+    String? profilePicture;
+    if (profileImageUrl != null) {
+      // Extract just the filename from the full URL
+      final parts = profileImageUrl!.split('/');
+      profilePicture = parts.last;
+    }
+
     return {
       'uid': id,
       'full_name': fullName,
@@ -81,7 +135,7 @@ class UserModel{
       'gender': gender,
       'region_id': regionId,
       'location': regionName,
-      'profile_picture': profileImageUrl,
+      'profile_picture': profilePicture,
     };
   }
 }

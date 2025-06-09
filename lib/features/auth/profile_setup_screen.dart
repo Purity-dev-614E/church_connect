@@ -17,6 +17,8 @@ import 'dart:html' as html;
 import 'dart:convert';
 import 'dart:typed_data';
 
+import '../../core/constants/app_endpoints.dart';
+
 class ProfileSetupScreen extends StatefulWidget {
   final String userId;
   final String email;
@@ -145,7 +147,16 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             
             // Set region if available
             _selectedRegionId = currentUser.regionId;
-                    });
+
+            // Set profile image URL if available
+            if (currentUser.profileImageUrl != null) {
+              // If the URL is relative, make it absolute
+              _profileImageUrl = currentUser.profileImageUrl!.startsWith('http')
+                  ? currentUser.profileImageUrl
+                  : '${ApiEndpoints.baseUrl}${currentUser.profileImageUrl}';
+              print('Profile image URL set to: $_profileImageUrl');
+            }
+          });
         }
       } catch (e) {
         _showError('Error loading user data: $e');
@@ -637,7 +648,6 @@ String? _validatePhoneNumber(String? value) {
           hintText: 'Enter next of kin phone number',
           prefixIcon: Icons.phone_outlined,
           keyboardType: TextInputType.phone,
-          validator: _validatePhoneNumber,
           inputFormatters: [
             FilteringTextInputFormatter.digitsOnly,
             LengthLimitingTextInputFormatter(15),

@@ -325,31 +325,86 @@ class AuthProvider extends ChangeNotifier {
         throw Exception('No authentication token found');
       }
 
+      // Format the base64 image with the data URL prefix if it doesn't have one
+      final formattedBase64Image = base64Image.startsWith('data:image/') 
+          ? base64Image 
+          : 'data:image/jpeg;base64,$base64Image';
+
       // Make API request to upload profile image
       final url = Uri.parse('${ApiEndpoints.baseUrl}/users/$userId/uploadimage');
-      print('Request Body: ${jsonEncode({
-        'image': base64Image,
-      })}');
+      
+      // Log request details (excluding the full base64 string for brevity)
+      print('Upload request details:');
+      print('- URL: $url');
+      print('- Method: PUT');
+      print('- Headers: Authorization: Bearer ${token.substring(0, 10)}...');
+      print('- Base64 image length: ${formattedBase64Image.length} characters');
+      print('- Base64 image format: ${formattedBase64Image.substring(0, 30)}...');
 
-     final response = await http.put(
-      url,
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
+      final response = await http.put(
+        url,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
         body: jsonEncode({
-        'image': base64Image,
+          'image': formattedBase64Image,
         }),
       );
 
+      print('\nUpload response details:');
+      print('- Status code: ${response.statusCode}');
+      print('- Headers: ${response.headers}');
+      print('- Body: ${response.body}');
+
       if (response.statusCode == 200) {
-      return true;
+        try {
+          final responseData = json.decode(response.body);
+          if (responseData['url'] != null) {
+            // Construct the full image URL by combining the base URL with the relative path
+            // Remove /api from the base URL when constructing the uploads URL
+            final baseUrl = ApiEndpoints.baseUrl.replaceAll('/api', '');
+            final fullImageUrl = '$baseUrl${responseData['url']}';
+            print('Full image URL: $fullImageUrl');
+
+            // Update the current user's profile image URL with the full URL
+            if (_currentUser != null) {
+              _currentUser = _currentUser!.copyWith(
+                profileImageUrl: fullImageUrl,
+              );
+              notifyListeners();
+            }
+            return true;
+          } else {
+            throw Exception('Server response missing URL');
+          }
+        } catch (e) {
+          print('Error parsing upload response: $e');
+          throw Exception('Invalid server response format');
+        }
+      } else if (response.statusCode == 401) {
+        // Handle authentication error
+        final refreshed = await handleAuthError();
+        if (refreshed) {
+          // Retry the upload with new token
+          return uploadProfileImage(userId, base64Image);
+        }
+        throw Exception('Authentication failed');
+      } else if (response.statusCode == 500) {
+        // Add specific handling for 500 errors
+        print('Server error details:');
+        print('- Status: 500 Internal Server Error');
+        print('- Response body: ${response.body}');
+        throw Exception('Server error: ${response.body}');
       } else {
-      throw Exception('Failed to upload profile image: ${response.body}');
+        final errorData = json.decode(response.body);
+        throw Exception(errorData['error'] ?? 'Failed to upload profile image');
       }
     } catch (e) {
-    print('Error uploading profile image: $e');
-    return false;
+      print('Error uploading profile image: $e');
+      _errorMessage = _getReadableErrorMessage(e.toString());
+      notifyListeners();
+      return false;
+    }
   }
-}
 }

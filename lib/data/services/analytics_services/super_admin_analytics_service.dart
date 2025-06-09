@@ -62,7 +62,7 @@ class SuperAdminAnalyticsService {
 
   /// Get demographic breakdown of a group
   Future<GroupDemographics> getGroupDemographics(String groupId) async {
-    final url = Uri.parse('https://safari-backend-production-bf65.up.railway.app/api/super-admin/analytics/groups/$groupId/demographics');
+    final url = Uri.parse('https://safari-backend-fgl3.onrender.com/api/super-admin/analytics/groups/$groupId/demographics');
     
     final response = await _handleRequest(() async {
       return await http.get(url, headers: await _getHeaders());
@@ -75,7 +75,7 @@ class SuperAdminAnalyticsService {
 
   /// Get attendance statistics for a group
   Future<GroupAttendanceStats> getGroupAttendanceStats(String groupId) async {
-    final url = Uri.parse('https://safari-backend-production-bf65.up.railway.app/api/super-admin/analytics/groups/$groupId/attendance');
+    final url = Uri.parse('https://safari-backend-fgl3.onrender.com/api/super-admin/analytics/groups/$groupId/attendance');
     
     final response = await _handleRequest(() async {
       return await http.get(url, headers: await _getHeaders());
@@ -87,7 +87,7 @@ class SuperAdminAnalyticsService {
 
   /// Get growth analytics for a group
   Future<GroupGrowthAnalytics> getGroupGrowthAnalytics(String groupId) async {
-    final url = Uri.parse('https://safari-backend-production-bf65.up.railway.app/api/super-admin/analytics/groups/$groupId/growth');
+    final url = Uri.parse('https://safari-backend-fgl3.onrender.com/api/super-admin/analytics/groups/$groupId/growth');
     
     final response = await _handleRequest(() async {
       return await http.get(url, headers: await _getHeaders());
@@ -99,7 +99,7 @@ class SuperAdminAnalyticsService {
 
   /// Compare multiple groups
   Future<GroupComparison> compareGroups(List<String> groupIds) async {
-    final url = Uri.parse('https://safari-backend-production-bf65.up.railway.app/api/super-admin/analytics/groups/compare');
+    final url = Uri.parse('https://safari-backend-fgl3.onrender.com/api/super-admin/analytics/groups/compare');
     
     final response = await _handleRequest(() async {
       return await http.post(
@@ -121,7 +121,7 @@ class SuperAdminAnalyticsService {
       throw ArgumentError('Period must be one of: week, month, year');
     }
 
-    final url = Uri.parse('https://safari-backend-production-bf65.up.railway.app/api/super-admin/analytics/attendance/period/$period');
+    final url = Uri.parse('https://safari-backend-fgl3.onrender.com/api/super-admin/analytics/attendance/period/$period');
     
     final response = await _handleRequest(() async {
       return await http.get(url, headers: await _getHeaders());
@@ -137,7 +137,7 @@ class SuperAdminAnalyticsService {
       throw ArgumentError('Period must be one of: week, month, year');
     }
 
-    final url = Uri.parse('https://safari-backend-production-bf65.up.railway.app/api/super-admin/analytics/attendance/overall/$period');
+    final url = Uri.parse('https://safari-backend-fgl3.onrender.com/api/super-admin/analytics/attendance/overall/$period');
     
     final response = await _handleRequest(() async {
       return await http.get(url, headers: await _getHeaders());
@@ -149,7 +149,7 @@ class SuperAdminAnalyticsService {
 
   /// Get attendance trends for a specific user
   Future<Map<String, dynamic>> getUserAttendanceTrends(String userId) async {
-    final url = Uri.parse('https://safari-backend-production-bf65.up.railway.app/api/super-admin/analytics/users/$userId/attendance-trends');
+    final url = Uri.parse('https://safari-backend-fgl3.onrender.com/api/super-admin/analytics/users/$userId/attendance-trends');
     
     final response = await _handleRequest(() async {
       return await http.get(url, headers: await _getHeaders());
@@ -163,7 +163,7 @@ class SuperAdminAnalyticsService {
 
   /// Get participation statistics for an event
   Future<EventParticipationStats> getEventParticipationStats(String eventId) async {
-    final url = Uri.parse('https://safari-backend-production-bf65.up.railway.app/api/super-admin/analytics/events/$eventId/participation');
+    final url = Uri.parse('https://safari-backend-fgl3.onrender.com/api/super-admin/analytics/events/$eventId/participation');
     
     final response = await _handleRequest(() async {
       return await http.get(url, headers: await _getHeaders());
@@ -175,7 +175,7 @@ class SuperAdminAnalyticsService {
 
   /// Compare attendance across multiple events
   Future<EventAttendanceComparison> compareEventAttendance(List<String> eventIds) async {
-    final url = Uri.parse('https://safari-backend-production-bf65.up.railway.app/api/super-admin/analytics/events/compare-attendance');
+    final url = Uri.parse('https://safari-backend-fgl3.onrender.com/api/super-admin/analytics/events/compare-attendance');
     
     final response = await _handleRequest(() async {
       return await http.post(
@@ -200,7 +200,7 @@ class SuperAdminAnalyticsService {
     if (startDate != null) queryParams['startDate'] = startDate;
     if (endDate != null) queryParams['endDate'] = endDate;
 
-    final uri = Uri.parse('https://safari-backend-production-bf65.up.railway.app/api/super-admin/analytics/members/participation-stats')
+    final uri = Uri.parse('https://safari-backend-fgl3.onrender.com/api/super-admin/analytics/members/participation-stats')
         .replace(queryParameters: queryParams);
     
     final response = await _handleRequest(() async {
@@ -277,7 +277,7 @@ class SuperAdminAnalyticsService {
 
   /// Get dashboard data for a specific group
   Future<GroupDashboardData> getGroupDashboardData(String groupId) async {
-    final url = Uri.parse('https://safari-backend-production-bf65.up.railway.app/api/super-admin/analytics/dashboard/group/$groupId');
+    final url = Uri.parse('https://safari-backend-fgl3.onrender.com/api/super-admin/analytics/dashboard/group/$groupId');
     
     final response = await _handleRequest(() async {
       return await http.get(url, headers: await _getHeaders());

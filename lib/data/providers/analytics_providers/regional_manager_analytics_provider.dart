@@ -123,7 +123,7 @@ class RegionalManagerAnalyticsProvider extends ChangeNotifier {
   
   RegionalManagerAnalyticsProvider({http.Client? client}) 
       : _analyticsService = RegionAnalyticsService(
-        baseUrl: 'https://safari-backend-production-bf65.up.railway.app/api'
+        baseUrl: 'https://safari-backend-fgl3.onrender.com/api'
           );
   
   // Helper methods

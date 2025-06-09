@@ -12,7 +12,7 @@ class RegionProvider extends ChangeNotifier {
   final UserServices _userServices = UserServices();
   final GroupServices _groupServices = GroupServices();
   final RegionAnalyticsService _analyticsServices = RegionAnalyticsService(
-    baseUrl: 'https://safari-backend-production-bf65.up.railway.app',
+    baseUrl: 'https://safari-backend-fgl3.onrender.com/api',
   );
   
   List<RegionModel> _regions = [];
