@@ -11,6 +11,9 @@ class UserModel{
   final String? regionName;
   final String? createdAt;
   final String? profileImageUrl;
+  final String? age;
+  final String? citam_Assembly;
+  final String? if_Not;
 
   UserModel({
     required this.id,
@@ -25,21 +28,30 @@ class UserModel{
     this.regionName,
     this.createdAt,
     this.profileImageUrl,
+    this.age,
+    this.citam_Assembly,
+    this.if_Not,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
+    // Helper function to safely convert any value to string
+    String safeToString(dynamic value) {
+      if (value == null) return '';
+      return value.toString();
+    }
+
     // Get the user ID from various possible fields
     String userId = '';
     if (json['uid'] != null) {
-      userId = json['uid'].toString();
+      userId = safeToString(json['uid']);
     } else if (json['id'] != null) {
-      userId = json['id'].toString();
+      userId = safeToString(json['id']);
     } else if (json['_id'] != null) {
-      userId = json['_id'].toString();
+      userId = safeToString(json['_id']);
     }
 
     // Normalize role to lowercase for consistent comparison
-    String role = (json['role'] ?? 'user').toString().toLowerCase();
+    String role = safeToString(json['role'] ?? 'user').toLowerCase();
 
     // Map role values to expected format
     if (role == 'super_admin' || role == 'superadmin' || role == 'super admin') {
@@ -55,17 +67,20 @@ class UserModel{
 
     return UserModel(
       id: userId,
-      fullName: json['full_name'] ?? json['fullName'] ?? '',
-      contact: json['phone_number'] ?? json['contact'] ?? '',
-      nextOfKin: json['next_of_kin_name'] ?? json['nextOfKin'] ?? '',
-      nextOfKinContact: json['next_of_kin_contact'] ?? json['nextOfKinContact'] ?? '',
+      fullName: safeToString(json['full_name'] ?? json['fullName']),
+      contact: safeToString(json['phone_number'] ?? json['contact']),
+      nextOfKin: safeToString(json['next_of_kin_name'] ?? json['nextOfKin']),
+      nextOfKinContact: safeToString(json['next_of_kin_contact'] ?? json['nextOfKinContact']),
       role: role,
-      email: json['email'] ?? '',
-      gender: json['gender'] ?? '',
-      regionId: json['region_id'] ?? json['regionId'] ?? '',
-      regionName: json['location'] ?? json['regionName'] ?? '',
-      createdAt: json['created_at'] ?? json['createdAt'],
-      profileImageUrl: json['profile_picture'] ?? json['profile_picture'] ?? ''
+      email: safeToString(json['email']),
+      gender: safeToString(json['gender']),
+      regionId: safeToString(json['region_id'] ?? json['regionId']),
+      regionName: safeToString(json['location'] ?? json['regionName']),
+      createdAt: safeToString(json['created_at'] ?? json['createdAt']),
+      profileImageUrl: safeToString(json['profile_picture'] ?? json['profileImageUrl']),
+      age: safeToString(json['age']),
+      citam_Assembly: safeToString(json['citam_assembly'] ?? json['citamAssembly']),
+      if_Not: safeToString(json['if_not_member'] ?? json['ifNot']),
     );
   }
 
@@ -82,6 +97,10 @@ class UserModel{
       'region_id': regionId,
       'location': regionName,
       'profile_picture': profileImageUrl,
+      'created_at': createdAt,
+      'age': age,
+      'citam_assembly': citam_Assembly,
+      'if_not_member': if_Not,
     };
   }
 }

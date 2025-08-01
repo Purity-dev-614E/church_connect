@@ -68,7 +68,7 @@ class GroupProvider extends ChangeNotifier {
         updatedGroup.id,
         updatedGroup.name,
         updatedGroup.description,
-        updatedGroup.group_admin,
+        updatedGroup.group_admin!,
         updatedGroup.region_id ?? '',
       );
       

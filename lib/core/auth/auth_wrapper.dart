@@ -104,13 +104,60 @@ class _AuthWrapperState extends State<AuthWrapper> {
         final userGroups = await groupProvider.getUserGroups(userId);
         
         if (userGroups.isEmpty) {
-          // User is not in any group, show no group screen
-          if (mounted) {
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (context) => const NoGroupScreen()),
-            );
+          // User is not in any group, try to add them to their assigned group
+          log('User is not in any groups, attempting to add to assigned group');
+          log('User group ID (stored in regionId): ${user.regionId}');
+          
+          if (user.regionId.isNotEmpty) {
+            try {
+              // Since regionId actually contains the group ID, add user directly to that group
+              log('Attempting to add user to group: ${user.regionId}');
+              
+              final addToGroupSuccess = await groupProvider.addMemberToGroup(user.regionId, userId);
+              
+              if (addToGroupSuccess) {
+                log('Successfully added user to group: ${user.regionId}');
+                // Refresh user groups and continue with normal flow
+                final updatedUserGroups = await groupProvider.getUserGroups(userId);
+                if (updatedUserGroups.isNotEmpty) {
+                  log('User now has ${updatedUserGroups.length} group(s)');
+                  // Continue with normal flow - user now has groups
+                } else {
+                  log('Failed to verify group membership after adding');
+                  if (mounted) {
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(builder: (context) => const NoGroupScreen()),
+                    );
+                  }
+                  return;
+                }
+              } else {
+                log('Failed to add user to group: ${user.regionId}');
+                if (mounted) {
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(builder: (context) => const NoGroupScreen()),
+                  );
+                }
+                return;
+              }
+            } catch (e) {
+              log('Error adding user to assigned group: $e');
+              if (mounted) {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (context) => const NoGroupScreen()),
+                );
+              }
+              return;
+            }
+          } else {
+            log('User has no group ID assigned, cannot auto-assign to group');
+            if (mounted) {
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (context) => const NoGroupScreen()),
+              );
+            }
+            return;
           }
-          return;
         }
       }
       

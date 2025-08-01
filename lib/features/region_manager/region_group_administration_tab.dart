@@ -277,9 +277,9 @@ class _RegionGroupAdministrationTabState extends State<RegionGroupAdministration
                       ),
                       const SizedBox(height: 4),
                       FutureBuilder<String>(
-                        future: _fetchAdminName(group.group_admin),
+                        future: _fetchAdminName(group.group_admin!),
                         builder: (context, snapshot) {
-                          final adminName = snapshot.data ?? (group.group_admin.isNotEmpty ? "Loading..." : "No admin assigned");
+                          final adminName = snapshot.data ?? (group.group_admin!.isNotEmpty ? "Loading..." : "No admin assigned");
                           return Text(
                             'Admin: $adminName',
                             style: TextStyles.bodyText.copyWith(
