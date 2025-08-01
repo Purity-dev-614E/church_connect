@@ -2,7 +2,7 @@ class GroupModel{
   final String id;
   final String name;
   final String description;
-  final String group_admin;
+  final String? group_admin;
   final String? region_id;
   final String created_at;
 
@@ -12,7 +12,7 @@ class GroupModel{
     required this.id,
     required this.name,
     this.description = '',
-    required this.group_admin,
+    this.group_admin,
     this.members,
     required this.region_id,
     this.created_at = '',

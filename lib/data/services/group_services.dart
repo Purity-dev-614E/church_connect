@@ -224,14 +224,29 @@ class GroupServices {
   // Add member to group
   Future<bool> addMemberToGroup(String groupId, String userId) async {
     try {
-      final response = await _httpClient.post(ApiEndpoints.addGroupMember(userId, groupId));
+      final endpoint = ApiEndpoints.addGroupMember(groupId, userId);
+      print("GroupServices: Adding member to group");
+      print("GroupServices: Endpoint: $endpoint");
+      print("GroupServices: GroupId: $groupId, UserId: $userId");
+      
+      final response = await _httpClient.post(endpoint,
+          body: jsonEncode({
+            'userId': userId,
+          })
+      );
+      
+      print("GroupServices: Response status: ${response.statusCode}");
+      print("GroupServices: Response body: ${response.body}");
 
       if (response.statusCode == 200 || response.statusCode == 201) {
+        print("GroupServices: Successfully added member to group");
         return true;
       } else {
-        throw Exception("Failed to add member to group: HTTP status ${response.statusCode}");
+        print("GroupServices: Failed to add member - HTTP ${response.statusCode}");
+        throw Exception("Failed to add member to group: HTTP status ${response.statusCode}, Body: ${response.body}");
       }
     } catch (e) {
+      print("GroupServices: Exception adding member to group: $e");
       throw Exception("Failed to add member to group: $e");
     }
   }
@@ -354,7 +369,7 @@ class GroupServices {
         body: jsonEncode({
           'name': group.name,
           'description': group.description,
-          'group_admin_id': group.group_admin.isNotEmpty ? group.group_admin : null,
+          'group_admin_id': group.group_admin!.isNotEmpty ? group.group_admin : null,
           'region_id': regionId,
         }),
       );
@@ -377,7 +392,7 @@ class GroupServices {
         body: jsonEncode({
           'name': group.name,
           'description': group.description,
-          'group_admin_id': group.group_admin.isNotEmpty ? group.group_admin : null,
+          'group_admin_id': group.group_admin!.isNotEmpty ? group.group_admin : null,
           'region_id': null, // Remove region ID
         }),
       );

@@ -1,5 +1,5 @@
 class ApiEndpoints {
-  static const String baseUrl = 'https://safari-backend-production-bf65.up.railway.app/api';
+  static const String baseUrl = 'https://safari-backend-fgl3.onrender.com/api';
 
   // Authentication Endpoints
   static const String auth = '$baseUrl/auth';
@@ -35,7 +35,7 @@ class ApiEndpoints {
   static String getGroupDemographics(String id) => '$groups/$id/groupDemographics';
   static String getGroupMembers(String id) => '$groups/$id/members';
   static String getmemberGroups(String userId) => '$groups/user/$userId';
-  static String addGroupMember(String userid, String groupId) => '$groups/$userid/members';
+  static String addGroupMember(String groupId, String userId) => '$groups/$groupId/members';
   static String removeGroupMember(String groupId, String userId) => '$groups/$groupId/members/$userId';
   static String getGroupsByAdmin(String userId) => '$groups/admin/$userId/groups';
   static String assignAdmin = '$groups/assign-admin';

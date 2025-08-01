@@ -679,15 +679,38 @@ class UserActivityStat {
   });
 
   factory UserActivityStat.fromJson(Map<String, dynamic> json) {
+    // Helper function to safely convert any value to string
+    String safeToString(dynamic value) {
+      if (value == null) return '';
+      return value.toString();
+    }
+
+    // Helper function to safely convert to int
+    int safeToInt(dynamic value) {
+      if (value == null) return 0;
+      if (value is int) return value;
+      if (value is String) return int.tryParse(value) ?? 0;
+      return 0;
+    }
+
+    // Helper function to safely convert to double
+    double safeToDouble(dynamic value) {
+      if (value == null) return 0.0;
+      if (value is double) return value;
+      if (value is int) return value.toDouble();
+      if (value is String) return double.tryParse(value) ?? 0.0;
+      return 0.0;
+    }
+
     return UserActivityStat(
-      userId: json['userId'],
-      userName: json['userName'],
-      userEmail: json['userEmail'],
-      totalPossibleEvents: json['totalPossibleEvents'],
-      attendedEvents: json['attendedEvents'],
-      attendanceRate: json['attendanceRate'].toDouble(),
-      activityStatus: json['activityStatus'],
-      activityThreshold: json['activityThreshold'],
+      userId: safeToString(json['userId']),
+      userName: safeToString(json['userName']),
+      userEmail: safeToString(json['userEmail']),
+      totalPossibleEvents: safeToInt(json['totalPossibleEvents']),
+      attendedEvents: safeToInt(json['attendedEvents']),
+      attendanceRate: safeToDouble(json['attendanceRate']),
+      activityStatus: safeToString(json['activityStatus']),
+      activityThreshold: safeToString(json['activityThreshold']),
     );
   }
 }
@@ -704,10 +727,18 @@ class StatusSummary {
   });
 
   factory StatusSummary.fromJson(Map<String, dynamic> json) {
+    // Helper function to safely convert to int
+    int safeToInt(dynamic value) {
+      if (value == null) return 0;
+      if (value is int) return value;
+      if (value is String) return int.tryParse(value) ?? 0;
+      return 0;
+    }
+
     return StatusSummary(
-      active: json['Active'],
-      inactive: json['Inactive'],
-      total: json['Total'],
+      active: safeToInt(json['Active']),
+      inactive: safeToInt(json['Inactive']),
+      total: safeToInt(json['Total']),
     );
   }
 }

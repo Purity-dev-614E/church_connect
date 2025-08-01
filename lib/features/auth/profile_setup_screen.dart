@@ -1,19 +1,20 @@
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:group_management_church_app/core/auth/auth_wrapper.dart';
 import 'package:group_management_church_app/core/constants/colors.dart';
 import 'package:group_management_church_app/core/constants/text_styles.dart';
-import 'package:group_management_church_app/data/models/region_model.dart';
+import 'package:group_management_church_app/data/models/group_model.dart';
 import 'package:group_management_church_app/data/models/user_model.dart';
 import 'package:group_management_church_app/data/providers/auth_provider.dart';
-import 'package:group_management_church_app/data/providers/region_provider.dart';
+import 'package:group_management_church_app/data/providers/group_provider.dart';
 import 'package:group_management_church_app/data/providers/user_provider.dart';
 import 'package:group_management_church_app/widgets/custom_button.dart';
 import 'package:group_management_church_app/widgets/input_field.dart';
 import 'package:provider/provider.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
 import 'package:image_picker_web/image_picker_web.dart';
-import 'dart:html' as html;
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -41,22 +42,31 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final TextEditingController _contactController = TextEditingController();
   final TextEditingController _nextOfKinController = TextEditingController();
   final TextEditingController _nextOfKinContactController = TextEditingController();
+  final TextEditingController _CitamAssembly = TextEditingController();
+  final TextEditingController _ifNot = TextEditingController();
   
   // Selected gender
-  String _selectedGender = 'male';
+  String _selectedGender = 'female';
   final List<String> _genderOptions = ['male', 'female'];
   
   // Selected region
   String? _selectedRegionId;
-  List<RegionModel> _regions = [];
+  List<GroupModel> _regions = [];
   
   // Default role is 'user' - only super_admin can change roles
-  final String _userRole = 'user';
+  final String _userRole = 'Christian User';
 
   // Profile picture state
   Uint8List? _profileImageBytes;
   String? _profileImageUrl;
   bool _isUploadingImage = false;
+
+  // Age group radio buttons
+  final List<String> _ageGroups = ['Under 20yrs', '21 to 30yrs', '31 to 40yrs', '41 to 50 yrs', 'Above 50yrs'];
+  String _selectedAgeGroup = 'Under 18';
+  //// Age group selection section
+  // _buildAgeGroupSection(),
+
 
   @override
   void initState() {
@@ -75,11 +85,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     });
     
     try {
-      final regionProvider = Provider.of<RegionProvider>(context, listen: false);
-      await regionProvider.loadRegions();
+      final regionProvider = Provider.of<GroupProvider>(context, listen: false);
+      await regionProvider.fetchGroups();
       
       setState(() {
-        _regions = regionProvider.regions;
+        _regions = regionProvider.groups;
         _isLoadingRegions = false;
       });
     } catch (e) {
@@ -137,6 +147,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             _contactController.text = currentUser.contact;
             _nextOfKinController.text = currentUser.nextOfKin;
             _nextOfKinContactController.text = currentUser.nextOfKinContact;
+
             
             // Set gender if it's one of the available options
             if (_genderOptions.contains(currentUser.gender)) {
@@ -217,11 +228,11 @@ String? _validatePhoneNumber(String? value) {
 
         final role = currentUser?.role ?? _userRole;
 
-        String selectedRegionName = 'your region';
+        String selectedRegionName = 'your place of residence';
         if (_selectedRegionId != null) {
           final selectedRegion = _regions.firstWhere(
             (region) => region.id == _selectedRegionId,
-            orElse: () => RegionModel(id: '', name: ''),
+            orElse: () => GroupModel(id: '', name: '', region_id: 'not specified'),
           );
           if (selectedRegion.name.isNotEmpty) {
             selectedRegionName = selectedRegion.name;
@@ -235,20 +246,21 @@ String? _validatePhoneNumber(String? value) {
           contact: _contactController.text.trim(),
           nextOfKin: _nextOfKinController.text.trim(),
           nextOfKinContact: _nextOfKinContactController.text.trim(),
+          age: _selectedAgeGroup,
           role: role,
           gender: _selectedGender,
           regionId: _selectedRegionId ?? '',
           regionName: selectedRegionName != 'your region' ? selectedRegionName : null,
-        );
+          citam_Assembly: _CitamAssembly.text.trim(),
+          if_Not: _ifNot.text.trim()
 
-        // Debugging: Log the user model
-        print('UserModel: ${userModel.toJson()}');
+        );
 
         final success = await authProvider.updateProfile(userModel);
 
         if (success) {
           await userProvider.loadUser(widget.userId);
-          _showSuccess('Profile updated successfully! You are now part of $selectedRegionName region.');
+          _showSuccess('Profile updated successfully!');
 
           final isEditMode = ModalRoute.of(context)?.settings.arguments == 'edit_mode';
           if (isEditMode) {
@@ -609,6 +621,9 @@ String? _validatePhoneNumber(String? value) {
             }
           },
         ),
+
+        // Age section
+        _buildAgeGroupSection(),
       ],
     );
   }
@@ -657,6 +672,22 @@ String? _validatePhoneNumber(String? value) {
         // Region selection dropdown
         _buildRegionDropdown(),
         const SizedBox(height: 16),
+
+        //Citam Assembly
+        EnhancedInputField(
+          controller: _CitamAssembly,
+          label: 'CITAM Assembly',
+          hintText: 'Indicate CITAM Assembly you Attend',
+          prefixIcon: Icons.group_work_outlined,
+        ),
+
+        // if not
+        EnhancedInputField(
+          controller: _ifNot,
+          label: 'Not a CITAM Member?',
+          hintText: 'If Not CITAM Member, Please Indicate Your Church',
+          prefixIcon: Icons.question_mark_outlined,
+        ),
         
         // Display role information (not editable)
         Container(
@@ -876,7 +907,7 @@ String? _validatePhoneNumber(String? value) {
                                 // Find the selected region
                                 final selectedRegion = _regions.firstWhere(
                                   (region) => region.id == newValue,
-                                  orElse: () => RegionModel(id: '', name: ''),
+                                  orElse: () => GroupModel(id: '', name: '', region_id: 'not specified'),
                                 );
 
                                 if (selectedRegion.id.isNotEmpty) {
@@ -894,7 +925,7 @@ String? _validatePhoneNumber(String? value) {
                                 }
                               }
                             },
-                            items: _regions.map<DropdownMenuItem<String>>((RegionModel region) {
+                            items: _regions.map<DropdownMenuItem<String>>((GroupModel region) {
                               return DropdownMenuItem<String>(
                                 value: region.id,
                                 child: Text(region.name),
@@ -944,7 +975,7 @@ String? _validatePhoneNumber(String? value) {
   }
   
   // Show region information dialog
-  void _showRegionInfo(RegionModel region) {
+  void _showRegionInfo(GroupModel region) {
     // Only show dialog if there's a description
     if (region.description == null || region.description!.isEmpty) {
       return;
@@ -1000,15 +1031,18 @@ String? _validatePhoneNumber(String? value) {
   }
   
   // Show all available regions in a dialog
-  void _showAllRegions() {
-    if (_regions.isEmpty) {
-      _showInfo('No regions available');
-      return;
-    }
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
+void _showAllRegions() {
+  if (_regions.isEmpty) {
+    _showInfo('No regions available');
+    return;
+  }
+
+  String searchQuery = '';
+
+  showDialog(
+    context: context,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setState) => AlertDialog(
         title: Row(
           children: [
             Icon(
@@ -1025,101 +1059,131 @@ String? _validatePhoneNumber(String? value) {
             ),
           ],
         ),
-        content: Container(
-          width: double.maxFinite,
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.5,
-          ),
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: _regions.length,
-            itemBuilder: (context, index) {
-              final region = _regions[index];
-              final isSelected = _selectedRegionId == region.id;
-              
-              return Card(
-                elevation: isSelected ? 2 : 0,
-                color: isSelected 
-                  ? AppColors.primaryColor.withOpacity(0.1) 
-                  : Colors.white,
-                margin: const EdgeInsets.only(bottom: 8),
-                shape: RoundedRectangleBorder(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Search field
+            TextField(
+              decoration: InputDecoration(
+                hintText: 'Search regions...',
+                prefixIcon: Icon(Icons.search, color: AppColors.primaryColor),
+                border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  side: BorderSide(
-                    color: isSelected 
-                      ? AppColors.primaryColor 
-                      : Colors.grey.withOpacity(0.3),
-                    width: isSelected ? 2 : 1,
-                  ),
                 ),
-                child: InkWell(
-                  onTap: () {
-                    setState(() {
-                      _selectedRegionId = region.id;
-                    });
-                    Navigator.of(context).pop();
-                  },
-                  borderRadius: BorderRadius.circular(8),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.location_on,
-                              color: isSelected 
-                                ? AppColors.primaryColor 
-                                : AppColors.secondaryColor,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                region.name,
-                                style: TextStyles.bodyText.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: isSelected 
-                                    ? AppColors.primaryColor 
-                                    : AppColors.textColor,
-                                ),
-                              ),
-                            ),
-                            if (isSelected)
-                              Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primaryColor,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.check,
-                                  color: Colors.white,
-                                  size: 16,
-                                ),
-                              ),
-                          ],
+              ),
+              onChanged: (value) {
+                setState(() {
+                  searchQuery = value.toLowerCase();
+                });
+              },
+            ),
+            const SizedBox(height: 16),
+            // Filtered regions list
+            Expanded(
+              child: Container(
+                width: double.maxFinite,
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.5,
+                ),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _regions.length,
+                  itemBuilder: (context, index) {
+                    final region = _regions[index];
+                    final isSelected = _selectedRegionId == region.id;
+
+                    // Filter regions based on search query
+                    if (!region.name.toLowerCase().contains(searchQuery)) {
+                      return const SizedBox.shrink();
+                    }
+
+                    return Card(
+                      elevation: isSelected ? 2 : 0,
+                      color: isSelected
+                          ? AppColors.primaryColor.withOpacity(0.1)
+                          : Colors.white,
+                      margin: const EdgeInsets.only(bottom: 8),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        side: BorderSide(
+                          color: isSelected
+                              ? AppColors.primaryColor
+                              : Colors.grey.withOpacity(0.3),
+                          width: isSelected ? 2 : 1,
                         ),
-                        if (region.description != null && region.description!.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          Text(
-                            region.description!,
-                            style: TextStyles.bodyText.copyWith(
-                              fontSize: 14,
-                              color: AppColors.textColor.withOpacity(0.7),
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
+                      ),
+                      child: InkWell(
+                        onTap: () {
+                          setState(() {
+                            _selectedRegionId = region.id;
+                          });
+                          Navigator.of(context).pop();
+                        },
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.location_on,
+                                    color: isSelected
+                                        ? AppColors.primaryColor
+                                        : AppColors.secondaryColor,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      region.name,
+                                      style: TextStyles.bodyText.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: isSelected
+                                            ? AppColors.primaryColor
+                                            : AppColors.textColor,
+                                      ),
+                                    ),
+                                  ),
+                                  if (isSelected)
+                                    Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primaryColor,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.check,
+                                        color: Colors.white,
+                                        size: 16,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              if (region.description != null &&
+                                  region.description!.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Text(
+                                  region.description!,
+                                  style: TextStyles.bodyText.copyWith(
+                                    fontSize: 14,
+                                    color: AppColors.textColor.withOpacity(0.7),
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ],
                           ),
-                        ],
-                      ],
-                    ),
-                  ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
-          ),
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -1128,9 +1192,9 @@ String? _validatePhoneNumber(String? value) {
           ),
         ],
       ),
-    );
-  }
-
+    ),
+  );
+}
   Widget _buildSectionHeader(String title, IconData icon) {
     return Row(
       children: [
@@ -1191,6 +1255,31 @@ String? _validatePhoneNumber(String? value) {
           ),
         ],
       ),
+    );
+  }
+  Widget _buildAgeGroupSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader('Indicate your Age', Icons.cake_sharp),
+        const SizedBox(height: 16),
+        Column(
+          children: _ageGroups.map((ageGroup) {
+            return RadioListTile<String>(
+              title: Text(ageGroup),
+              value: ageGroup,
+              groupValue: _selectedAgeGroup,
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() {
+                    _selectedAgeGroup = value;
+                  });
+                }
+              },
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 }
