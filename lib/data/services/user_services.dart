@@ -62,6 +62,7 @@ class UserServices {
             role: 'user',
             gender: '',
             regionId: '',
+            regionalID: '',
           );
         }
         
@@ -80,6 +81,7 @@ class UserServices {
         role: 'user',
         gender: '',
         regionId: '',
+        regionalID: '',
       );
     }
   }
@@ -261,7 +263,8 @@ class UserServices {
         nextOfKinContact: user.nextOfKinContact,
         role: user.role,
         gender: user.gender,
-        regionId: regionId,
+        regionId: user.regionId,
+        regionalID: regionId // Keep existing regional ID
       );
       
       // Update the user
@@ -294,6 +297,7 @@ class UserServices {
         role: user.role,
         gender: user.gender,
         regionId: '', // Remove region ID
+        regionalID: user.regionalID, // Keep existing regional ID
       );
       
       // Update the user

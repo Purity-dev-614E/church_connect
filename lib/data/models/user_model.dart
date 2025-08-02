@@ -14,6 +14,7 @@ class UserModel{
   final String? age;
   final String? citam_Assembly;
   final String? if_Not;
+  final String regionalID;
 
   UserModel({
     required this.id,
@@ -25,6 +26,7 @@ class UserModel{
     required this.role,
     required this.gender,
     required this.regionId,
+    required this.regionalID,
     this.regionName,
     this.createdAt,
     this.profileImageUrl,
@@ -74,8 +76,9 @@ class UserModel{
       role: role,
       email: safeToString(json['email']),
       gender: safeToString(json['gender']),
-      regionId: safeToString(json['region_id'] ?? json['regionId']),
+      regionId: safeToString(json['group_id'] ?? json['groupId']),
       regionName: safeToString(json['location'] ?? json['regionName']),
+      regionalID: safeToString(json['region_id'] ?? json['regionId']),
       createdAt: safeToString(json['created_at'] ?? json['createdAt']),
       profileImageUrl: safeToString(json['profile_picture'] ?? json['profileImageUrl']),
       age: safeToString(json['age']),
@@ -94,7 +97,8 @@ class UserModel{
       'role': role,
       'email': email,
       'gender': gender,
-      'region_id': regionId,
+      'group_id': regionId,
+      'region_id': regionalID,
       'location': regionName,
       'profile_picture': profileImageUrl,
       'created_at': createdAt,

@@ -363,10 +363,11 @@ class AuthServices {
           "next_of_kin_contact": user.nextOfKinContact,
           "role": user.role,
           "location": user.regionName,
-          "region_id": user.regionId,
+          "group_id": user.regionId,
           "age": user.age,
           "citam_assembly": user.citam_Assembly,
-          "if_not_member": user.if_Not
+          "if_not_member": user.if_Not,
+          "region_id": user.regionalID,
         })
       );
 

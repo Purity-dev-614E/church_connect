@@ -21,7 +21,7 @@ import 'dart:typed_data';
 class ProfileSetupScreen extends StatefulWidget {
   final String userId;
   final String email;
-  
+
   const ProfileSetupScreen({
     super.key,
     required this.userId,
@@ -36,7 +36,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   bool _isLoadingRegions = false;
-  
+
   // Form controllers
   final TextEditingController _fullNameController = TextEditingController();
   final TextEditingController _contactController = TextEditingController();
@@ -44,17 +44,18 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final TextEditingController _nextOfKinContactController = TextEditingController();
   final TextEditingController _CitamAssembly = TextEditingController();
   final TextEditingController _ifNot = TextEditingController();
-  
+
   // Selected gender
   String _selectedGender = 'female';
   final List<String> _genderOptions = ['male', 'female'];
-  
+
   // Selected region
   String? _selectedRegionId;
   List<GroupModel> _regions = [];
-  
+
   // Default role is 'user' - only super_admin can change roles
-  final String _userRole = 'Christian User';
+  final String _userRole = 'User';
+
 
   // Profile picture state
   Uint8List? _profileImageBytes;
@@ -64,8 +65,22 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   // Age group radio buttons
   final List<String> _ageGroups = ['Under 20yrs', '21 to 30yrs', '31 to 40yrs', '41 to 50 yrs', 'Above 50yrs'];
   String _selectedAgeGroup = 'Under 18';
-  //// Age group selection section
-  // _buildAgeGroupSection(),
+
+  String? _regionalID; // initializer to store the result
+
+  void fetchRegionIdForGroup(String groupId) {
+    final matchingGroup = _regions.firstWhere(
+          (group) => group.id == groupId,
+      orElse: () => GroupModel(id: '', name: '', region_id: 'not specified'),
+    );
+
+    if (matchingGroup != null) {
+      _regionalID = matchingGroup.region_id;
+      print('Found regionId: $_regionalID');
+    } else {
+      print('Group with id $groupId not found.');
+    }
+  }
 
 
   @override
@@ -77,17 +92,17 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       _loadRegions();
     });
   }
-  
+
   // Load available regions
   Future<void> _loadRegions() async {
     setState(() {
       _isLoadingRegions = true;
     });
-    
+
     try {
       final regionProvider = Provider.of<GroupProvider>(context, listen: false);
       await regionProvider.fetchGroups();
-      
+
       setState(() {
         _regions = regionProvider.groups;
         _isLoadingRegions = false;
@@ -99,7 +114,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       });
     }
   }
-  
+
   void _showError(String message) {
     CustomNotification.show(
       context: context,
@@ -124,22 +139,22 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     );
   }
 
-  
+
   Future<void> _loadUserData() async {
     // Check if we're in edit mode
     final isEditMode = ModalRoute.of(context)?.settings.arguments == 'edit_mode';
-    
+
     if (isEditMode) {
       setState(() {
         _isLoading = true;
       });
-      
+
       try {
         // Load current user data to pre-fill the form
         final userProvider = Provider.of<UserProvider>(context, listen: false);
         await userProvider.loadUser(widget.userId);
         final currentUser = userProvider.currentUser;
-        
+
         if (currentUser != null) {
           // Pre-fill form fields with current user data
           setState(() {
@@ -148,12 +163,12 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             _nextOfKinController.text = currentUser.nextOfKin;
             _nextOfKinContactController.text = currentUser.nextOfKinContact;
 
-            
+
             // Set gender if it's one of the available options
             if (_genderOptions.contains(currentUser.gender)) {
               _selectedGender = currentUser.gender;
             }
-            
+
             // Set region if available
             _selectedRegionId = currentUser.regionId;
                     });
@@ -199,13 +214,22 @@ String? _validatePhoneNumber(String? value) {
     if (value == null || value.isEmpty) {
       return 'Full name is required';
     }
-    
+
     if (value.length < 3) {
       return 'Name must be at least 3 characters';
     }
-    
+
     return null;
   }
+  // get region by group
+String? _getRegionByGroup(String groupId) {
+  return _regions.firstWhere(
+    (region) => region.id == groupId,
+    orElse: () => GroupModel(id: '', name: '', region_id: 'not specified'),
+  ).id;
+}
+
+
 
   //Submit Form
   Future<void> _submitForm() async {
@@ -239,6 +263,11 @@ String? _validatePhoneNumber(String? value) {
           }
         }
 
+        // Get the regional ID for the selected region
+        if (_selectedRegionId != null) {
+          fetchRegionIdForGroup(_selectedRegionId!);
+        }
+
         final userModel = UserModel(
           id: widget.userId,
           fullName: _fullNameController.text.trim(),
@@ -252,7 +281,8 @@ String? _validatePhoneNumber(String? value) {
           regionId: _selectedRegionId ?? '',
           regionName: selectedRegionName != 'your region' ? selectedRegionName : null,
           citam_Assembly: _CitamAssembly.text.trim(),
-          if_Not: _ifNot.text.trim()
+          if_Not: _ifNot.text.trim(),
+          regionalID: _regionalID ?? ''
 
         );
 

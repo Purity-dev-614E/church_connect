@@ -276,7 +276,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         nextOfKinContact: currentUser.nextOfKinContact,
         role: currentUser.role,
         gender: currentUser.gender,
-        regionId: currentUser.regionId
+        regionId: currentUser.regionId,
+        regionalID: currentUser.regionalID
       );
 
       // Update user profile
