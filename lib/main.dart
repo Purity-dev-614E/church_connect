@@ -1,4 +1,9 @@
+import 'dart:async'; // <-- added
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+
 import 'package:group_management_church_app/core/theme/app_theme.dart';
 import 'package:group_management_church_app/core/utils/auth_error_handler.dart';
 import 'package:group_management_church_app/data/providers/auth_provider.dart';
@@ -14,28 +19,10 @@ import 'package:group_management_church_app/features/auth/login.dart';
 import 'package:group_management_church_app/features/auth/reset_password.dart';
 import 'package:group_management_church_app/features/auth/signup.dart';
 import 'package:group_management_church_app/features/splash_screen.dart';
-import 'package:provider/provider.dart';
-import 'package:flutter/services.dart';
+
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Set preferred orientations
-  SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
-
-  // Set system UI overlay style
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-      systemNavigationBarColor: Colors.black,
-      systemNavigationBarIconBrightness: Brightness.light,
-    ),
-  );
-
   runApp(const MyApp());
 }
 
@@ -44,19 +31,17 @@ class _AuthErrorObserver extends NavigatorObserver {
   @override
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
     super.didPush(route, previousRoute);
-    // Listen for auth errors when new routes are pushed
     _setupAuthErrorListener(route);
   }
-  
+
   void _setupAuthErrorListener(Route<dynamic> route) {
-    if (route.settings.name != '/login' && 
-        route.settings.name != '/signup' && 
+    if (route.settings.name != '/login' &&
+        route.settings.name != '/signup' &&
         route.settings.name != '/reset-password') {
-      // Add listener for auth errors on non-auth routes
       Future.delayed(Duration.zero, () {
         if (navigator?.context != null) {
           final authProvider = Provider.of<AuthProvider>(navigator!.context, listen: false);
-          if (authProvider.status == AuthStatus.unauthenticated && 
+          if (authProvider.status == AuthStatus.unauthenticated &&
               authProvider.errorMessage.contains('Authentication failed')) {
             AuthErrorHandler.handleAuthError(navigator!.context);
           }
@@ -69,7 +54,6 @@ class _AuthErrorObserver extends NavigatorObserver {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
@@ -94,9 +78,8 @@ class MyApp extends StatelessWidget {
         routes: {
           '/login': (context) => const LoginScreen(),
           '/signup': (context) => const SignupScreen(),
-          '/reset-password': (context) => const ResetPasswordScreen(),
+          '/reset-password': (context) => const ResetPasswordScreen(), // Assuming you have a LogScreen
         },
-        // Add global error handling for HTTP errors
         navigatorObservers: [
           _AuthErrorObserver(),
         ],

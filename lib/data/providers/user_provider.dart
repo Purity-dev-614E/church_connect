@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import '../../data/services/user_services.dart';
 import '../../data/services/auth_services.dart';
@@ -13,6 +15,7 @@ class UserProvider with ChangeNotifier {
     try {
       _currentUser = await _userService.fetchCurrentUser(userId);
       notifyListeners();
+      log('User Found: ${_currentUser!.fullName} (ID: ${_currentUser!.id})');
     } catch (e) {
       print('Error loading user: $e');
       // Don't update _currentUser if there's an error

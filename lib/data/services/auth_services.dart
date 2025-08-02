@@ -5,6 +5,8 @@ import 'dart:convert';
 import '../models/user_model.dart';
 import 'package:http/http.dart' as http;
 
+import 'http_client.dart';
+
 class AuthServices {
   // Use a single instance of FlutterSecureStorage
   final FlutterSecureStorage secureStorage = const FlutterSecureStorage();
@@ -13,6 +15,8 @@ class AuthServices {
   static const String accessTokenKey = 'accessToken';
   static const String refreshTokenKey = 'refreshToken';
   static const String userIdKey = 'user_id';
+
+  final HttpClient _httpClient = HttpClient();
 
   // Login method with proper error handling and token storage
   Future<Map<String, dynamic>> login(String email, String password) async {
@@ -350,12 +354,7 @@ class AuthServices {
   // Update user profile
   Future<bool> updateProfile(UserModel user) async {
     try {
-      final response = await http.put(
-        Uri.parse(ApiEndpoints.updateUser(user.id)),
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-        },
+      final response = await _httpClient.put(ApiEndpoints.updateUser(user.id),
         body: json.encode({
           "full_name": user.fullName,
           "phone_number": user.contact,
@@ -364,7 +363,11 @@ class AuthServices {
           "next_of_kin_contact": user.nextOfKinContact,
           "role": user.role,
           "location": user.regionName,
-          "region_id": user.regionId,
+          "group_id": user.regionId,
+          "age": user.age,
+          "citam_assembly": user.citam_Assembly,
+          "if_not_member": user.if_Not,
+          "region_id": user.regionalID,
         })
       );
 
@@ -373,7 +376,7 @@ class AuthServices {
         return true;
       } else {
         final data = json.decode(response.body);
-        print("Failed to Update Profile: ${data['message']}");
+        print("Failed to Update Profile: ${data['message']}. \n Response status code: ${response.statusCode}, \n Response body: ${response.body}");
         return false;
       }
     } catch (e) {

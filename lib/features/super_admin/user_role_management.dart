@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:group_management_church_app/core/constants/colors.dart';
 import 'package:group_management_church_app/core/constants/text_styles.dart';
@@ -118,12 +120,12 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
   
   Future<void> _updateUserRole(UserModel user, String newRole, {String? regionId}) async {
     // Debug logging
-    print('Attempting to update role for user:');
-    print('User ID: ${user.id}');
-    print('User Name: ${user.fullName}');
-    print('Current Role: ${user.role}');
-    print('New Role: $newRole');
-    print('Region ID: $regionId');
+    log('Attempting to update role for user:');
+    log('User ID: ${user.id}');
+    log('User Name: ${user.fullName}');
+    log('Current Role: ${user.role}');
+    log('New Role: $newRole');
+    log('Region ID: $regionId');
 
     // Validate user ID
     if (user.id.isEmpty) {
@@ -149,8 +151,9 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
         nextOfKinContact: user.nextOfKinContact,
         role: newRole,
         gender: user.gender,
-        regionId: newRole == 'regional manager' ? regionId ?? user.regionId : user.regionId,
+        regionId: user.regionId,
         regionName: user.regionName,
+        regionalID: newRole == 'regional manager' ? regionId ?? user.regionalID : user.regionalID,
       );
 
       print('Created updated user model:');
@@ -401,7 +404,7 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
                           color: Colors.grey[600],
                         ),
                       ),
-                      if (user.role == 'regional manager' && user.regionName != null)
+                      if (user.role == 'regional manager' && user.regionalID != null)
                         Text(
                           'Region: ${user.regionName}',
                           style: TextStyles.bodyText.copyWith(
@@ -511,15 +514,22 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
       );
     }
   }
-  
+
   void _showRegionSelectionDialog(UserModel user, String newRole) {
     // Default selected region (either user's current region or first in list)
-    String? selectedRegionId = user.regionId;
-    
+    String? selectedRegionId = user.regionalID;
+
+    // ✅ Fallback to first region if user's region is null
     if (selectedRegionId == null && _regions.isNotEmpty) {
       selectedRegionId = _regions.first.id;
     }
-    
+
+    // ✅ Ensure selectedRegionId exists in the _regions list
+    if (selectedRegionId != null &&
+        !_regions.any((r) => r.id == selectedRegionId)) {
+      selectedRegionId = _regions.isNotEmpty ? _regions.first.id : null;
+    }
+
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -580,9 +590,9 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
               onPressed: _regions.isEmpty
                   ? null
                   : () {
-                      Navigator.pop(context);
-                      _updateUserRole(user, newRole, regionId: selectedRegionId);
-                    },
+                Navigator.pop(context);
+                _updateUserRole(user, newRole, regionId: selectedRegionId);
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryColor,
                 disabledBackgroundColor: Colors.grey,
@@ -594,4 +604,5 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
       ),
     );
   }
+
 }

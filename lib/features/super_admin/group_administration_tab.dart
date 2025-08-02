@@ -26,10 +26,15 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
   bool _isLoading = false;
   String? _errorMessage;
   List<GroupModel> _groups = [];
+  List<GroupModel> _filteredGroups = [];
+  String _searchQuery = '';
+  String _selectedFilter = 'All Groups';
+  final List<String> _filterOptions = ['All Groups', 'Active', 'Inactive'];
   
   @override
   void initState() {
     super.initState();
+    _filteredGroups = _groups;
     _loadGroups();
   }
   
@@ -47,9 +52,11 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
       if (mounted) {
         setState(() {
           _groups = groupProvider.groups;
+          _filteredGroups = _groups;
           _errorMessage = null;
           _isLoading = false;
         });
+        _filterGroups();
       }
     } catch (e) {
       if (mounted) {
@@ -59,6 +66,18 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
         });
       }
     }
+  }
+  
+  void _filterGroups() {
+    setState(() {
+      _filteredGroups = _groups.where((group) {
+        final matchesSearch = group.name.toLowerCase().contains(_searchQuery.toLowerCase());
+        final matchesFilter = _selectedFilter == 'All Groups' || 
+                             (_selectedFilter == 'Active' && true) || // Assuming all groups are active for now
+                             (_selectedFilter == 'Inactive' && false);
+        return matchesSearch && matchesFilter;
+      }).toList();
+    });
   }
   
   void _showError(String message) {
@@ -104,12 +123,47 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
             style: TextStyles.bodyText,
           ),
           const SizedBox(height: 24),
+          TextField(
+            onChanged: (value) {
+              setState(() {
+                _searchQuery = value.toLowerCase();
+              });
+              _filterGroups();
+            },
+            decoration: InputDecoration(
+              labelText: 'Search Groups',
+              hintText: 'Enter group name',
+              prefixIcon: const Icon(Icons.search),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          DropdownButton<String>(
+            value: _selectedFilter,
+            onChanged: (value) {
+              setState(() {
+                _selectedFilter = value!;
+              });
+              _filterGroups();
+            },
+            items: _filterOptions.map((filter) {
+              return DropdownMenuItem(
+                value: filter,
+                child: Text(filter),
+              );
+            }).toList(),
+            isExpanded: true,
+            hint: const Text('Filter Groups'),
+          ),
+          const SizedBox(height: 24),
           Expanded(
             child: _isLoading 
               ? const Center(child: CircularProgressIndicator())
               : _errorMessage != null
                 ? _buildErrorView()
-                : _groups.isEmpty
+                : _filteredGroups.isEmpty
                   ? _buildEmptyView()
                   : _buildGroupList(),
           ),
@@ -219,9 +273,9 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
     return RefreshIndicator(
       onRefresh: _loadGroups,
       child: ListView.builder(
-        itemCount: _groups.length,
+        itemCount: _filteredGroups.length,
         itemBuilder: (context, index) {
-          final group = _groups[index];
+          final group = _filteredGroups[index];
           return _buildGroupListItem(group);
         },
       ),
@@ -259,9 +313,9 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
                       ),
                       const SizedBox(height: 4),
                       FutureBuilder<String>(
-                        future: _fetchAdminName(group.group_admin),
+                        future: _fetchAdminName(group.group_admin!),
                         builder: (context, snapshot) {
-                          final adminName = snapshot.data ?? (group.group_admin.isNotEmpty ? "Loading..." : "No admin assigned");
+                          final adminName = snapshot.data ?? (group.group_admin!.isNotEmpty ? "Loading..." : "No admin assigned");
                           return Text(
                             'Admin: $adminName',
                             style: TextStyles.bodyText.copyWith(

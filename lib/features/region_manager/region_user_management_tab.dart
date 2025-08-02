@@ -401,6 +401,7 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
                   role: selectedRole,
                   gender: user.gender,
                   regionId: user.regionId,
+                  regionalID: user.regionalID,
                 );
 
                 final userProvider = Provider.of<UserProvider>(context, listen: false);

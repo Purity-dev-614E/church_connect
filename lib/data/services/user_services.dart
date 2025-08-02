@@ -62,6 +62,7 @@ class UserServices {
             role: 'user',
             gender: '',
             regionId: '',
+            regionalID: '',
           );
         }
         
@@ -80,6 +81,7 @@ class UserServices {
         role: 'user',
         gender: '',
         regionId: '',
+        regionalID: '',
       );
     }
   }
@@ -166,9 +168,46 @@ class UserServices {
       
       if (response.statusCode == 200) {
         final jsonResponse = jsonDecode(response.body);
-        final List<dynamic> usersData = jsonResponse['data'] ?? [];
-        return usersData.map((user) => UserModel.fromJson(user)).toList();
+        print('Region users response: $jsonResponse');
+        
+        // Handle different response structures
+        List<dynamic> usersData = [];
+        
+        if (jsonResponse is List) {
+          // If the response is directly a list of users
+          usersData = jsonResponse;
+        } else if (jsonResponse is Map<String, dynamic>) {
+          // If the response is wrapped in an object
+          if (jsonResponse.containsKey('data')) {
+            usersData = jsonResponse['data'] ?? [];
+          } else if (jsonResponse.containsKey('users')) {
+            usersData = jsonResponse['users'] ?? [];
+          } else {
+            // If the response structure is different, try to extract users
+            print('Unexpected response structure: $jsonResponse');
+            usersData = [];
+          }
+        }
+        
+        // Convert each user data to UserModel with error handling
+        List<UserModel> users = [];
+        for (var userData in usersData) {
+          try {
+            if (userData is Map<String, dynamic>) {
+              users.add(UserModel.fromJson(userData));
+            } else {
+              print('Invalid user data format: $userData');
+            }
+          } catch (e) {
+            print('Error parsing user data: $userData, Error: $e');
+            // Skip this user and continue with others
+            continue;
+          }
+        }
+        
+        return users;
       } else {
+        print('API request failed with status: ${response.statusCode}, Body: ${response.body}');
         // If the API fails, fall back to filtering all users locally by region
         final allUsers = await fetchAllUsers();
         return allUsers.where((user) => user.regionId == regionId).toList();
@@ -176,8 +215,13 @@ class UserServices {
     } catch (e) {
       print('Error fetching users by region: $e');
       // Fall back to filtering all users locally
-      final allUsers = await fetchAllUsers();
-      return allUsers.where((user) => user.regionId == regionId).toList();
+      try {
+        final allUsers = await fetchAllUsers();
+        return allUsers.where((user) => user.regionId == regionId).toList();
+      } catch (fallbackError) {
+        print('Fallback also failed: $fallbackError');
+        return []; // Return empty list if everything fails
+      }
     }
   }
   
@@ -219,7 +263,8 @@ class UserServices {
         nextOfKinContact: user.nextOfKinContact,
         role: user.role,
         gender: user.gender,
-        regionId: regionId,
+        regionId: user.regionId,
+        regionalID: regionId // Keep existing regional ID
       );
       
       // Update the user
@@ -252,6 +297,7 @@ class UserServices {
         role: user.role,
         gender: user.gender,
         regionId: '', // Remove region ID
+        regionalID: user.regionalID, // Keep existing regional ID
       );
       
       // Update the user
