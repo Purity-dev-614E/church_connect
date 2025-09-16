@@ -262,7 +262,7 @@ class _EnhancedInputFieldState extends State<EnhancedInputField> {
   Color _getTextColor() {
     if (_hasError) return Colors.red;
     if (_isFocused) return AppColors.primaryColor;
-    return AppColors.textColor;
+    return Theme.of(context).colorScheme.onBackground;
   }
 
   InputDecoration _buildInputDecoration() {
@@ -278,7 +278,7 @@ class _EnhancedInputFieldState extends State<EnhancedInputField> {
         color: _getTextColor(),
       ),
       hintStyle: TextStyles.bodyText.copyWith(
-        color: AppColors.textColor.withOpacity(0.5),
+        color: Theme.of(context).colorScheme.onBackground.withOpacity(0.5),
       ),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(widget.borderRadius),
@@ -364,7 +364,7 @@ class _EnhancedInputFieldState extends State<EnhancedInputField> {
       return IconButton(
         icon: Icon(
           Icons.clear,
-          color: AppColors.textColor.withOpacity(0.5),
+          color: Theme.of(context).colorScheme.onBackground.withOpacity(0.5),
           size: 20,
         ),
         onPressed: () {

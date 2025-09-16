@@ -61,7 +61,7 @@ class _RegionManagerScreenState extends State<RegionManagerScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => RegionDetailsScreen(regionId: region.id),
+        builder: (context) => RegionDetailsScreen(regionalID: region.id),
       ),
     );
   }

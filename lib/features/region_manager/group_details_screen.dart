@@ -196,7 +196,7 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> with SingleTick
                         Text(
                           member.email,
                           style: TextStyles.bodyText.copyWith(
-                            color: AppColors.textColor.withOpacity(0.7),
+                            color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -273,7 +273,7 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> with SingleTick
                         Text(
                           event.description,
                           style: TextStyles.bodyText.copyWith(
-                            color: AppColors.textColor.withOpacity(0.7),
+                            color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                           ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -287,7 +287,7 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> with SingleTick
                               _formatEventDateTime(event.dateTime),
                               style: TextStyles.bodyText.copyWith(
                                 fontSize: 12,
-                                color: AppColors.textColor.withOpacity(0.7),
+                                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                               ),
                             ),
                           ],

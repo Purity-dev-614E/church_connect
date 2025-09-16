@@ -190,7 +190,7 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
            child: Text(
              'Cancel',
              style: TextStyles.bodyText.copyWith(
-               color: AppColors.textColor,
+               color: Theme.of(context).colorScheme.onBackground,
              ),
            ),
          ),
@@ -389,7 +389,7 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
               event.title,
               style: TextStyles.heading1.copyWith(
                 fontWeight: FontWeight.bold,
-                color: AppColors.textColor,
+                color: Theme.of(context).colorScheme.onBackground,
               ),
             ),
             const SizedBox(height: 16),
@@ -417,14 +417,14 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
               'Description',
               style: TextStyles.bodyText.copyWith(
                 fontWeight: FontWeight.bold,
-                color: AppColors.textColor,
+                color: Theme.of(context).colorScheme.onBackground,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               event.description,
               style: TextStyles.bodyText.copyWith(
-                color: AppColors.textColor.withOpacity(0.7),
+                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
               ),
             ),
           ],
@@ -444,7 +444,7 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
             Text(
               label,
               style: TextStyles.bodyText.copyWith(
-                color: AppColors.textColor.withOpacity(0.7),
+                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                 fontSize: 12,
               ),
             ),
@@ -510,7 +510,7 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
         Text(
           label,
           style: TextStyles.bodyText.copyWith(
-            color: AppColors.textColor.withOpacity(0.7),
+            color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
           ),
         ),
       ],
@@ -526,7 +526,7 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
           title,
           style: TextStyles.heading2.copyWith(
             fontWeight: FontWeight.bold,
-            color: AppColors.textColor,
+            color: Theme.of(context).colorScheme.onBackground,
           ),
         ),
       ],
@@ -550,13 +550,13 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
                 Icon(
                   isAttendee ? Icons.people_outline : Icons.person_off,
                   size: 48,
-                  color: AppColors.textColor.withOpacity(0.5),
+                  color: Theme.of(context).colorScheme.onBackground.withOpacity(0.5),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   isAttendee ? 'No attendees yet' : 'No absent members',
                   style: TextStyles.bodyText.copyWith(
-                    color: AppColors.textColor.withOpacity(0.7),
+                    color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                   ),
                 ),
               ],
@@ -598,7 +598,7 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
               user.email,
               style: TextStyles.bodyText.copyWith(
                 fontSize: 14,
-                color: AppColors.textColor.withOpacity(0.7),
+                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
               ),
             ),
             trailing: Row(
@@ -658,14 +658,14 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
           label,
           style: TextStyles.bodyText.copyWith(
             fontWeight: FontWeight.bold,
-            color: AppColors.textColor,
+            color: Theme.of(context).colorScheme.onBackground,
           ),
         ),
         const SizedBox(height: 4),
         Text(
           value,
           style: TextStyles.bodyText.copyWith(
-            color: AppColors.textColor.withOpacity(0.7),
+            color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
           ),
         ),
       ],
@@ -749,7 +749,7 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
                 Text(
                   'No members found',
                   style: TextStyles.bodyText.copyWith(
-                    color: AppColors.textColor.withOpacity(0.7),
+                    color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                   ),
                 ),
             ],
@@ -763,7 +763,7 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
               child: Text(
                 'Cancel',
                 style: TextStyles.bodyText.copyWith(
-                  color: AppColors.textColor,
+                  color: Theme.of(context).colorScheme.onBackground,
                 ),
               ),
             ),

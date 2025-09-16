@@ -146,7 +146,7 @@ class _RegionManagementTabState extends State<RegionManagementTab> {
                                           context,
                                           MaterialPageRoute(
                                             builder: (context) => RegionDetailsScreen(
-                                              regionId: region.id,
+                                              regionalID: region.id,
                                             ),
                                           ),
                                         );

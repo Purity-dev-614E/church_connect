@@ -147,7 +147,7 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
                       Text(
                         _user!.fullName,
                         style: TextStyles.heading1.copyWith(
-                          color: AppColors.textColor,
+                          color: Theme.of(context).colorScheme.onBackground,
                           fontWeight: FontWeight.bold,
                         ),
                         textAlign: TextAlign.center,
@@ -219,7 +219,7 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
       case 'user':
         return AppColors.accentColor;
       default:
-        return AppColors.textColor;
+        return Theme.of(context).colorScheme.onBackground;
     }
   }
   
@@ -528,7 +528,7 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
                   trailing: Icon(
                     Icons.arrow_forward_ios,
                     size: 16,
-                    color: AppColors.textColor.withOpacity(0.5),
+                    color: Theme.of(context).colorScheme.onBackground.withOpacity(0.5),
                   ),
                   onTap: () {
                     // Navigate to group details
@@ -561,7 +561,7 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
                 Text(
                   label,
                   style: TextStyles.bodyText.copyWith(
-                    color: AppColors.textColor.withOpacity(0.6),
+                    color: Theme.of(context).colorScheme.onBackground.withOpacity(0.6),
                     fontSize: 14,
                   ),
                 ),
@@ -573,7 +573,7 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
                     fontSize: 16,
                     color: label == 'Region' && (value.isEmpty || value == 'Not assigned') 
                         ? AppColors.errorColor.withOpacity(0.7)
-                        : AppColors.textColor,
+                        : Theme.of(context).colorScheme.onBackground,
                   ),
                 ),
               ],

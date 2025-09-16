@@ -182,7 +182,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                 end: Alignment.bottomCenter,
                 colors: [
                   AppColors.primaryColor,
-                  AppColors.secondaryColor,
+                  Colors.black12,
                   AppColors.primaryColor.withOpacity(0.8),
                 ],
               ),
@@ -274,14 +274,14 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                         child: SlideTransition(
                           position: _textSlideAnimation,
                           child: Text(
-                            'Church Connect',
+                            'Safari Connect',
                             style: TextStyles.heading1.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
                               fontSize: 36,
                               shadows: [
                                 Shadow(
-                                  color: Colors.black.withOpacity(0.3),
+                                  color: Colors.grey.withOpacity(0.3),
                                   offset: const Offset(2, 2),
                                   blurRadius: 5,
                                 ),
@@ -309,7 +309,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                             animatedTexts: [
                               TypewriterAnimatedText(
                                 'Bringing Communities Together',
-                                speed: const Duration(milliseconds: 100),
+                                speed: const Duration(milliseconds: 80),
                               ),
                             ],
                             isRepeatingAnimation: false,

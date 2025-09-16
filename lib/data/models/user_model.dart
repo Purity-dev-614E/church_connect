@@ -1,5 +1,3 @@
-import '../../core/constants/app_endpoints.dart';
-
 class UserModel{
   final String id;
   final String fullName;
@@ -17,6 +15,7 @@ class UserModel{
   final String? citam_Assembly;
   final String? if_Not;
   final String regionalID;
+  final String? overalRegionName;
 
   UserModel({
     required this.id,
@@ -35,6 +34,7 @@ class UserModel{
     this.age,
     this.citam_Assembly,
     this.if_Not,
+    this.overalRegionName,
   });
 
   UserModel copyWith({
@@ -48,8 +48,10 @@ class UserModel{
     String? gender,
     String? regionId,
     String? regionName,
+    String? regionalID,
     String? createdAt,
     String? profileImageUrl,
+    String? OveralRegionName,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -62,8 +64,10 @@ class UserModel{
       gender: gender ?? this.gender,
       regionId: regionId ?? this.regionId,
       regionName: regionName ?? this.regionName,
+      regionalID: this.regionalID,
       createdAt: createdAt ?? this.createdAt,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
+      overalRegionName: OveralRegionName ?? this.overalRegionName,
     );
   }
 
@@ -99,20 +103,6 @@ class UserModel{
       role = 'user';
     }
 
-    // Handle profile picture URL
-    String? profileImageUrl;
-    final rawProfilePicture = json['profile_picture'] ?? json['profileImageUrl'];
-    if (rawProfilePicture != null && rawProfilePicture.isNotEmpty) {
-      // If the URL is already absolute (starts with http), use it as is
-      // Otherwise, construct the full URL by combining with the base URL
-      // Remove /api from the base URL when constructing the uploads URL
-      final baseUrl = ApiEndpoints.baseUrl.replaceAll('/api', '');
-      profileImageUrl = rawProfilePicture.startsWith('http')
-          ? rawProfilePicture
-          : '$baseUrl/uploads/$rawProfilePicture';
-      print('Profile image URL constructed: $profileImageUrl');
-    }
-
     return UserModel(
       id: userId,
       fullName: safeToString(json['full_name'] ?? json['fullName']),
@@ -130,18 +120,11 @@ class UserModel{
       age: safeToString(json['age']),
       citam_Assembly: safeToString(json['citam_assembly'] ?? json['citamAssembly']),
       if_Not: safeToString(json['if_not_member'] ?? json['ifNot']),
+      overalRegionName: safeToString(json['region_name'] ?? json['overalRegionName']),
     );
   }
 
   Map<String, dynamic> toJson(){
-    // When converting to JSON, store only the filename part of the profile picture URL
-    String? profilePicture;
-    if (profileImageUrl != null) {
-      // Extract just the filename from the full URL
-      final parts = profileImageUrl!.split('/');
-      profilePicture = parts.last;
-    }
-
     return {
       'uid': id,
       'full_name': fullName,
@@ -159,6 +142,7 @@ class UserModel{
       'age': age,
       'citam_assembly': citam_Assembly,
       'if_not_member': if_Not,
+      'region_name': overalRegionName,
     };
   }
 }

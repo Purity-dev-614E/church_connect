@@ -439,7 +439,7 @@ class _RegionManagerAnalyticsScreenState extends State<RegionManagerAnalyticsScr
             description,
             style: TextStyles.bodyText.copyWith(
               fontSize: 12,
-              color: AppColors.textColor.withOpacity(0.7),
+              color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
             ),
           ),
         ],
@@ -528,7 +528,7 @@ class _RegionManagerAnalyticsScreenState extends State<RegionManagerAnalyticsScr
                 description,
                 style: TextStyles.bodyText.copyWith(
                   fontSize: 12,
-                  color: AppColors.textColor.withOpacity(0.7),
+                  color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                 ),
               ),
             ],

@@ -196,7 +196,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with SingleTi
           Text(
             'Enter your email to receive a password reset link',
             style: TextStyles.bodyText.copyWith(
-              color: AppColors.textColor.withOpacity(0.7),
+              color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
             ),
           ),
           const SizedBox(height: 32),
@@ -296,7 +296,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with SingleTi
         Text(
           'Please check your email and follow the instructions to reset your password.',
           style: TextStyles.bodyText.copyWith(
-            color: AppColors.textColor.withOpacity(0.7),
+            color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
           ),
           textAlign: TextAlign.center,
         ),
@@ -321,7 +321,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with SingleTi
               Text(
                 'Check your spam folder or try again in a few minutes.',
                 style: TextStyles.bodyText.copyWith(
-                  color: AppColors.textColor.withOpacity(0.7),
+                  color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                   fontSize: 14,
                 ),
                 textAlign: TextAlign.center,
@@ -512,7 +512,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with SingleTi
             'Need help? Contact support@churchconnect.com',
             style: TextStyle(
               fontSize: 11,
-              color: AppColors.textColor.withOpacity(0.6),
+              color: Theme.of(context).colorScheme.onBackground.withOpacity(0.6),
             ),
           ),
         ],
@@ -831,7 +831,7 @@ class _NewPasswordScreenState extends State<NewPasswordScreen> {
               Text(
                 'Your new password must be different from previously used passwords.',
                 style: TextStyles.bodyText.copyWith(
-                  color: AppColors.textColor.withOpacity(0.7),
+                  color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                 ),
               ),
               const SizedBox(height: 32),

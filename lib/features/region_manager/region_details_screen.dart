@@ -12,11 +12,11 @@ import 'package:group_management_church_app/widgets/custom_notification.dart';
 import 'package:provider/provider.dart';
 
 class RegionDetailsScreen extends StatefulWidget {
-  final String regionId;
+  final String regionalID;
 
   const RegionDetailsScreen({
     super.key,
-    required this.regionId,
+    required this.regionalID
   });
 
   @override
@@ -49,7 +49,7 @@ class _RegionDetailsScreenState extends State<RegionDetailsScreen> {
     try {
       // Get region details first
       final regionProvider = Provider.of<RegionProvider>(context, listen: false);
-      final region = await regionProvider.getRegionById(widget.regionId);
+      final region = await regionProvider.getRegionById(widget.regionalID);
       
       if (region == null) {
         throw Exception('Region not found');
@@ -84,7 +84,7 @@ class _RegionDetailsScreenState extends State<RegionDetailsScreen> {
   Future<void> _loadUsers() async {
     try {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
-      final users = await userProvider.getUsersByRegion(widget.regionId);
+      final users = await userProvider.getUsersByRegion(widget.regionalID);
       if (mounted) {
         setState(() {
           _userCount = users.length;
@@ -98,7 +98,7 @@ class _RegionDetailsScreenState extends State<RegionDetailsScreen> {
   Future<void> _loadGroups() async {
     try {
       final groupProvider = Provider.of<GroupProvider>(context, listen: false);
-      final groups = await groupProvider.getGroupsByRegion(widget.regionId);
+      final groups = await groupProvider.getGroupsByRegion(widget.regionalID);
       if (mounted) {
         setState(() {
           _groupCount = groups.length;
@@ -112,7 +112,7 @@ class _RegionDetailsScreenState extends State<RegionDetailsScreen> {
   Future<void> _loadEvents() async {
     try {
       final eventProvider = Provider.of<EventProvider>(context, listen: false);
-      final events = await eventProvider.getEventsByRegion(widget.regionId);
+      final events = await eventProvider.getEventsByRegion(widget.regionalID);
       if (mounted) {
         setState(() {
           _eventCount = events.length;
@@ -126,7 +126,7 @@ class _RegionDetailsScreenState extends State<RegionDetailsScreen> {
   Future<void> _loadActivityStatus() async {
     try {
       final regionmanagerProvider = Provider.of<RegionalManagerAnalyticsProvider>(context, listen: false);
-      final activityStatus = await regionmanagerProvider.getActivityStatus(widget.regionId);
+      final activityStatus = await regionmanagerProvider.getActivityStatus(widget.regionalID);
       
       if (activityStatus == null) {
         throw Exception('Activity status is null');
@@ -381,14 +381,14 @@ class _RegionDetailsScreenState extends State<RegionDetailsScreen> {
                 value,
                 style: TextStyles.heading1.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textColor,
+                  color: Theme.of(context).colorScheme.onBackground,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 title,
                 style: TextStyles.bodyText.copyWith(
-                  color: AppColors.textColor.withOpacity(0.7),
+                  color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                 ),
                 textAlign: TextAlign.center,
               ),

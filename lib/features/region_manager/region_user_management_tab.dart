@@ -268,7 +268,7 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
             Text(
               user.email,
               style: TextStyles.bodyText.copyWith(
-                color: AppColors.textColor.withOpacity(0.7),
+                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
               ),
             ),
             const SizedBox(height: 8),

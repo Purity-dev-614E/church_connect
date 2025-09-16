@@ -31,10 +31,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   final _formKey = GlobalKey<FormState>();
-  
+
   // User and group data
   UserModel? _user;
-  List<GroupModel> _userGroups = [];
+  GroupModel? _userGroups;
   GroupModel? _primaryGroup;
 
   @override
@@ -53,7 +53,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       // Get current user from AuthProvider
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final userProvider = Provider.of<UserProvider>(context, listen: false);
-      
+
       // Get user ID
       final authService = AuthServices();
       final userId = await authService.getUserId();
@@ -61,29 +61,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (userId == null) {
         throw Exception('User ID not found');
       }
-      
+
       // Load user data
       await userProvider.loadUser(userId);
       _user = userProvider.currentUser;
-      
+
       if (_user == null) {
         throw Exception('Failed to load user data');
       }
-      
+
       // Set profile image URL if available
       if (_user!.profileImageUrl != null) {
         setState(() {
           _profileImageUrl = _user!.profileImageUrl;
         });
       }
-      
+
       // Load user groups
       final groupProvider = Provider.of<GroupProvider>(context, listen: false);
-      _userGroups = await groupProvider.getUserGroups(userId);
-      
-      // Set primary group (first group or empty if no groups)
-      _primaryGroup = _userGroups.isNotEmpty ? _userGroups.first : null;
-      
+      _userGroups = await groupProvider.getGroupById(_user!.regionalID);
+
+
+
       setState(() {
         _isLoading = false;
       });
@@ -95,6 +94,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       print('Error loading profile data: $e');
     }
   }
+
 
   Future<void> _pickProfileImage() async {
     try {
@@ -120,17 +120,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       // Convert image bytes to base64
       final base64Image = base64Encode(_profileImageBytes!);
-      
+
       // Get auth provider for token
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      
+
       // Get user ID
       final authService = AuthServices();
       final userId = await authService.getUserId();
       if (userId == null) {
         throw Exception('User ID not found');
       }
-      
+
       // Upload image to server
       final success = await authProvider.uploadProfileImage(
         userId,
@@ -166,7 +166,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // Get user initials from full name
   String _getInitials(String fullName) {
     if (fullName.isEmpty) return '?';
-    
+
     List<String> nameParts = fullName.split(' ');
     String initials = '';
 
@@ -176,7 +176,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         initials = nameParts[0][0] + nameParts[nameParts.length - 1][0];
       } else {
         // If only one name, get first two letters or just first letter if name is only one character
-        initials = nameParts[0].length > 1 ? nameParts[0].substring(0, 2) : nameParts[0][0];
+        initials = nameParts[0].length > 1
+            ? nameParts[0].substring(0, 2)
+            : nameParts[0][0];
       }
     }
 
@@ -185,28 +187,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _navigateToEditProfile() async {
     if (_user == null) return;
-    
+
     try {
       final authService = AuthServices();
       final userId = await authService.getUserId();
-      
+
       if (userId == null) {
         _showError('Cannot edit profile: User ID not found');
         return;
       }
-      
+
       // Navigate to profile setup screen with current user data
       final result = await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => ProfileSetupScreen(
-            userId: userId,
-            email: _user!.email,
-          ),
+          builder: (context) =>
+              ProfileSetupScreen(
+                userId: userId,
+                email: _user!.email,
+              ),
           settings: const RouteSettings(arguments: 'edit_mode'),
         ),
       );
-      
+
       // Reload user data when returning from edit screen
       if (result == true) {
         _loadUserData();
@@ -215,13 +218,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _showError('Error: ${e.toString()}');
     }
   }
-  
+
   // Logout function
   Future<void> _logout(BuildContext context) async {
     try {
       final authServices = AuthServices();
       await authServices.logout();
-      
+
       // Navigate to login screen and clear all previous routes
       Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
     } catch (e) {
@@ -258,7 +261,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      
+
       // Get current user to preserve existing data
       final currentUser = userProvider.currentUser;
       if (currentUser == null) {
@@ -268,16 +271,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       // Create updated user model
       final updatedUser = UserModel(
-        id: currentUser.id,
-        fullName: currentUser.fullName,
-        email: currentUser.email,
-        contact: currentUser.contact,
-        nextOfKin: currentUser.nextOfKin,
-        nextOfKinContact: currentUser.nextOfKinContact,
-        role: currentUser.role,
-        gender: currentUser.gender,
-        regionId: currentUser.regionId,
-        regionalID: currentUser.regionalID
+          id: currentUser.id,
+          fullName: currentUser.fullName,
+          email: currentUser.email,
+          contact: currentUser.contact,
+          nextOfKin: currentUser.nextOfKin,
+          nextOfKinContact: currentUser.nextOfKinContact,
+          role: currentUser.role,
+          gender: currentUser.gender,
+          regionId: currentUser.regionId,
+          regionalID: currentUser.regionalID,
+          overalRegionName: currentUser.overalRegionName
       );
 
       // Update user profile
@@ -314,95 +318,98 @@ class _ProfileScreenState extends State<ProfileScreen> {
         title: 'Profile',
         showBackButton: true,
       ),
-      body: _isLoading 
-        ? const Center(child: CircularProgressIndicator())
-        : _errorMessage != null
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage != null
           ? _buildErrorView()
           : _user == null
-            ? _buildNoUserView()
-            : SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        const SizedBox(height: 20),
+          ? _buildNoUserView()
+          : SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const SizedBox(height: 20),
 
-                        // Profile Picture or Initials
-                        _buildProfileAvatar(_user!.fullName),
+                // Profile Picture or Initials
+                _buildProfileAvatar(_user!.fullName),
 
-                        const SizedBox(height: 24),
+                const SizedBox(height: 24),
 
-                        // User Name
-                        Text(
-                          _user!.fullName,
-                          style: TextStyles.heading1.copyWith(
-                            color: AppColors.textColor,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-
-                        const SizedBox(height: 8),
-
-                        // User Role and Group
-                        Text(
-                          _primaryGroup != null 
-                            ? '${_user!.role} • ${_primaryGroup!.name}'
-                            : _user!.role,
-                          style: TextStyles.bodyText.copyWith(
-                            color: AppColors.secondaryColor,
-                            fontWeight: FontWeight.w500,
-                            fontSize: 18,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-
-                        const SizedBox(height: 32),
-
-                        // Edit Profile Button
-                        CustomButton(
-                          label: 'Edit Profile',
-                          onPressed: _navigateToEditProfile,
-                          icon: Icons.edit,
-                          color: AppColors.primaryColor,
-                          isPulsing: true,
-                          pulseEffect: PulseEffectType.glow,
-                          isFullWidth: false,
-                          horizontalPadding: 32,
-                        ),
-                        
-                        const SizedBox(height: 16),
-                        
-                        // Logout Button
-                        CustomButton(
-                          label: 'Logout',
-                          onPressed: () => _logout(context),
-                          icon: Icons.logout,
-                          color: AppColors.errorColor,
-                          isFullWidth: false,
-                          horizontalPadding: 32,
-                        ),
-
-                        const SizedBox(height: 40),
-
-                        // User Information Card
-                        _buildUserInfoCard(_user!),
-
-                        const SizedBox(height: 24),
-
-                        // Emergency Contact Card
-                        _buildEmergencyContactCard(_user!),
-                      ],
-                    ),
+                // User Name
+                Text(
+                  _user!.fullName,
+                  style: TextStyles.heading1.copyWith(
+                    color: Theme
+                        .of(context)
+                        .colorScheme
+                        .onBackground,
+                    fontWeight: FontWeight.bold,
                   ),
+                  textAlign: TextAlign.center,
                 ),
-              ),
+
+                const SizedBox(height: 8),
+
+                // User Role and Group
+                Text(
+                  _primaryGroup != null
+                      ? '${_user!.role} • ${_primaryGroup!.name}'
+                      : _user!.role,
+                  style: TextStyles.bodyText.copyWith(
+                    color: AppColors.secondaryColor,
+                    fontWeight: FontWeight.w500,
+                    fontSize: 18,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+
+                const SizedBox(height: 32),
+
+                // Edit Profile Button
+                CustomButton(
+                  label: 'Edit Profile',
+                  onPressed: _navigateToEditProfile,
+                  icon: Icons.edit,
+                  color: AppColors.primaryColor,
+                  isPulsing: true,
+                  pulseEffect: PulseEffectType.glow,
+                  isFullWidth: false,
+                  horizontalPadding: 32,
+                ),
+
+                const SizedBox(height: 16),
+
+                // Logout Button
+                CustomButton(
+                  label: 'Logout',
+                  onPressed: () => _logout(context),
+                  icon: Icons.logout,
+                  color: AppColors.errorColor,
+                  isFullWidth: false,
+                  horizontalPadding: 32,
+                ),
+
+                const SizedBox(height: 40),
+
+                // User Information Card
+                _buildUserInfoCard(_user!),
+
+                const SizedBox(height: 24),
+
+                // Emergency Contact Card
+                _buildEmergencyContactCard(_user!),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
-  
+
   Widget _buildErrorView() {
     return Center(
       child: Padding(
@@ -441,7 +448,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
-  
+
   Widget _buildNoUserView() {
     return Center(
       child: Padding(
@@ -509,44 +516,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             child: _profileImageBytes != null
                 ? ClipOval(
-                    child: Image.memory(
-                      _profileImageBytes!,
-                      fit: BoxFit.cover,
-                      width: 120,
-                      height: 120,
-                    ),
-                  )
+              child: Image.memory(
+                _profileImageBytes!,
+                fit: BoxFit.cover,
+                width: 120,
+                height: 120,
+              ),
+            )
                 : _profileImageUrl != null
-                    ? ClipOval(
-                        child: Image.network(
-                          _profileImageUrl!,
-                          fit: BoxFit.cover,
-                          width: 120,
-                          height: 120,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Center(
-                              child: Text(
-                                _getInitials(fullName),
-                                style: TextStyles.heading1.copyWith(
-                                  color: Colors.white,
-                                  fontSize: 42,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      )
-                    : Center(
-                        child: Text(
-                          _getInitials(fullName),
-                          style: TextStyles.heading1.copyWith(
-                            color: Colors.white,
-                            fontSize: 42,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                ? ClipOval(
+              child: Image.network(
+                _profileImageUrl!,
+                fit: BoxFit.cover,
+                width: 120,
+                height: 120,
+                errorBuilder: (context, error, stackTrace) {
+                  return Center(
+                    child: Text(
+                      _getInitials(fullName),
+                      style: TextStyles.heading1.copyWith(
+                        color: Colors.white,
+                        fontSize: 42,
+                        fontWeight: FontWeight.bold,
                       ),
+                    ),
+                  );
+                },
+              ),
+            )
+                : Center(
+              child: Text(
+                _getInitials(fullName),
+                style: TextStyles.heading1.copyWith(
+                  color: Colors.white,
+                  fontSize: 42,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
           ),
         ),
         Positioned(
@@ -588,7 +595,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   TextButton.icon(
                     onPressed: _isUploadingImage ? null : _uploadProfileImage,
-                    icon: const Icon(Icons.upload, color: Colors.white, size: 16),
+                    icon: const Icon(
+                        Icons.upload, color: Colors.white, size: 16),
                     label: const Text(
                       'Upload',
                       style: TextStyle(color: Colors.white, fontSize: 12),
@@ -596,14 +604,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(width: 4),
                   IconButton(
-                    icon: const Icon(Icons.cancel, color: Colors.white, size: 16),
+                    icon: const Icon(
+                        Icons.cancel, color: Colors.white, size: 16),
                     onPressed: _isUploadingImage
                         ? null
                         : () {
-                            setState(() {
-                              _profileImageBytes = null;
-                            });
-                          },
+                      setState(() {
+                        _profileImageBytes = null;
+                      });
+                    },
                   ),
                 ],
               ),
@@ -658,16 +667,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _buildInfoRow(Icons.person, 'Gender', user.gender),
             const Divider(),
             _buildInfoRow(
-              Icons.location_on, 
-              'Region', 
-              user.regionName ?? (user.regionId != null ? 'Region ID: ${user.regionId}' : 'Not assigned'),
-              user.regionId != null ? AppColors.primaryColor : AppColors.errorColor.withOpacity(0.7),
+              Icons.location_on, 'Place of Residence', user.regionName ?? 'Not Assigned',
             ),
+            const Divider(),
+            _buildInfoRow(Icons.place_outlined, "Region", user.overalRegionName ?? 'Not Assigned'),
           ],
         ),
       ),
     );
   }
+
 
   Widget _buildEmergencyContactCard(UserModel user) {
     return Card(
@@ -698,6 +707,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildInfoRow(IconData icon, String label, String value, [Color? iconColor]) {
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
@@ -715,7 +725,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Text(
                   label,
                   style: TextStyles.bodyText.copyWith(
-                    color: AppColors.textColor.withOpacity(0.6),
+                    color: Theme
+                        .of(context)
+                        .colorScheme
+                        .onBackground
+                        .withOpacity(0.6),
                     fontSize: 14,
                   ),
                 ),
@@ -725,9 +739,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   style: TextStyles.bodyText.copyWith(
                     fontWeight: FontWeight.w500,
                     fontSize: 16,
-                    color: label == 'Region' && value == 'Not assigned' 
-                        ? AppColors.errorColor.withOpacity(0.7)
-                        : AppColors.textColor,
+                    color: Theme
+                        .of(context)
+                        .colorScheme
+                        .onBackground,
                   ),
                 ),
               ],

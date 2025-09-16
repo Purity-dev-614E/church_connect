@@ -111,12 +111,12 @@ class _AuthWrapperState extends State<AuthWrapper> {
           if (user.regionId.isNotEmpty) {
             try {
               // Since regionId actually contains the group ID, add user directly to that group
-              log('Attempting to add user to group: ${user.regionId}');
+              log('Attempting to add user to group: ${user.overalRegionName}');
               
               final addToGroupSuccess = await groupProvider.addMemberToGroup(user.regionId, userId);
               
               if (addToGroupSuccess) {
-                log('Successfully added user to group: ${user.regionId}');
+                log('Successfully added user to group: ${user.overalRegionName}');
                 // Refresh user groups and continue with normal flow
                 final updatedUserGroups = await groupProvider.getUserGroups(userId);
                 if (updatedUserGroups.isNotEmpty) {
@@ -286,7 +286,7 @@ class _RoleBasedNavigator extends StatelessWidget {
           );
         }
         
-        return RegionDashboard(regionId: user.regionId);
+        return RegionDashboard(regionId: user.regionalID);
 
       case 'admin':
         log('Navigating to AdminDashboard');

@@ -508,7 +508,7 @@ class _UserDashboardState extends State<UserDashboard> {
                     'Events This Week',
                     style: TextStyles.heading2.copyWith(
                       fontSize: 22,
-                      color: AppColors.textColor,
+                      color: Theme.of(context).colorScheme.onBackground,
                     ),
                   ),
                   const Spacer(),
@@ -662,7 +662,7 @@ class _UserDashboardState extends State<UserDashboard> {
             Text(
               'Loading events...',
               style: TextStyles.bodyText.copyWith(
-                color: AppColors.textColor.withOpacity(0.7),
+                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
               ),
               textAlign: TextAlign.center,
             ),
@@ -682,13 +682,13 @@ class _UserDashboardState extends State<UserDashboard> {
             Icon(
               Icons.event_busy,
               size: 64,
-              color: AppColors.textColor.withOpacity(0.5),
+              color: Theme.of(context).colorScheme.onBackground.withOpacity(0.5),
             ),
             const SizedBox(height: 16),
             Text(
               message,
               style: TextStyles.bodyText.copyWith(
-                color: AppColors.textColor.withOpacity(0.7),
+                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
               ),
               textAlign: TextAlign.center,
             ),
@@ -711,7 +711,7 @@ class _UserDashboardState extends State<UserDashboard> {
                   'Events',
                   style: TextStyles.heading2.copyWith(
                     fontSize: 22,
-                    color: AppColors.textColor,
+                    color: Theme.of(context).colorScheme.onBackground,
                   ),
                 ),
                 const Spacer(),
@@ -727,7 +727,7 @@ class _UserDashboardState extends State<UserDashboard> {
           ),
           TabBar(
             labelColor: AppColors.primaryColor,
-            unselectedLabelColor: AppColors.textColor.withOpacity(0.5),
+            unselectedLabelColor: Theme.of(context).colorScheme.onBackground.withOpacity(0.5),
             indicatorColor: AppColors.primaryColor,
             tabs: const [
               Tab(text: 'Upcoming'),
@@ -758,7 +758,7 @@ class _UserDashboardState extends State<UserDashboard> {
                 Text(
                   'Loading events...',
                   style: TextStyles.bodyText.copyWith(
-                    color: AppColors.textColor.withOpacity(0.7),
+                    color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                   ),
                 ),
               ],
@@ -772,13 +772,13 @@ class _UserDashboardState extends State<UserDashboard> {
                     Icon(
                       Icons.event_busy,
                       size: 64,
-                      color: AppColors.textColor.withOpacity(0.5),
+                      color: Theme.of(context).colorScheme.onBackground.withOpacity(0.5),
                     ),
                     const SizedBox(height: 16),
                     Text(
                       'No upcoming events',
                       style: TextStyles.bodyText.copyWith(
-                        color: AppColors.textColor.withOpacity(0.7),
+                        color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                       ),
                     ),
                   ],
@@ -821,7 +821,7 @@ class _UserDashboardState extends State<UserDashboard> {
                 Text(
                   'Loading events...',
                   style: TextStyles.bodyText.copyWith(
-                    color: AppColors.textColor.withOpacity(0.7),
+                    color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                   ),
                 ),
               ],
@@ -835,13 +835,13 @@ class _UserDashboardState extends State<UserDashboard> {
                     Icon(
                       Icons.event_busy,
                       size: 64,
-                      color: AppColors.textColor.withOpacity(0.5),
+                      color: Theme.of(context).colorScheme.onBackground.withOpacity(0.5),
                     ),
                     const SizedBox(height: 16),
                     Text(
                       'No past events',
                       style: TextStyles.bodyText.copyWith(
-                        color: AppColors.textColor.withOpacity(0.7),
+                        color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                       ),
                     ),
                   ],
@@ -869,7 +869,7 @@ class _UserDashboardState extends State<UserDashboard> {
                             event.title,
                             style: TextStyles.heading2.copyWith(
                               fontSize: 18,
-                              color: AppColors.textColor,
+                              color: Theme.of(context).colorScheme.onBackground,
                             ),
                           ),
                           subtitle: Column(
@@ -879,14 +879,14 @@ class _UserDashboardState extends State<UserDashboard> {
                               Text(
                                 _formatEventDate(event.dateTime),
                                 style: TextStyles.bodyText.copyWith(
-                                  color: AppColors.textColor.withOpacity(0.7),
+                                  color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                                 ),
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 event.location,
                                 style: TextStyles.bodyText.copyWith(
-                                  color: AppColors.textColor.withOpacity(0.7),
+                                  color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                                 ),
                               ),
                             ],

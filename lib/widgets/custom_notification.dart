@@ -214,14 +214,14 @@ class _CustomNotificationState extends State<CustomNotification> with SingleTick
                       child: Text(
                         widget.message,
                         style: TextStyles.bodyText.copyWith(
-                          color: AppColors.textColor,
+                          color: Theme.of(context).colorScheme.onBackground,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
                     IconButton(
                       icon: const Icon(Icons.close, size: 20),
-                      color: AppColors.textColor.withOpacity(0.5),
+                      color: Theme.of(context).colorScheme.onBackground.withOpacity(0.5),
                       onPressed: () {
                         _controller.reverse().then((_) {
                           widget.onDismissed?.call();

@@ -199,7 +199,7 @@ class _RegionGroupAdministrationTabState extends State<RegionGroupAdministration
           Icon(
             Icons.groups_outlined,
             size: 64,
-            color: AppColors.textColor.withOpacity(0.5),
+            color: Theme.of(context).colorScheme.onBackground.withOpacity(0.5),
           ),
           const SizedBox(height: 16),
           Text(
@@ -212,7 +212,7 @@ class _RegionGroupAdministrationTabState extends State<RegionGroupAdministration
           Text(
             'Create your first group to get started',
             style: TextStyles.bodyText.copyWith(
-              color: AppColors.textColor.withOpacity(0.7),
+              color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
             ),
             textAlign: TextAlign.center,
           ),
@@ -284,7 +284,7 @@ class _RegionGroupAdministrationTabState extends State<RegionGroupAdministration
                             'Admin: $adminName',
                             style: TextStyles.bodyText.copyWith(
                               fontSize: 14,
-                              color: AppColors.textColor.withOpacity(0.7),
+                              color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                             ),
                           );
                         },
@@ -456,7 +456,7 @@ class _RegionGroupAdministrationTabState extends State<RegionGroupAdministration
               label,
               style: TextStyles.bodyText.copyWith(
                 fontSize: 12,
-                color: AppColors.textColor.withOpacity(0.7),
+                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
               ),
             ),
           ],
@@ -905,7 +905,7 @@ class _AssignAdminDialogState extends State<_AssignAdminDialog> {
                     Text(
                       'You need to assign an admin role to users before they can be selected as group leaders.',
                       style: TextStyles.bodyText.copyWith(
-                        color: AppColors.textColor.withOpacity(0.7),
+                        color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -973,14 +973,14 @@ class _AssignAdminDialogState extends State<_AssignAdminDialog> {
                                 admin.email,
                                 style: TextStyles.bodyText.copyWith(
                                   fontSize: 12,
-                                  color: AppColors.textColor.withOpacity(0.7),
+                                  color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                                 ),
                               ),
                               Text(
                                 'Role: ${admin.role}',
                                 style: TextStyles.bodyText.copyWith(
                                   fontSize: 12,
-                                  color: AppColors.textColor.withOpacity(0.7),
+                                  color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                                 ),
                               ),
                             ],

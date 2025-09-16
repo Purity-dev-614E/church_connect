@@ -64,13 +64,13 @@ class EventCard extends StatelessWidget {
                         Icon(
                           Icons.calendar_today,
                           size: 16,
-                          color: AppColors.secondaryColor,
+                          color: Theme.of(context).colorScheme.onBackground,
                         ),
                         const SizedBox(width: 6.0),
                         Text(
                           eventDate,
                           style: TextStyles.bodyText.copyWith(
-                            color: AppColors.secondaryColor,
+                            color: Theme.of(context).colorScheme.onBackground,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -82,13 +82,13 @@ class EventCard extends StatelessWidget {
                         Icon(
                           Icons.location_on,
                           size: 16,
-                          color: AppColors.textColor.withOpacity(0.7),
+                          color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                         ),
                         const SizedBox(width: 6.0),
                         Text(
                           eventLocation,
                           style: TextStyles.bodyText.copyWith(
-                            color: AppColors.textColor.withOpacity(0.7),
+                            color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                           ),
                         ),
                       ],
@@ -98,7 +98,7 @@ class EventCard extends StatelessWidget {
               ),
               Icon(
                 Icons.arrow_forward_ios,
-                color: AppColors.primaryColor,
+                color: Theme.of(context).colorScheme.onBackground,
                 size: 16,
               ),
             ],

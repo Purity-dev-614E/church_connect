@@ -232,7 +232,7 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
           Icon(
             Icons.groups_outlined,
             size: 64,
-            color: AppColors.textColor.withOpacity(0.5),
+            color: Theme.of(context).colorScheme.onBackground.withOpacity(0.5),
           ),
           const SizedBox(height: 16),
           Text(
@@ -245,7 +245,7 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
           Text(
             'Create your first group to get started',
             style: TextStyles.bodyText.copyWith(
-              color: AppColors.textColor.withOpacity(0.7),
+              color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
             ),
             textAlign: TextAlign.center,
           ),
@@ -320,7 +320,7 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
                             'Admin: $adminName',
                             style: TextStyles.bodyText.copyWith(
                               fontSize: 14,
-                              color: AppColors.textColor.withOpacity(0.7),
+                              color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                             ),
                           );
                         },
@@ -481,7 +481,7 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
             label,
             style: TextStyles.bodyText.copyWith(
               fontSize: 12,
-              color: AppColors.textColor.withOpacity(0.7),
+              color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
             ),
           ),
         ],

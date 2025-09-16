@@ -77,7 +77,7 @@ class _RegionDashboardState extends State<RegionDashboard> {
     super.initState();
     try {
       _analyticsServices = RegionAnalyticsService(
-        baseUrl: 'https://safari-backend-production-bf65.up.railway.app/api'
+        baseUrl: 'https://safari-backend-fgl3.onrender.com/api'
       );
       _eventServices = EventServices();
 
@@ -565,14 +565,14 @@ class _RegionDashboardState extends State<RegionDashboard> {
               value,
               style: TextStyles.heading1.copyWith(
                 fontWeight: FontWeight.bold,
-                color: AppColors.textColor,
+                color: Theme.of(context).colorScheme.onBackground,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               title,
               style: TextStyles.bodyText.copyWith(
-                color: AppColors.textColor.withOpacity(0.7),
+                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
               ),
               textAlign: TextAlign.center,
             ),
@@ -640,13 +640,13 @@ class _RegionDashboardState extends State<RegionDashboard> {
                 Icon(
                   Icons.people_outline,
                   size: 48,
-                  color: AppColors.textColor.withOpacity(0.5),
+                  color: Theme.of(context).colorScheme.onBackground.withOpacity(0.5),
                 ),
                 const SizedBox(height: 16),
                 Text(
                   'No users in this region yet',
                   style: TextStyles.bodyText.copyWith(
-                    color: AppColors.textColor.withOpacity(0.7),
+                    color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -699,7 +699,7 @@ class _RegionDashboardState extends State<RegionDashboard> {
               user.email,
               style: TextStyles.bodyText.copyWith(
                 fontSize: 12,
-                color: AppColors.textColor.withOpacity(0.7),
+                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
               ),
             ),
             trailing: const Icon(Icons.chevron_right),
@@ -726,13 +726,13 @@ class _RegionDashboardState extends State<RegionDashboard> {
                 Icon(
                   Icons.groups_outlined,
                   size: 48,
-                  color: AppColors.textColor.withOpacity(0.5),
+                  color: Theme.of(context).colorScheme.onBackground.withOpacity(0.5),
                 ),
                 const SizedBox(height: 16),
                 Text(
                   'No groups in this region yet',
                   style: TextStyles.bodyText.copyWith(
-                    color: AppColors.textColor.withOpacity(0.7),
+                    color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -783,7 +783,7 @@ class _RegionDashboardState extends State<RegionDashboard> {
                   'Members: ${group.members?.length ?? 0}',
                   style: TextStyles.bodyText.copyWith(
                     fontSize: 12,
-                    color: AppColors.textColor.withOpacity(0.7),
+                    color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                   ),
                 ),
                 trailing: const Icon(Icons.chevron_right),

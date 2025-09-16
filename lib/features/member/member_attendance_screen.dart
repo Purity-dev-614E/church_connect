@@ -165,7 +165,7 @@ class _MemberAttendanceScreenState extends State<MemberAttendanceScreen> {
                                         Text(
                                           _member?.email ?? 'No email',
                                           style: TextStyles.bodyText.copyWith(
-                                            color: AppColors.textColor.withOpacity(0.7),
+                                            color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                                           ),
                                         ),
                                       ],
@@ -311,7 +311,7 @@ class _MemberAttendanceScreenState extends State<MemberAttendanceScreen> {
             Text(
               title,
               style: TextStyles.bodyText.copyWith(
-                color: AppColors.textColor.withOpacity(0.7),
+                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
               ),
             ),
           ],
@@ -328,13 +328,13 @@ class _MemberAttendanceScreenState extends State<MemberAttendanceScreen> {
           Icon(
             Icons.event_busy,
             size: 48,
-            color: AppColors.textColor.withOpacity(0.5),
+            color: Theme.of(context).colorScheme.onBackground.withOpacity(0.5),
           ),
           const SizedBox(height: 16),
           Text(
             message,
             style: TextStyles.bodyText.copyWith(
-              color: AppColors.textColor.withOpacity(0.7),
+              color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
             ),
             textAlign: TextAlign.center,
           ),

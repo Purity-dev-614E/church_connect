@@ -752,7 +752,7 @@ String? _getRegionByGroup(String groupId) {
                     Text(
                       'Role in Church',
                       style: TextStyles.bodyText.copyWith(
-                        color: AppColors.textColor.withOpacity(0.7),
+                        color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                         fontSize: 14,
                       ),
                     ),
@@ -768,7 +768,7 @@ String? _getRegionByGroup(String groupId) {
                       'Note: Only Super Admins can change user roles',
                       style: TextStyles.bodyText.copyWith(
                         fontSize: 12,
-                        color: AppColors.textColor.withOpacity(0.6),
+                        color: Theme.of(context).colorScheme.onBackground.withOpacity(0.6),
                         fontStyle: FontStyle.italic,
                       ),
                     ),
@@ -820,7 +820,7 @@ String? _getRegionByGroup(String groupId) {
                             Text(
                               'Your Region',
                               style: TextStyles.bodyText.copyWith(
-                                color: AppColors.textColor,
+                                color: Theme.of(context).colorScheme.onBackground,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
                               ),
@@ -868,7 +868,7 @@ String? _getRegionByGroup(String groupId) {
                       'Select the region you belong to for group assignments',
                       style: TextStyles.bodyText.copyWith(
                         fontSize: 12,
-                        color: AppColors.textColor.withOpacity(0.7),
+                        color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -935,7 +935,7 @@ String? _getRegionByGroup(String groupId) {
                             hint: Text(
                               'Select your region',
                               style: TextStyles.bodyText.copyWith(
-                                color: AppColors.textColor.withOpacity(0.5),
+                                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.5),
                               ),
                             ),
                             icon: const Icon(Icons.arrow_drop_down, color: AppColors.primaryColor),
@@ -1182,7 +1182,7 @@ void _showAllRegions() {
                                         fontWeight: FontWeight.bold,
                                         color: isSelected
                                             ? AppColors.primaryColor
-                                            : AppColors.textColor,
+                                            : Theme.of(context).colorScheme.onBackground,
                                       ),
                                     ),
                                   ),
@@ -1208,7 +1208,7 @@ void _showAllRegions() {
                                   region.description!,
                                   style: TextStyles.bodyText.copyWith(
                                     fontSize: 14,
-                                    color: AppColors.textColor.withOpacity(0.7),
+                                    color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                                   ),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,

@@ -1,4 +1,4 @@
-import 'dart:async'; // <-- added
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -20,9 +20,15 @@ import 'package:group_management_church_app/features/auth/reset_password.dart';
 import 'package:group_management_church_app/features/auth/signup.dart';
 import 'package:group_management_church_app/features/splash_screen.dart';
 
-
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Optional: lock orientation to portrait
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+
   runApp(const MyApp());
 }
 
@@ -40,7 +46,8 @@ class _AuthErrorObserver extends NavigatorObserver {
         route.settings.name != '/reset-password') {
       Future.delayed(Duration.zero, () {
         if (navigator?.context != null) {
-          final authProvider = Provider.of<AuthProvider>(navigator!.context, listen: false);
+          final authProvider =
+          Provider.of<AuthProvider>(navigator!.context, listen: false);
           if (authProvider.status == AuthStatus.unauthenticated &&
               authProvider.errorMessage.contains('Authentication failed')) {
             AuthErrorHandler.handleAuthError(navigator!.context);
@@ -69,16 +76,16 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => SuperAdminAnalyticsProvider()),
       ],
       child: MaterialApp(
-        title: 'Church Connect',
+        title: 'Safari Connect',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,
-        themeMode: ThemeMode.system,
+        themeMode: ThemeMode.system, // <- auto switch based on system/Chrome
         home: const SplashScreen(),
         routes: {
           '/login': (context) => const LoginScreen(),
           '/signup': (context) => const SignupScreen(),
-          '/reset-password': (context) => const ResetPasswordScreen(), // Assuming you have a LogScreen
+          '/reset-password': (context) => const ResetPasswordScreen(),
         },
         navigatorObservers: [
           _AuthErrorObserver(),

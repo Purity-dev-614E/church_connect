@@ -158,7 +158,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     final size = MediaQuery.of(context).size;
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
@@ -184,7 +183,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                           Text(
                             'Welcome Back',
                             style: TextStyles.heading1.copyWith(
-                              color: AppColors.primaryColor,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -193,7 +191,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                           Text(
                             'Sign in to continue to your account',
                             style: TextStyles.bodyText.copyWith(
-                              color: AppColors.textColor.withOpacity(0.7),
+                              color: Theme.of(context).colorScheme.onBackground,
                             ),
                           ),
                           const SizedBox(height: 24),
@@ -263,7 +261,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                 child: Text(
                                   'Forgot Password?',
                                   style: TextStyles.bodyText.copyWith(
-                                    color: AppColors.primaryColor,
+                                    color: Theme.of(context).colorScheme.onBackground,
                                     fontWeight: FontWeight.w600,
                                     fontSize: 14,
                                   ),
@@ -278,7 +276,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                             label: 'Login',
                             onPressed: _login,
                             isLoading: _isLoading,
-                            color: AppColors.primaryColor,
+                            color: Color(0xffd32f2f),
                             isPulsing: true,
                             pulseEffect: PulseEffectType.glow,
                           ),
@@ -290,14 +288,17 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                             children: [
                               Text(
                                 'Don\'t have an account? ',
-                                style: TextStyles.bodyText,
+                                style: TextStyles.bodyText.copyWith(
+                                  fontSize: 14,
+                                  color: Theme.of(context).colorScheme.onBackground,
+                                ),
                               ),
                               GestureDetector(
                                 onTap: _navigateToSignup,
                                 child: Text(
                                   'Sign Up',
                                   style: TextStyles.bodyText.copyWith(
-                                    color: AppColors.primaryColor,
+                                    color: Theme.of(context).colorScheme.onBackground,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
@@ -333,7 +334,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             end: Alignment.bottomCenter,
             colors: [
               AppColors.primaryColor,
-              AppColors.secondaryColor,
+              Colors.black38,
             ],
           ),
           borderRadius: const BorderRadius.only(
@@ -408,7 +409,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
                   // App name
                   Text(
-                    'Church Connect',
+                    'Safari Connect',
                     style: TextStyle(
                       fontFamily: 'WinkySans',
                       fontSize: 26, // Smaller font
@@ -480,10 +481,10 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
           // Copyright text
           Text(
-            '© 2025 Church Connect. All rights reserved.',
+            '© 2025 Safari Connect. All rights reserved.',
             style: TextStyle(
               fontSize: 11, // Smaller font
-              color: AppColors.textColor.withOpacity(0.6),
+              color: Theme.of(context).colorScheme.onBackground,
             ),
           ),
         ],

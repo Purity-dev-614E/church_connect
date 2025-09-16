@@ -586,7 +586,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                       child: Text(
                         'Cancel',
                         style: TextStyles.bodyText.copyWith(
-                          color: AppColors.textColor,
+                          color: Theme.of(context).colorScheme.onBackground,
                         ),
                       ),
                     ),
@@ -789,7 +789,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                       child: Text(
                         'Cancel',
                         style: TextStyles.bodyText.copyWith(
-                          color: AppColors.textColor,
+                          color: Theme.of(context).colorScheme.onBackground,
                         ),
                       ),
                     ),
@@ -991,7 +991,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                     'View Details',
                     style: TextStyles.bodyText.copyWith(
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textColor,
+                      color: Theme.of(context).colorScheme.onBackground,
                     ),
                   ),
                   onTap: () {
@@ -1224,7 +1224,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                       child: Text(
                         'Cancel',
                         style: TextStyles.bodyText.copyWith(
-                          color: AppColors.textColor,
+                          color: Theme.of(context).colorScheme.onBackground,
                         ),
                       ),
                     ),
@@ -1768,14 +1768,14 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
               value,
               style: TextStyles.heading1.copyWith(
                 fontWeight: FontWeight.bold,
-                color: AppColors.textColor,
+                color: Theme.of(context).colorScheme.onBackground,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               title,
               style: TextStyles.bodyText.copyWith(
-                color: AppColors.textColor.withOpacity(0.7),
+                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
               ),
               textAlign: TextAlign.center,
             ),
@@ -1802,7 +1802,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
               title,
               style: TextStyles.heading2.copyWith(
                 fontWeight: FontWeight.bold,
-                color: AppColors.textColor,
+                color: Theme.of(context).colorScheme.onBackground,
               ),
             ),
           ],
@@ -1921,7 +1921,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
               member.email,
               style: TextStyles.bodyText.copyWith(
                 fontSize: 14,
-                color: AppColors.textColor.withOpacity(0.7),
+                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
               ),
             ),
             trailing: IconButton(
@@ -1989,13 +1989,13 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                 Icon(
                   Icons.event_busy,
                   size: 64,
-                  color: AppColors.textColor.withOpacity(0.5),
+                  color: Theme.of(context).colorScheme.onBackground.withOpacity(0.5),
                 ),
                 const SizedBox(height: 16),
                 Text(
                   'No upcoming events',
                   style: TextStyles.bodyText.copyWith(
-                    color: AppColors.textColor.withOpacity(0.7),
+                    color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -2003,7 +2003,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                   label: 'Create Event',
                   onPressed: _showCreateEventDialog,
                   icon: Icons.add,
-                  color: AppColors.primaryColor,
+                  color: Color(0xffc62828),
                   isFullWidth: false,
                   horizontalPadding: 24,
                 ),
@@ -2044,13 +2044,13 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                 Icon(
                   Icons.event_busy,
                   size: 64,
-                  color: AppColors.textColor.withOpacity(0.5),
+                  color: Theme.of(context).colorScheme.onBackground.withOpacity(0.5),
                 ),
                 const SizedBox(height: 16),
                 Text(
                   'No past events',
                   style: TextStyles.bodyText.copyWith(
-                    color: AppColors.textColor.withOpacity(0.7),
+                    color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                   ),
                 ),
               ],
@@ -2095,7 +2095,11 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
             title: 'Appearance',
             icon: Icons.palette,
             children: [
-              _buildThemeSelector(),
+              _buildThemeSelector(_isDarkMode,(bool newValue){
+                setState(() {
+                  _isDarkMode = newValue;
+                });
+              }),
               const SizedBox(height: 16),
               _buildAccentColorSelector(),
             ],
@@ -2313,7 +2317,10 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
     );
   }
 
-  Widget _buildThemeSelector() {
+  Widget _buildThemeSelector(bool? isDarkMode, Function(bool) onChanged) {
+    // default to false if null for UI selection
+    final selected = isDarkMode ?? WidgetsBinding.instance.window.platformBrightness == Brightness.dark;
+
     return Row(
       children: [
         const Text('Theme Mode:'),
@@ -2332,17 +2339,16 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                 icon: Icon(Icons.dark_mode),
               ),
             ],
-            selected: {_isDarkMode},
+            selected: {selected},
             onSelectionChanged: (Set<bool> selection) {
-              setState(() {
-                _isDarkMode = selection.first;
-              });
+              onChanged(selection.first); // user overrides system
             },
           ),
         ),
       ],
     );
   }
+
 
   Widget _buildAccentColorSelector() {
     final List<Color> colorOptions = [

@@ -415,7 +415,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
               title,
               style: TextStyles.bodyText.copyWith(
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? color : AppColors.textColor,
+                color: isSelected ? color : Theme.of(context).colorScheme.onBackground,
               ),
               textAlign: TextAlign.center,
             ),

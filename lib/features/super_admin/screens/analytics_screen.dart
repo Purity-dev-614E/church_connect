@@ -478,7 +478,7 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
             description,
             style: TextStyles.bodyText.copyWith(
               fontSize: 12,
-              color: AppColors.textColor.withOpacity(0.7),
+              color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
             ),
           ),
         ],
@@ -490,7 +490,7 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.backgroundColor,
+        color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.accentColor),
       ),
@@ -548,7 +548,7 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
                 description,
                 style: TextStyles.bodyText.copyWith(
                   fontSize: 12,
-                  color: AppColors.textColor.withOpacity(0.7),
+                  color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                 ),
               ),
             ],

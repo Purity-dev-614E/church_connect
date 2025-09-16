@@ -313,7 +313,7 @@ class _UserManagementTabState extends State<UserManagementTab> {
             Text(
               'Phone Number: +${user.contact}',
               style: TextStyles.bodyText.copyWith(
-                color: AppColors.textColor.withOpacity(0.7),
+                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
               ),
             ),
             const SizedBox(height: 8),

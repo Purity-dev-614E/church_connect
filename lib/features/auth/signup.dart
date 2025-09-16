@@ -224,7 +224,7 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
                           Text(
                             'Join our community today',
                             style: TextStyles.bodyText.copyWith(
-                              color: AppColors.textColor.withOpacity(0.7),
+                              color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                             ),
                           ),
                           const SizedBox(height: 24),
@@ -303,7 +303,7 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
                             label: 'Sign Up',
                             onPressed: _signup,
                             isLoading: _isLoading,
-                            color: AppColors.secondaryColor,
+                            color: Color(0xffef9a9a),
                             isPulsing: true,
                             pulseEffect: PulseEffectType.glow,
                           ),
@@ -518,7 +518,7 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
             '© 2025 Church Connect. All rights reserved.',
             style: TextStyle(
               fontSize: 11,
-              color: AppColors.textColor.withOpacity(0.6),
+              color: Theme.of(context).colorScheme.onBackground.withOpacity(0.6),
             ),
           ),
         ],
