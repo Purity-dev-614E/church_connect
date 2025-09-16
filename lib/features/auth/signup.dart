@@ -301,7 +301,18 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
                           // Signup button
                           CustomButton(
                             label: 'Sign Up',
-                            onPressed: _signup,
+                            onPressed: () { 
+                              showDialog(
+                                context: context,
+                                barrierDismissable: false,
+                                builder:(_) => DisclaimerPopup(
+                                  onAcceppted()async{
+                                    _signup()
+                                  }
+                                )
+                             )
+                            }
+                          ),
                             isLoading: _isLoading,
                             color: Color(0xffef9a9a),
                             isPulsing: true,
@@ -454,7 +465,7 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
 
                   // App name
                   Text(
-                    'Join Church Connect',
+                    'Join Safari Connect',
                     style: TextStyle(
                       fontFamily: 'WinkySans',
                       fontSize: 24,
@@ -515,7 +526,7 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
 
           // Copyright text
           Text(
-            '© 2025 Church Connect. All rights reserved.',
+            '© 2025 Safari Connect. All rights reserved.',
             style: TextStyle(
               fontSize: 11,
               color: Theme.of(context).colorScheme.onBackground.withOpacity(0.6),
@@ -523,6 +534,121 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
           ),
         ],
       ),
+    );
+  }
+}
+
+class DisclaimerPopup extends StatefulWidget{
+  final VoidCallBack onAcceppted;
+
+  const DisclaimerPopup({super.key,required this.onAcceppted});
+
+  @override
+  State<DisclaimerPopup> createState() => _DisclaimerPopupState();
+}
+
+class _DisclaimerPopupState extends State<DisclaimerPopup>{
+  final ScrollController _scrollController = ScrollController();
+  bool _isAtBottom = false;
+  bool _accepted = false;
+  bool _showFull = false;
+
+  @override
+  void initState(){
+    super.initState();
+    _scrollController.addListener((){
+      if(_scrollController.offset >= _scrollController.position.maxScrollExtent){
+        setState((){
+          _isAtBottom = true;
+        });
+      }
+    })
+  }
+
+  @override
+  Widget build(BuildContext context){
+    return AlertDialog(
+      title: const Text("Data Protection & privacy Disclaimer"),
+      content: SizedBox(
+        height:300,
+        width:400,
+        child: _showFull ?
+        _buildFullContent(): _buildShortContent(),
+    ),
+    actions: _showFull ? [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text("Decline"),
+      ),
+      ElevatedButton(
+        onPressed: _accepted ? (){
+          Navigator.pop(context);
+          widget.onAcceppted;
+        }
+        :null,
+        child: const Text ("Continue"),
+      ),
+    ]
+    : [
+      TextButton(
+        onPressed: () => 
+        Navigator.pop(context),
+        child: const Text ("Cancel"),
+      ),
+      ElevatedButton(
+        onPressed: () {
+          setState((){
+            _showFull = true;
+          });
+        },
+        child: const Text ("View More"),
+      )
+    ],
+    );
+  }
+
+
+  Widget _buildShortContent () {
+    return const Text("""
+      By creating an account, you consent to the collection and use of your personal data for Safari group Ministry purposes and strictly in line with the Kenya Data Protection Act,2019
+    """)
+  }
+
+  Widget _buildFullContent () {
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            controller: _scrollController,
+            child: const Text(
+              """By registering and using this application, you consent to the collection and processing of your personal information by Christ Is The Answer Ministries (CITAM) Valley Road Safari Groups administration, including enrollment, attendance tracking, communication and discipleship reporting. 
+              Your information will be stored securely and will not be shared with unauthorized third parties. 
+              Access will be restricted to designated Safari Group leaders, coordinators, and ministry administrators for official ministry purposes only. 
+              You have the right to request access, correction, or deletion of your personal data in line with the provisions of the Kenya Data Protection Act, 2019. 
+              For any questions or to exercise your rights, please contact the Citam valley road safari group leadership.
+              """,
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children[
+            Checkbox(
+              value: _accepted,
+              onChanged: _isAtBottom
+                        ?(val) {
+                          setState((){
+                            _accepted = val ?? false;
+                          });
+                        }
+                        :null,
+            ),
+            const Flexible(
+              child:Text("I Accept")
+            ),
+          ]
+        )
+      ]
     );
   }
 }
