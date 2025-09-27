@@ -5,6 +5,7 @@ import 'package:group_management_church_app/data/providers/analytics_providers/s
 import 'package:group_management_church_app/data/providers/region_provider.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
+import '../../../main.dart';
 
 class SuperAdminAnalyticsScreen extends StatefulWidget {
   const SuperAdminAnalyticsScreen({super.key});
@@ -388,7 +389,7 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
                           const SizedBox(width: 16),
                           Expanded(
                             child: _buildStatCard(
-                              'Total Groups',
+                              'All Groups',
                               _totalGroups.toString(),
                               Icons.group_work,
                               AppColors.secondaryColor,
@@ -412,7 +413,7 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
                           const SizedBox(width: 16),
                           Expanded(
                             child: _buildStatCard(
-                              'Overall Attendance',
+                              'Attendance',
                               '${_overallAttendance.toStringAsFixed(1)}%',
                               Icons.trending_up,
                               AppColors.successColor,
@@ -468,7 +469,6 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
           Text(
             value,
             style: TextStyles.heading1.copyWith(
-              fontSize: 28,
               fontWeight: FontWeight.bold,
               color: color,
             ),
@@ -477,7 +477,6 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
           Text(
             description,
             style: TextStyles.bodyText.copyWith(
-              fontSize: 12,
               color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
             ),
           ),
@@ -547,7 +546,6 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
               Text(
                 description,
                 style: TextStyles.bodyText.copyWith(
-                  fontSize: 12,
                   color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                 ),
               ),

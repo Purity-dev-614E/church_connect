@@ -308,7 +308,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                           child: AnimatedTextKit(
                             animatedTexts: [
                               TypewriterAnimatedText(
-                                'Bringing Communities Together',
+                                'Powered by the Spirit',
                                 speed: const Duration(milliseconds: 80),
                               ),
                             ],

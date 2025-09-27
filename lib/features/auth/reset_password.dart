@@ -146,7 +146,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with SingleTi
     final size = MediaQuery.of(context).size;
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
@@ -509,7 +508,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with SingleTi
 
           // Support text
           Text(
-            'Need help? Contact support@churchconnect.com',
+            'Need help? Contact safariconnect.com',
             style: TextStyle(
               fontSize: 11,
               color: Theme.of(context).colorScheme.onBackground.withOpacity(0.6),

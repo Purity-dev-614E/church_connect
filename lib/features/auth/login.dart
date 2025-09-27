@@ -422,7 +422,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
                   // App tagline
                   Text(
-                    'Pressing Towards the Mark',
+                    'Powered by the Spirit',
                     style: TextStyle(
                       fontSize: 13, // Smaller font
                       color: Colors.white.withOpacity(0.9),

@@ -293,7 +293,7 @@ String? _getRegionByGroup(String groupId) {
           regionName: selectedRegionName != 'your region' ? selectedRegionName : null,
           citam_Assembly: _CitamAssembly.text.trim(),
           if_Not: _ifNot.text.trim(),
-          regionalID: _regionalID ?? ''
+          regionalID: _regionalID ?? '',
 
         );
 
@@ -398,7 +398,6 @@ String? _getRegionByGroup(String groupId) {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
@@ -628,7 +627,6 @@ String? _getRegionByGroup(String groupId) {
           prefixIcon: Icons.email_outlined,
           enabled: false,
           filled: true,
-          fillColor: Colors.grey[200],
         ),
         const SizedBox(height: 16),
         
@@ -720,7 +718,7 @@ String? _getRegionByGroup(String groupId) {
           hintText: 'Indicate CITAM Assembly you Attend',
           prefixIcon: Icons.group_work_outlined,
         ),
-
+        const SizedBox(height: 16),
         // if not
         EnhancedInputField(
           controller: _ifNot,
@@ -728,56 +726,8 @@ String? _getRegionByGroup(String groupId) {
           hintText: 'If Not CITAM Member, Please Indicate Your Church',
           prefixIcon: Icons.question_mark_outlined,
         ),
-        
-        // Display role information (not editable)
-        Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: AppColors.primaryColor.withOpacity(0.5)),
-            borderRadius: BorderRadius.circular(8),
-            color: Colors.grey[200],
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          child: Row(
-            children: [
-              Icon(
-                Icons.work_outline,
-                color: AppColors.primaryColor,
-                size: 24,
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Role in Church',
-                      style: TextStyles.bodyText.copyWith(
-                        color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'User',
-                      style: TextStyles.bodyText.copyWith(
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Note: Only Super Admins can change user roles',
-                      style: TextStyles.bodyText.copyWith(
-                        fontSize: 12,
-                        color: Theme.of(context).colorScheme.onBackground.withOpacity(0.6),
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
+        const SizedBox(height: 16),
+
       ],
     );
   }
@@ -917,12 +867,12 @@ String? _getRegionByGroup(String groupId) {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: Theme.of(context).colorScheme.surface,
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(color: AppColors.primaryColor.withOpacity(0.3)),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
+                              color: Theme.of(context).colorScheme.surface,
                               blurRadius: 4,
                               offset: const Offset(0, 2),
                             ),
@@ -984,7 +934,7 @@ String? _getRegionByGroup(String groupId) {
               margin: const EdgeInsets.only(top: 12),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: AppColors.secondaryColor.withOpacity(0.1),
+                color: Theme.of(context).cardTheme.color?.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.secondaryColor.withOpacity(0.3)),
               ),
@@ -1001,7 +951,7 @@ String? _getRegionByGroup(String groupId) {
                       'Please select your region to continue',
                       style: TextStyles.bodyText.copyWith(
                         fontSize: 12,
-                        color: AppColors.secondaryColor,
+                        color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                         fontWeight: FontWeight.w500,
                       ),
                     ),

@@ -667,7 +667,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _buildInfoRow(Icons.person, 'Gender', user.gender),
             const Divider(),
             _buildInfoRow(
-              Icons.location_on, 'Place of Residence', user.regionName ?? 'Not Assigned',
+              Icons.location_on, 'Safari Group', user.regionName ?? 'Not Assigned',
             ),
             const Divider(),
             _buildInfoRow(Icons.place_outlined, "Region", user.overalRegionName ?? 'Not Assigned'),

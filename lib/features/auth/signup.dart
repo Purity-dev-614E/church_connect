@@ -189,7 +189,6 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
     final size = MediaQuery.of(context).size;
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
@@ -304,17 +303,16 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
                             onPressed: () { 
                               showDialog(
                                 context: context,
-                                barrierDismissable: false,
+                                barrierDismissible: false,
                                 builder:(_) => DisclaimerPopup(
-                                  onAcceppted()async{
-                                    _signup()
+                                  onAccepted: () async{
+                                    _signup();
                                   }
                                 )
-                             )
-                            }
-                          ),
-                            isLoading: _isLoading,
-                            color: Color(0xffef9a9a),
+                             );
+                            },
+                            isLoading : _isLoading,
+                            color: Color(0xffd32f2f),
                             isPulsing: true,
                             pulseEffect: PulseEffectType.glow,
                           ),
@@ -333,7 +331,7 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
                                 child: Text(
                                   'Login',
                                   style: TextStyles.bodyText.copyWith(
-                                    color: AppColors.secondaryColor,
+                                    color: Theme.of(context).colorScheme.onBackground,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
@@ -341,7 +339,7 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
                             ],
                           ),
                           const SizedBox(height: 16),
-                        ],
+                  ],
                       ),
                     ),
                   ),
@@ -538,117 +536,169 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
   }
 }
 
-class DisclaimerPopup extends StatefulWidget{
-  final VoidCallBack onAcceppted;
+class DisclaimerPopup extends StatefulWidget {
+  final VoidCallback onAccepted;
 
-  const DisclaimerPopup({super.key,required this.onAcceppted});
+  const DisclaimerPopup({super.key, required this.onAccepted});
 
   @override
   State<DisclaimerPopup> createState() => _DisclaimerPopupState();
 }
 
-class _DisclaimerPopupState extends State<DisclaimerPopup>{
+class _DisclaimerPopupState extends State<DisclaimerPopup> {
   final ScrollController _scrollController = ScrollController();
   bool _isAtBottom = false;
   bool _accepted = false;
   bool _showFull = false;
 
   @override
-  void initState(){
+  void initState() {
     super.initState();
-    _scrollController.addListener((){
-      if(_scrollController.offset >= _scrollController.position.maxScrollExtent){
-        setState((){
+    _scrollController.addListener(() {
+      if (_scrollController.offset >= _scrollController.position.maxScrollExtent) {
+        setState(() {
           _isAtBottom = true;
         });
       }
-    })
+    });
   }
 
   @override
-  Widget build(BuildContext context){
+  Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text("Data Protection & privacy Disclaimer"),
-      content: SizedBox(
-        height:300,
-        width:400,
-        child: _showFull ?
-        _buildFullContent(): _buildShortContent(),
-    ),
-    actions: _showFull ? [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text("Decline"),
+      title: Text(
+        "Data Protection & Privacy Disclaimer",
+        style: TextStyles.heading2.copyWith(
+          fontWeight: FontWeight.bold,
+          color: Theme.of(context).colorScheme.onBackground,
+        ),
       ),
-      ElevatedButton(
-        onPressed: _accepted ? (){
-          Navigator.pop(context);
-          widget.onAcceppted;
-        }
-        :null,
-        child: const Text ("Continue"),
+      content: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.5,
+          maxWidth: MediaQuery.of(context).size.width * 0.1, // Adjust the multiplier as needed
+        ),
+        child: _showFull ? _buildFullContent() : _buildShortContent(),
       ),
-    ]
-    : [
-      TextButton(
-        onPressed: () => 
-        Navigator.pop(context),
-        child: const Text ("Cancel"),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
       ),
-      ElevatedButton(
-        onPressed: () {
-          setState((){
-            _showFull = true;
-          });
-        },
-        child: const Text ("View More"),
-      )
-    ],
+      elevation: 8,
+      backgroundColor: Theme.of(context).cardTheme.color,
+      actions: _showFull
+          ? [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  "Decline",
+                  style: TextStyles.bodyText.copyWith(
+                    color: AppColors.errorColor,
+                  ),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: _accepted
+                    ? () {
+                        Navigator.pop(context);
+                        widget.onAccepted();
+                      }
+                    : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: Text(
+                  "Continue",
+                  style: TextStyles.bodyText.copyWith(
+                    color: Theme.of(context).colorScheme.onBackground,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ]
+          : [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  "Cancel",
+                  style: TextStyles.bodyText.copyWith(
+                    color: AppColors.errorColor,
+                  ),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _showFull = true;
+                  });
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: Text(
+                  "View More",
+                  style: TextStyles.bodyText.copyWith(
+                    color: Theme.of(context).colorScheme.onBackground,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
     );
   }
+Widget _buildShortContent() {
+  return  Text(
+    "By creating an account, you consent to the collection and use of your personal data for Safari group Ministry purposes and strictly in line with the Kenya Data Protection Act, 2019.",
+    style: TextStyle(
+      fontSize: 14,
+      fontWeight: FontWeight.w500,
+      color: Theme.of(context).colorScheme.onBackground,
+      height: 1.5,
+    ),
+    textAlign: TextAlign.justify,
+  );
+}
 
-
-  Widget _buildShortContent () {
-    return const Text("""
-      By creating an account, you consent to the collection and use of your personal data for Safari group Ministry purposes and strictly in line with the Kenya Data Protection Act,2019
-    """)
-  }
-
-  Widget _buildFullContent () {
+  Widget _buildFullContent() {
     return Column(
       children: [
         Expanded(
           child: SingleChildScrollView(
             controller: _scrollController,
-            child: const Text(
-              """By registering and using this application, you consent to the collection and processing of your personal information by Christ Is The Answer Ministries (CITAM) Valley Road Safari Groups administration, including enrollment, attendance tracking, communication and discipleship reporting. 
-              Your information will be stored securely and will not be shared with unauthorized third parties. 
-              Access will be restricted to designated Safari Group leaders, coordinators, and ministry administrators for official ministry purposes only. 
-              You have the right to request access, correction, or deletion of your personal data in line with the provisions of the Kenya Data Protection Act, 2019. 
-              For any questions or to exercise your rights, please contact the Citam valley road safari group leadership.
-              """,
+            child:  Text(
+              "By registering and using this application, you consent to the collection and processing of your personal information by Christ Is The Answer Ministries (CITAM) Valley Road Safari Groups administration, including enrollment, attendance tracking, communication and discipleship reporting. Your information will be stored securely and will not be shared with unauthorized third parties. Access will be restricted to designated Safari Group leaders, coordinators, and ministry administrators for official ministry purposes only. You have the right to request access, correction, or deletion of your personal data in line with the provisions of the Kenya Data Protection Act, 2019. For any questions or to exercise your rights, please contact the Citam valley road safari group leadership.",
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Theme.of(context).colorScheme.onBackground,
+                height: 1.5,
+              ),
+              textAlign: TextAlign.justify,
             ),
           ),
         ),
         const SizedBox(height: 10),
         Row(
-          children[
+          children: [
             Checkbox(
               value: _accepted,
               onChanged: _isAtBottom
-                        ?(val) {
-                          setState((){
-                            _accepted = val ?? false;
-                          });
-                        }
-                        :null,
+                  ? (val) {
+                      setState(() {
+                        _accepted = val ?? false;
+                      });
+                    }
+                  : null,
             ),
-            const Flexible(
-              child:Text("I Accept")
-            ),
-          ]
-        )
-      ]
+            const Flexible(child: Text("I Accept")),
+          ],
+        ),
+      ],
     );
   }
 }

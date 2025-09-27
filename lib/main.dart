@@ -32,6 +32,31 @@ void main() async {
   runApp(const MyApp());
 }
 
+/// 🔹 Global device configuration helper
+class DeviceConfig {
+  /// ✅ Safe Android defaults (Samsung Galaxy A16 reference)
+  static double screenWidth = 1080;   // baseline width
+  static double screenHeight = 2408;  // baseline height
+  static bool isMobile = true;
+
+  static void init(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    screenWidth = size.width;
+    screenHeight = size.height;
+    isMobile = screenWidth < 600;
+  }
+
+  /// 🔹 Dynamic font scaling
+  static double font(double size) {
+    return screenWidth * (size / 1080);
+  }
+
+  /// 🔹 Dynamic spacing (paddings, margins, etc.)
+  static double space(double size) {
+    return screenWidth * (size / 1080);
+  }
+}
+
 /// Custom navigator observer to handle authentication errors
 class _AuthErrorObserver extends NavigatorObserver {
   @override
@@ -80,7 +105,7 @@ class MyApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,
-        themeMode: ThemeMode.system, // <- auto switch based on system/Chrome
+        themeMode: ThemeMode.system,
         home: const SplashScreen(),
         routes: {
           '/login': (context) => const LoginScreen(),
@@ -90,6 +115,31 @@ class MyApp extends StatelessWidget {
         navigatorObservers: [
           _AuthErrorObserver(),
         ],
+
+        /// 🔹 Global scaling for MOBILE-first app
+        builder: (context, child) {
+          final mediaQuery = MediaQuery.of(context);
+          double width = mediaQuery.size.width;
+
+          double targetWidth;
+          if (width <= 480) {
+            targetWidth = width; // small phone
+          } else if (width <= 800) {
+            targetWidth = width; // tablet
+          } else {
+            targetWidth = 800;   // cap width on desktop
+          }
+
+          /// 🔹 Initialize DeviceConfig with actual screen values
+          DeviceConfig.init(context);
+
+          return MediaQuery(
+            data: mediaQuery.copyWith(
+              size: Size(targetWidth, mediaQuery.size.height),
+            ),
+            child: child!,
+          );
+        },
       ),
     );
   }

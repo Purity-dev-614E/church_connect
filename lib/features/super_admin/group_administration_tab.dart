@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:group_management_church_app/core/constants/colors.dart';
 import 'package:group_management_church_app/core/constants/text_styles.dart';
 import 'package:group_management_church_app/data/models/group_model.dart';
@@ -30,25 +31,43 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
   String _searchQuery = '';
   String _selectedFilter = 'All Groups';
   final List<String> _filterOptions = ['All Groups', 'Active', 'Inactive'];
+  final ScrollController _scrollController = ScrollController();
+  bool _isHeaderVisible = true;
   
   @override
   void initState() {
     super.initState();
     _filteredGroups = _groups;
     _loadGroups();
+
+    _scrollController.addListener(() {
+      if (_scrollController.position.userScrollDirection == ScrollDirection.reverse) {
+        if (_isHeaderVisible) {
+          setState(() {
+            _isHeaderVisible = false;
+          });
+        }
+      } else if (_scrollController.position.userScrollDirection == ScrollDirection.forward) {
+        if (!_isHeaderVisible) {
+          setState(() {
+            _isHeaderVisible = true;
+          });
+        }
+      }
+    });
   }
-  
+
   Future<void> _loadGroups() async {
     if (_isLoading) return; // Prevent multiple simultaneous loads
-    
+
     setState(() {
       _isLoading = true;
     });
-    
+
     try {
       final groupProvider = Provider.of<GroupProvider>(context, listen: false);
       await groupProvider.fetchGroups();
-      
+
       if (mounted) {
         setState(() {
           _groups = groupProvider.groups;
@@ -67,12 +86,12 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
       }
     }
   }
-  
+
   void _filterGroups() {
     setState(() {
       _filteredGroups = _groups.where((group) {
         final matchesSearch = group.name.toLowerCase().contains(_searchQuery.toLowerCase());
-        final matchesFilter = _selectedFilter == 'All Groups' || 
+        final matchesFilter = _selectedFilter == 'All Groups' ||
                              (_selectedFilter == 'Active' && true) || // Assuming all groups are active for now
                              (_selectedFilter == 'Inactive' && false);
         return matchesSearch && matchesFilter;
@@ -105,94 +124,113 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Group Management',
-            style: TextStyles.heading1.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Manage all church groups from this dashboard. You can create, edit, and view details of each group.',
-            style: TextStyles.bodyText,
-          ),
-          const SizedBox(height: 24),
-          TextField(
-            onChanged: (value) {
-              setState(() {
-                _searchQuery = value.toLowerCase();
-              });
-              _filterGroups();
-            },
-            decoration: InputDecoration(
-              labelText: 'Search Groups',
-              hintText: 'Enter group name',
-              prefixIcon: const Icon(Icons.search),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+    return Scaffold(
+      body: CustomScrollView(
+        controller: _scrollController,
+        slivers: [
+          // Title + subtitle (scroll away)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Group Management',
+                    style: TextStyles.heading1.copyWith(
+                      color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+                  ),),
+                  const SizedBox(height: 16),
+                  Text('Manage all church groups from this dashboard.',
+                    style: TextStyles.heading2.copyWith(
+                      color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+                    ),
+                  ),
+
+                ],
               ),
             ),
           ),
-          const SizedBox(height: 16),
-          DropdownButton<String>(
-            value: _selectedFilter,
-            onChanged: (value) {
-              setState(() {
-                _selectedFilter = value!;
-              });
-              _filterGroups();
-            },
-            items: _filterOptions.map((filter) {
-              return DropdownMenuItem(
-                value: filter,
-                child: Text(filter),
-              );
-            }).toList(),
-            isExpanded: true,
-            hint: const Text('Filter Groups'),
-          ),
-          const SizedBox(height: 24),
-          Expanded(
-            child: _isLoading 
-              ? const Center(child: CircularProgressIndicator())
-              : _errorMessage != null
-                ? _buildErrorView()
-                : _filteredGroups.isEmpty
-                  ? _buildEmptyView()
-                  : _buildGroupList(),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () async {
-                final created = await _showCreateGroupDialog(context);
-                if (created) {
-                  await _loadGroups();
-                }
-              },
-              icon: const Icon(Icons.add),
-              label: const Text('Create New Group'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryColor,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+
+          // Search + filter (pinned)
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _SearchFilterHeader(
+              child: Container(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    TextField(
+                      onChanged: (value) {
+                        setState(() {
+                          _searchQuery = value.toLowerCase();
+                        });
+                        _filterGroups();
+                      },
+                      decoration: const InputDecoration(
+                        labelText: 'Search Groups',
+                        prefixIcon: Icon(Icons.search),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButton<String>(
+                      value: _selectedFilter,
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedFilter = value!;
+                        });
+                        _filterGroups();
+                      },
+                      items: _filterOptions
+                          .map((filter) => DropdownMenuItem(
+                        value: filter,
+                        child: Text(filter),
+                      ))
+                          .toList(),
+                      isExpanded: true,
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
+
+          // Groups list
+          _isLoading
+              ? const SliverFillRemaining(
+            child: Center(child: CircularProgressIndicator()),
+          )
+              : _errorMessage != null
+              ? SliverFillRemaining(child: _buildErrorView())
+              : _filteredGroups.isEmpty
+              ? SliverFillRemaining(child: _buildEmptyView())
+              : SliverList(
+            delegate: SliverChildBuilderDelegate(
+                  (context, index) =>
+                  _buildGroupListItem(_filteredGroups[index]),
+              childCount: _filteredGroups.length,
+            ),
+          ),
         ],
+      ),
+
+      // Floating Add Button (just plus)
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          final created = await _showCreateGroupDialog(context);
+          if (created) {
+            await _loadGroups();
+          }
+        },
+        backgroundColor: AppColors.primaryColor,
+        child: const Icon(Icons.add),
       ),
     );
   }
-  
+
+
   Widget _buildErrorView() {
     return Center(
       child: Column(
@@ -245,23 +283,23 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
           Text(
             'Create your first group to get started',
             style: TextStyles.bodyText.copyWith(
-              color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
-            ),
+            color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+          ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: () async {
-              final created = await _showCreateGroupDialog(context);
-              if (created) {
-                await _loadGroups();
-              }
-            },
-            icon: const Icon(Icons.add),
-            label: const Text('Create Group'),
-            style: ElevatedButton.styleFrom(
+
+          SizedBox(
+            width: double.infinity,
+            child: FloatingActionButton(
+              onPressed: () async {
+                final created = await _showCreateGroupDialog(context);
+                if (created) {
+                  await _loadGroups();
+                }
+              },
               backgroundColor: AppColors.primaryColor,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              child: const Icon(Icons.add),
             ),
           ),
         ],
@@ -272,13 +310,16 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
   Widget _buildGroupList() {
     return RefreshIndicator(
       onRefresh: _loadGroups,
-      child: ListView.builder(
-        itemCount: _filteredGroups.length,
-        itemBuilder: (context, index) {
-          final group = _filteredGroups[index];
-          return _buildGroupListItem(group);
-        },
-      ),
+     child: ListView.builder(
+       itemCount: _filteredGroups.length,
+       itemBuilder: (context, index) {
+         if (_filteredGroups.isEmpty) {
+           return const Center(child: Text('No groups available'));
+         }
+         final group = _filteredGroups[index];
+         return _buildGroupListItem(group);
+       },
+     )
     );
   }
   
@@ -660,7 +701,7 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
     
     return completer.future;
   }
-  
+
   // Safely fetch admin name without causing navigation
   Future<String> _fetchAdminName(String adminId) async {
     if (adminId.isEmpty) {
@@ -747,5 +788,33 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
     );
     
     return completer.future;
+  }
+}
+class _SearchFilterHeader extends SliverPersistentHeaderDelegate {
+  final Widget child;
+
+  _SearchFilterHeader({required this.child});
+
+  @override
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return child;
+  }
+
+  @override
+  double get maxExtent => _height;
+
+  @override
+  double get minExtent => _height;
+
+  double get _height {
+    // adjust if you change paddings
+    return 16 + 56 + 16 + 48 + 16;
+    // top padding + TextField + spacing + Dropdown + bottom padding
+  }
+
+  @override
+  bool shouldRebuild(covariant _SearchFilterHeader oldDelegate) {
+    return oldDelegate.child != child;
   }
 }
