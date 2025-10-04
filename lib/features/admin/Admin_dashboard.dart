@@ -1622,7 +1622,6 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
               style: TextStyles.bodyText.copyWith(
                 color: Colors.white,
                 fontWeight: FontWeight.w500,
-                fontSize: 12,
               ),
             ),
           ],
@@ -1920,7 +1919,6 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
             subtitle: Text(
               member.email,
               style: TextStyles.bodyText.copyWith(
-                fontSize: 14,
                 color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
               ),
             ),
@@ -2303,7 +2301,6 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                 Text(
                   title,
                   style: TextStyles.heading2.copyWith(
-                    fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
                 ),

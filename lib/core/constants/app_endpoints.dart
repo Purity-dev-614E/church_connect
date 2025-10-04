@@ -67,6 +67,7 @@ class ApiEndpoints {
   static String getAttendanceByUser(String userId) => '$attendance/user/$userId';
   static String getAttendanceByPeriod(String period) => '$attendance/$period';
   static String getAttendanceByRegion(String regionId) => '$attendance/region/$regionId';
+  static String getGroupAttendancePercentage(String groupId) => '$attendance/group/$groupId';
 
   // Analytics Endpoints
   // Base Analytics URLs

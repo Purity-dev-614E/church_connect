@@ -320,7 +320,7 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
        child: Column(
          crossAxisAlignment: CrossAxisAlignment.start,
          children: [
-           const Text('Event Attendance', style: TextStyle(fontSize: 18)),
+           Text('Event Attendance', style: TextStyles.bodyText),
            const SizedBox(height: 16),
            _buildPeriodSelector(),
            const SizedBox(height: 16),
@@ -403,7 +403,7 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
              child: Column(
                crossAxisAlignment: CrossAxisAlignment.start,
                children: [
-                 const Text('Gender Distribution', style: TextStyle(fontSize: 18)),
+                Text('Gender Distribution', style: TextStyles.bodyText),
                  const SizedBox(height: 16),
                  SizedBox(
                    height: 200,
@@ -488,7 +488,6 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
                Text(
                  'Quick Stats of the last event',
                  style: TextStyles.heading1.copyWith(
-                   fontSize: 24,
                    fontWeight: FontWeight.bold,
                  ),
                ),
@@ -574,7 +573,6 @@ Widget _buildStatCard(String title, String value, IconData icon, Color color,) {
           Text(
             title,
             style: TextStyles.heading2.copyWith(
-              fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -582,7 +580,6 @@ Widget _buildStatCard(String title, String value, IconData icon, Color color,) {
           Text(
             value,
             style: TextStyles.bodyText.copyWith(
-              fontSize: 16,
               fontWeight: FontWeight.bold,
             ),
           ),

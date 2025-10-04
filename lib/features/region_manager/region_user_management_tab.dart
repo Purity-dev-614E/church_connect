@@ -257,7 +257,6 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
         title: Text(
           user.fullName,
           style: TextStyles.heading2.copyWith(
-            fontSize: 16,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -284,7 +283,6 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
                 style: TextStyles.bodyText.copyWith(
                   color: roleColor,
                   fontWeight: FontWeight.w500,
-                  fontSize: 12,
                 ),
               ),
             ),

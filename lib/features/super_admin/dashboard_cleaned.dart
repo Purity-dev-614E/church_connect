@@ -661,7 +661,6 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
               style: TextStyle(
                 color: color,
                 fontWeight: FontWeight.bold,
-                fontSize: 14,
               ),
               textAlign: TextAlign.center,
             ),

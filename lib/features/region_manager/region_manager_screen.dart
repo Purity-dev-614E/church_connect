@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:group_management_church_app/core/constants/colors.dart';
+import 'package:group_management_church_app/core/constants/text_styles.dart';
 import 'package:group_management_church_app/data/models/region_model.dart';
 import 'package:group_management_church_app/data/providers/auth_provider.dart';
 import 'package:group_management_church_app/data/providers/region_provider.dart';
@@ -172,11 +173,8 @@ class _RegionManagerScreenState extends State<RegionManagerScreen> {
                     contentPadding: const EdgeInsets.all(16),
                     title: Text(
                       region.name,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
+                      style: TextStyles.heading2
                       ),
-                    ),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [

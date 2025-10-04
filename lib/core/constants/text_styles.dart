@@ -5,12 +5,12 @@ import 'colors.dart';
 
 class TextStyles {
   static TextStyle heading1 = GoogleFonts.notoSans(
-    fontSize: DeviceConfig.font(24),
+    fontSize: DeviceConfig.font(22),
     fontWeight: FontWeight.bold,
   );
 
   static TextStyle heading2 = GoogleFonts.notoSans(
-    fontSize: DeviceConfig.font(16),
+    fontSize: DeviceConfig.font(14),
     fontWeight: FontWeight.w600,
   );
 

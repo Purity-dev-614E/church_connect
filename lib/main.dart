@@ -20,6 +20,8 @@ import 'package:group_management_church_app/features/auth/reset_password.dart';
 import 'package:group_management_church_app/features/auth/signup.dart';
 import 'package:group_management_church_app/features/splash_screen.dart';
 
+import 'features/auth/SignupFlowWrapper.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -32,9 +34,7 @@ void main() async {
   runApp(const MyApp());
 }
 
-/// 🔹 Global device configuration helper
 class DeviceConfig {
-  /// ✅ Safe Android defaults (Samsung Galaxy A16 reference)
   static double screenWidth = 1080;   // baseline width
   static double screenHeight = 2408;  // baseline height
   static bool isMobile = true;
@@ -46,18 +46,15 @@ class DeviceConfig {
     isMobile = screenWidth < 600;
   }
 
-  /// 🔹 Dynamic font scaling
   static double font(double size) {
     return screenWidth * (size / 1080);
   }
 
-  /// 🔹 Dynamic spacing (paddings, margins, etc.)
   static double space(double size) {
     return screenWidth * (size / 1080);
   }
 }
 
-/// Custom navigator observer to handle authentication errors
 class _AuthErrorObserver extends NavigatorObserver {
   @override
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
@@ -109,14 +106,13 @@ class MyApp extends StatelessWidget {
         home: const SplashScreen(),
         routes: {
           '/login': (context) => const LoginScreen(),
-          '/signup': (context) => const SignupScreen(),
+          '/signup': (context) => const SignUpFlowWrapper(),
           '/reset-password': (context) => const ResetPasswordScreen(),
         },
         navigatorObservers: [
           _AuthErrorObserver(),
         ],
 
-        /// 🔹 Global scaling for MOBILE-first app
         builder: (context, child) {
           final mediaQuery = MediaQuery.of(context);
           double width = mediaQuery.size.width;
@@ -130,7 +126,6 @@ class MyApp extends StatelessWidget {
             targetWidth = 800;   // cap width on desktop
           }
 
-          /// 🔹 Initialize DeviceConfig with actual screen values
           DeviceConfig.init(context);
 
           return MediaQuery(

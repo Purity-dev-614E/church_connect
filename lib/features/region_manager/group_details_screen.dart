@@ -185,7 +185,6 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> with SingleTick
                     title: Text(
                       member.fullName,
                       style: TextStyles.heading2.copyWith(
-                        fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -212,7 +211,6 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> with SingleTick
                             style: TextStyles.bodyText.copyWith(
                               color: AppColors.accentColor,
                               fontWeight: FontWeight.w500,
-                              fontSize: 12,
                             ),
                           ),
                         ),
@@ -262,7 +260,6 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> with SingleTick
                     title: Text(
                       event.title,
                       style: TextStyles.heading2.copyWith(
-                        fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -286,7 +283,6 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> with SingleTick
                             Text(
                               _formatEventDateTime(event.dateTime),
                               style: TextStyles.bodyText.copyWith(
-                                fontSize: 12,
                                 color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                               ),
                             ),

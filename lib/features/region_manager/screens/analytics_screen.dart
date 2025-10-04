@@ -336,7 +336,6 @@ class _RegionManagerAnalyticsScreenState extends State<RegionManagerAnalyticsScr
                 Text(
                   'Quick Stats',
                   style: TextStyles.heading1.copyWith(
-                    fontSize: 24,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -429,7 +428,6 @@ class _RegionManagerAnalyticsScreenState extends State<RegionManagerAnalyticsScr
           Text(
             value,
             style: TextStyles.heading1.copyWith(
-              fontSize: 28,
               fontWeight: FontWeight.bold,
               color: color,
             ),
@@ -438,7 +436,6 @@ class _RegionManagerAnalyticsScreenState extends State<RegionManagerAnalyticsScr
           Text(
             description,
             style: TextStyles.bodyText.copyWith(
-              fontSize: 12,
               color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
             ),
           ),
@@ -527,7 +524,6 @@ class _RegionManagerAnalyticsScreenState extends State<RegionManagerAnalyticsScr
               Text(
                 description,
                 style: TextStyles.bodyText.copyWith(
-                  fontSize: 12,
                   color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                 ),
               ),
@@ -713,23 +709,15 @@ class _RegionManagerAnalyticsScreenState extends State<RegionManagerAnalyticsScr
                       title: '${(activityStatus['active'] ?? 0).toStringAsFixed(1)}%',
                       color: AppColors.successColor,
                       radius: 80,
-                      titleStyle: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
+                      titleStyle: TextStyles.heading2
                     ),
                     PieChartSectionData(
                       value: activityStatus['inactive'] ?? 0,
                       title: '${(activityStatus['inactive'] ?? 0).toStringAsFixed(1)}%',
                       color: AppColors.errorColor,
                       radius: 80,
-                      titleStyle: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                      titleStyle: TextStyles.heading2
                       ),
-                    ),
                   ],
                   sectionsSpace: 2,
                   centerSpaceRadius: 40,

@@ -121,17 +121,17 @@ class _RegionManagementTabState extends State<RegionManagementTab> {
                                         builder: (context, snapshot) {
                                           if (snapshot.connectionState == ConnectionState.waiting) {
                                             return Text(
-                                              'Region Head: Loading...',
+                                              'Region Focal Person: Loading...',
                                               style: TextStyles.buttonText,
                                             );
                                           } else if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
                                             return Text(
-                                              'Region Head: Not Assigned',
+                                              'Region Focal Person: Not Assigned',
                                               style: TextStyles.buttonText,
                                             );
                                           } else {
                                             return Text(
-                                              'Region Head: ${snapshot.data}',
+                                              'Region Focal Person: ${snapshot.data}',
                                               style: TextStyles.bodyText,
                                             );
                                           }

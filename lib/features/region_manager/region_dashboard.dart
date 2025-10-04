@@ -698,7 +698,6 @@ class _RegionDashboardState extends State<RegionDashboard> {
             subtitle: Text(
               user.email,
               style: TextStyles.bodyText.copyWith(
-                fontSize: 12,
                 color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
               ),
             ),
@@ -782,7 +781,6 @@ class _RegionDashboardState extends State<RegionDashboard> {
                 subtitle: Text(
                   'Members: ${group.members?.length ?? 0}',
                   style: TextStyles.bodyText.copyWith(
-                    fontSize: 12,
                     color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                   ),
                 ),

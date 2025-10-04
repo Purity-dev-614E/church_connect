@@ -13,7 +13,8 @@ import 'package:group_management_church_app/widgets/custom_notification.dart';
 
 
 class SignupScreen extends StatefulWidget {
-  const SignupScreen({super.key});
+  final VoidCallback onNext;
+  const SignupScreen({super.key, required this.onNext});
 
   @override
   State<SignupScreen> createState() => _SignupScreenState();
@@ -26,7 +27,6 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
   final TextEditingController _confirmPasswordController = TextEditingController();
   final TextEditingController _fullNameController = TextEditingController();
   bool _isLoading = false;
-  bool _agreeToTerms = false;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
@@ -132,16 +132,16 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
     );
   }
 
-  Future<void> _signup() async {
+  Future<AuthResult> _signup() async {
     if (!_formKey.currentState!.validate()) {
       _showError('Please fill in all fields correctly');
-      return;
+      return AuthResult(success: false, message: 'Validation failed');
     }
 
-    if (!_agreeToTerms) {
-      _showError('Please agree to the Terms and Conditions');
-      return;
-    }
+    // if (!_agreeToTerms) {
+    //   _showError('Please agree to the Terms and Conditions');
+    //   return AuthResult(success: false, message: 'Terms not accepted');
+    // }
 
     setState(() {
       _isLoading = true;
@@ -149,28 +149,39 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
 
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final result = await authProvider.signup(
+
+      // Signup
+      final signupResult = await authProvider.signup(
         _emailController.text,
         _passwordController.text,
       );
 
-      if (result.success) {
-        if (mounted) {
-          _showSuccess(result.message);
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const LoginScreen()),
-          );
-        }
-      } else {
-        if (mounted) {
-          _showError(result.message);
-        }
+      if (!signupResult.success) {
+        if (mounted) _showError(signupResult.message);
+        return signupResult;
       }
-    } catch (e) {
+
+      // Login immediately after successful signup
+      final loginResult = await authProvider.login(
+        _emailController.text,
+        _passwordController.text,
+      );
+
+      if (!loginResult.success) {
+        if (mounted) _showError(loginResult.message);
+        return loginResult;
+      }
+
+      // Success: navigate to next step
       if (mounted) {
-        _showError('An error occurred. Please try again.');
+        widget.onNext();
       }
+
+      return loginResult;
+
+    } catch (e) {
+      if (mounted) _showError('An unexpected error occurred. Please try again.');
+      return AuthResult(success: false, message: 'Unexpected error');
     } finally {
       if (mounted) {
         setState(() {
@@ -179,6 +190,7 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
       }
     }
   }
+
 
   void _navigateToLogin() {
     Navigator.pop(context);
@@ -266,50 +278,48 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
                           const SizedBox(height: 16),
 
                           // Terms and conditions checkbox
-                          Row(
-                            children: [
-                              SizedBox(
-                                height: 24,
-                                width: 24,
-                                child: Checkbox(
-                                  value: _agreeToTerms,
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _agreeToTerms = value ?? false;
-                                    });
-                                  },
-                                  activeColor: AppColors.secondaryColor,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'I agree to the Terms and Conditions and Privacy Policy',
-                                  style: TextStyles.bodyText.copyWith(
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                          // Row(
+                          //   children: [
+                          //     SizedBox(
+                          //       height: 24,
+                          //       width: 24,
+                          //       child: Checkbox(
+                          //         value: _agreeToTerms,
+                          //         onChanged: (value) {
+                          //           setState(() {
+                          //             _agreeToTerms = value ?? false;
+                          //           });
+                          //         },
+                          //         activeColor: AppColors.secondaryColor,
+                          //         shape: RoundedRectangleBorder(
+                          //           borderRadius: BorderRadius.circular(4),
+                          //         ),
+                          //       ),
+                          //     ),
+                          //     const SizedBox(width: 8),
+                          //     Expanded(
+                          //       child: Text(
+                          //         'I agree to the Terms and Conditions and Privacy Policy',
+                          //         style: TextStyles.bodyText.copyWith(
+                          //           fontSize: 14,
+                          //         ),
+                          //       ),
+                          //     ),
+                          //   ],
+                          // ),
                           const SizedBox(height: 24),
 
                           // Signup button
                           CustomButton(
-                            label: 'Sign Up',
-                            onPressed: () { 
-                              showDialog(
-                                context: context,
-                                barrierDismissible: false,
-                                builder:(_) => DisclaimerPopup(
-                                  onAccepted: () async{
-                                    _signup();
-                                  }
-                                )
-                             );
+                            label: 'Next',
+                            onPressed: () async {
+                              final result = await _signup(); // await the signup process
+
+                              if (result.success && result.user != null) {
+                                widget.onNext(); // actually call the function
+                              } else {
+                                _showError(result.message); // show error if signup failed
+                              }
                             },
                             isLoading : _isLoading,
                             color: Color(0xffd32f2f),
@@ -339,7 +349,7 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
                             ],
                           ),
                           const SizedBox(height: 16),
-                  ],
+                        ],
                       ),
                     ),
                   ),
@@ -536,169 +546,3 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
   }
 }
 
-class DisclaimerPopup extends StatefulWidget {
-  final VoidCallback onAccepted;
-
-  const DisclaimerPopup({super.key, required this.onAccepted});
-
-  @override
-  State<DisclaimerPopup> createState() => _DisclaimerPopupState();
-}
-
-class _DisclaimerPopupState extends State<DisclaimerPopup> {
-  final ScrollController _scrollController = ScrollController();
-  bool _isAtBottom = false;
-  bool _accepted = false;
-  bool _showFull = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _scrollController.addListener(() {
-      if (_scrollController.offset >= _scrollController.position.maxScrollExtent) {
-        setState(() {
-          _isAtBottom = true;
-        });
-      }
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(
-        "Data Protection & Privacy Disclaimer",
-        style: TextStyles.heading2.copyWith(
-          fontWeight: FontWeight.bold,
-          color: Theme.of(context).colorScheme.onBackground,
-        ),
-      ),
-      content: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.5,
-          maxWidth: MediaQuery.of(context).size.width * 0.1, // Adjust the multiplier as needed
-        ),
-        child: _showFull ? _buildFullContent() : _buildShortContent(),
-      ),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      elevation: 8,
-      backgroundColor: Theme.of(context).cardTheme.color,
-      actions: _showFull
-          ? [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text(
-                  "Decline",
-                  style: TextStyles.bodyText.copyWith(
-                    color: AppColors.errorColor,
-                  ),
-                ),
-              ),
-              ElevatedButton(
-                onPressed: _accepted
-                    ? () {
-                        Navigator.pop(context);
-                        widget.onAccepted();
-                      }
-                    : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: Text(
-                  "Continue",
-                  style: TextStyles.bodyText.copyWith(
-                    color: Theme.of(context).colorScheme.onBackground,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ]
-          : [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text(
-                  "Cancel",
-                  style: TextStyles.bodyText.copyWith(
-                    color: AppColors.errorColor,
-                  ),
-                ),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  setState(() {
-                    _showFull = true;
-                  });
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: Text(
-                  "View More",
-                  style: TextStyles.bodyText.copyWith(
-                    color: Theme.of(context).colorScheme.onBackground,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-    );
-  }
-Widget _buildShortContent() {
-  return  Text(
-    "By creating an account, you consent to the collection and use of your personal data for Safari group Ministry purposes and strictly in line with the Kenya Data Protection Act, 2019.",
-    style: TextStyle(
-      fontSize: 14,
-      fontWeight: FontWeight.w500,
-      color: Theme.of(context).colorScheme.onBackground,
-      height: 1.5,
-    ),
-    textAlign: TextAlign.justify,
-  );
-}
-
-  Widget _buildFullContent() {
-    return Column(
-      children: [
-        Expanded(
-          child: SingleChildScrollView(
-            controller: _scrollController,
-            child:  Text(
-              "By registering and using this application, you consent to the collection and processing of your personal information by Christ Is The Answer Ministries (CITAM) Valley Road Safari Groups administration, including enrollment, attendance tracking, communication and discipleship reporting. Your information will be stored securely and will not be shared with unauthorized third parties. Access will be restricted to designated Safari Group leaders, coordinators, and ministry administrators for official ministry purposes only. You have the right to request access, correction, or deletion of your personal data in line with the provisions of the Kenya Data Protection Act, 2019. For any questions or to exercise your rights, please contact the Citam valley road safari group leadership.",
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Theme.of(context).colorScheme.onBackground,
-                height: 1.5,
-              ),
-              textAlign: TextAlign.justify,
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Checkbox(
-              value: _accepted,
-              onChanged: _isAtBottom
-                  ? (val) {
-                      setState(() {
-                        _accepted = val ?? false;
-                      });
-                    }
-                  : null,
-            ),
-            const Flexible(child: Text("I Accept")),
-          ],
-        ),
-      ],
-    );
-  }
-}

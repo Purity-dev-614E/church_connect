@@ -177,50 +177,38 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Validate inputs
       if (email.trim().isEmpty || password.isEmpty) {
         _status = AuthStatus.unauthenticated;
         _errorMessage = 'Email and password are required';
         notifyListeners();
-        return AuthResult(
-          success: false,
-          message: _errorMessage,
-        );
+        return AuthResult(success: false, message: _errorMessage);
       }
-      
-      // Log signup attempt
-      print('AuthProvider: Attempting signup with email: ${email.trim()}');
-      
-      // Call the signup service
-      final success = await _authService.signup(email.trim(), password);
 
-      if (success) {
-        _status = AuthStatus.unauthenticated; // User still needs to login
-        notifyListeners();
-        return AuthResult(
-          success: true,
-          message: 'Account created successfully. Please login.',
-        );
+      print('AuthProvider: Attempting signup with email: ${email.trim()}');
+
+      // Call the signup service
+      final signupSuccess = await _authService.signup(email.trim(), password);
+
+      if (signupSuccess) {
+        // Signup succeeded → automatically log in
+        print('Signup successful, logging in...');
+        final loginResult = await login(email.trim(), password);
+        return loginResult;
       } else {
         _status = AuthStatus.unauthenticated;
         _errorMessage = 'Failed to create account. Email may already be in use.';
         notifyListeners();
-        return AuthResult(
-          success: false,
-          message: _errorMessage,
-        );
+        return AuthResult(success: false, message: _errorMessage);
       }
     } catch (e) {
       print('AuthProvider: Signup error: $e');
       _status = AuthStatus.error;
       _errorMessage = _getReadableErrorMessage(e.toString());
       notifyListeners();
-      return AuthResult(
-        success: false,
-        message: _errorMessage,
-      );
+      return AuthResult(success: false, message: _errorMessage);
     }
   }
+
 
   Future<bool> logout() async {
     try {

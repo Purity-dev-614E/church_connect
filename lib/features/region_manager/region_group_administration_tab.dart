@@ -283,7 +283,6 @@ class _RegionGroupAdministrationTabState extends State<RegionGroupAdministration
                           return Text(
                             'Admin: $adminName',
                             style: TextStyles.bodyText.copyWith(
-                              fontSize: 14,
                               color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                             ),
                           );
@@ -309,7 +308,6 @@ class _RegionGroupAdministrationTabState extends State<RegionGroupAdministration
                         style: TextStyles.bodyText.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.w500,
-                          fontSize: 12,
                         ),
                       ),
                     );
@@ -448,14 +446,12 @@ class _RegionGroupAdministrationTabState extends State<RegionGroupAdministration
             Text(
               value,
               style: TextStyles.heading2.copyWith(
-                fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
             ),
             Text(
               label,
               style: TextStyles.bodyText.copyWith(
-                fontSize: 12,
                 color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
               ),
             ),
@@ -533,7 +529,6 @@ class _RegionGroupAdministrationTabState extends State<RegionGroupAdministration
                 Text(
                   'Group Information',
                   style: TextStyles.heading2.copyWith(
-                    fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -972,17 +967,14 @@ class _AssignAdminDialogState extends State<_AssignAdminDialog> {
                               Text(
                                 admin.email,
                                 style: TextStyles.bodyText.copyWith(
-                                  fontSize: 12,
                                   color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                                 ),
                               ),
                               Text(
                                 'Role: ${admin.role}',
-                                style: TextStyles.bodyText.copyWith(
-                                  fontSize: 12,
-                                  color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+                                  style: TextStyles.bodyText.copyWith(color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                                 ),
-                              ),
+                              )
                             ],
                           ),
                         ],

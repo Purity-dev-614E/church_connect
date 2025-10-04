@@ -12,6 +12,7 @@ import 'package:provider/provider.dart';
 import 'package:group_management_church_app/data/providers/auth_provider.dart';
 
 import '../../widgets/input_field.dart';
+import 'SignupFlowWrapper.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -149,7 +150,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   void _navigateToSignup() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const SignupScreen()),
+      MaterialPageRoute(builder: (context) => const SignUpFlowWrapper()),
     );
   }
 
@@ -247,7 +248,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                   Text(
                                     'Remember me',
                                     style: TextStyles.bodyText.copyWith(
-                                      fontSize: 14,
                                     ),
                                   ),
                                 ],
@@ -263,7 +263,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                   style: TextStyles.bodyText.copyWith(
                                     color: Theme.of(context).colorScheme.onBackground,
                                     fontWeight: FontWeight.w600,
-                                    fontSize: 14,
                                   ),
                                 ),
                               ),
@@ -289,7 +288,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                               Text(
                                 'Don\'t have an account? ',
                                 style: TextStyles.bodyText.copyWith(
-                                  fontSize: 14,
                                   color: Theme.of(context).colorScheme.onBackground,
                                 ),
                               ),

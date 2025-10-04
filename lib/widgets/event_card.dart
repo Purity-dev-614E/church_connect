@@ -54,7 +54,6 @@ class EventCard extends StatelessWidget {
                     Text(
                       eventTitle,
                       style: TextStyles.heading2.copyWith(
-                        fontSize: 18,
                         fontWeight: FontWeight.w600,
                       ),
                     ),

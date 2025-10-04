@@ -507,7 +507,6 @@ class _UserDashboardState extends State<UserDashboard> {
                   Text(
                     'Events This Week',
                     style: TextStyles.heading2.copyWith(
-                      fontSize: 22,
                       color: Theme.of(context).colorScheme.onBackground,
                     ),
                   ),
@@ -710,7 +709,6 @@ class _UserDashboardState extends State<UserDashboard> {
                 Text(
                   'Events',
                   style: TextStyles.heading2.copyWith(
-                    fontSize: 22,
                     color: Theme.of(context).colorScheme.onBackground,
                   ),
                 ),
@@ -868,7 +866,6 @@ class _UserDashboardState extends State<UserDashboard> {
                           title: Text(
                             event.title,
                             style: TextStyles.heading2.copyWith(
-                              fontSize: 18,
                               color: Theme.of(context).colorScheme.onBackground,
                             ),
                           ),
@@ -1000,7 +997,6 @@ class _CardWidgetState extends State<CardWidget> with SingleTickerProviderStateM
                     child: Text(
                       'Hello, ${widget.userName}',
                       style: TextStyles.heading2.copyWith(
-                        fontSize: 28,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                       ),
@@ -1015,7 +1011,6 @@ class _CardWidgetState extends State<CardWidget> with SingleTickerProviderStateM
                 child: Text(
                   'Welcome to ${widget.group_name}',
                   style: TextStyles.bodyText.copyWith(
-                    fontSize: 18,
                     fontWeight: FontWeight.w500,
                     color: Colors.white,
                   ),
@@ -1027,7 +1022,6 @@ class _CardWidgetState extends State<CardWidget> with SingleTickerProviderStateM
                 child: Text(
                   'Check out your upcoming events below',
                   style: TextStyles.bodyText.copyWith(
-                    fontSize: 14,
                     color: Colors.white.withOpacity(0.9),
                   ),
                 ),

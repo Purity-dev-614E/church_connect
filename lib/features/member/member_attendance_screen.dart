@@ -146,9 +146,8 @@ class _MemberAttendanceScreenState extends State<MemberAttendanceScreen> {
                                     radius: 30,
                                     child: Text(
                                       _member?.fullName.substring(0, 1) ?? '?',
-                                      style: const TextStyle(
+                                      style: TextStyles.bodyText.copyWith(
                                         color: Colors.white,
-                                        fontSize: 24,
                                       ),
                                     ),
                                   ),

@@ -445,7 +445,6 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
               label,
               style: TextStyles.bodyText.copyWith(
                 color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
-                fontSize: 12,
               ),
             ),
             Text(
@@ -597,7 +596,6 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
             subtitle: Text(
               user.email,
               style: TextStyles.bodyText.copyWith(
-                fontSize: 14,
                 color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
               ),
             ),

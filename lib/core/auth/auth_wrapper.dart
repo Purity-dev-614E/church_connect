@@ -18,6 +18,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:developer';
 import '../../features/admin/Admin_dashboard.dart';
 import '../../features/super_admin/dashboard_cleaned.dart';
+import '../constants/text_styles.dart';
 
 class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
@@ -256,15 +257,15 @@ class _RoleBasedNavigator extends StatelessWidget {
                 children: [
                   const Icon(Icons.error_outline, size: 64, color: Colors.red),
                   const SizedBox(height: 16),
-                  const Text(
+                   Text(
                     'No Region Assigned',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                    style: TextStyles.bodyText,
                   ),
                   const SizedBox(height: 8),
-                  const Text(
+                   Text(
                     'You have been assigned as a Region Manager but no region has been assigned to you yet.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 16),
+                    style: TextStyles.bodyText,
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton(
@@ -278,7 +279,9 @@ class _RoleBasedNavigator extends StatelessWidget {
                         );
                       }
                     },
-                    child: const Text('Logout'),
+                    child: Text('Logout',
+                      style: TextStyles.bodyText,
+                    ),
                   ),
                 ],
               ),
@@ -290,10 +293,7 @@ class _RoleBasedNavigator extends StatelessWidget {
 
       case 'admin':
         log('Navigating to AdminDashboard');
-        return const AdminDashboardWrapper(
-          groupId: 'default',
-          groupName: 'Default Group',
-        );
+        return const AdminDashboardWrapper();
 
       case 'user':
         log('Navigating to UserDashboard');

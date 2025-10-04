@@ -23,11 +23,15 @@ import '../../core/constants/app_endpoints.dart';
 class ProfileSetupScreen extends StatefulWidget {
   final String userId;
   final String email;
+  final VoidCallback? onBack;
+  final VoidCallback? onFinish;
 
   const ProfileSetupScreen({
     super.key,
     required this.userId,
     required this.email,
+    this.onBack,
+    this.onFinish,
   });
 
   @override
@@ -244,89 +248,98 @@ String? _getRegionByGroup(String groupId) {
 
   //Submit Form
   Future<void> _submitForm() async {
-    if (_formKey.currentState!.validate()) {
-      if (_selectedRegionId == null || _selectedRegionId!.isEmpty) {
-        _showError('Please select your region');
-        return;
-      }
+    if (!_formKey.currentState!.validate()) {
+      _showError('Please fill in all required fields correctly');
+      return;
+    }
 
-      setState(() {
-        _isLoading = true;
-      });
+    if (_selectedRegionId == null || _selectedRegionId!.isEmpty) {
+      _showError('Please select your region');
+      return;
+    }
 
-      try {
-        final userProvider = Provider.of<UserProvider>(context, listen: false);
-        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    setState(() => _isLoading = true);
 
-        await userProvider.loadUser(widget.userId);
-        final currentUser = userProvider.currentUser;
+    try {
+      final isEditMode = ModalRoute.of(context)?.settings.arguments == 'edit_mode';
 
-        final role = currentUser?.role ?? _userRole;
-
-        String selectedRegionName = 'your place of residence';
-        if (_selectedRegionId != null) {
-          final selectedRegion = _regions.firstWhere(
-            (region) => region.id == _selectedRegionId,
-            orElse: () => GroupModel(id: '', name: '', region_id: 'not specified'),
-          );
-          if (selectedRegion.name.isNotEmpty) {
-            selectedRegionName = selectedRegion.name;
-          }
-        }
-
-        // Get the regional ID for the selected region
-        if (_selectedRegionId != null) {
-          fetchRegionIdForGroup(_selectedRegionId!);
-        }
-
-        final userModel = UserModel(
-          id: widget.userId,
-          fullName: _fullNameController.text.trim(),
-          email: widget.email,
-          contact: _contactController.text.trim(),
-          nextOfKin: _nextOfKinController.text.trim(),
-          nextOfKinContact: _nextOfKinContactController.text.trim(),
-          age: _selectedAgeGroup,
-          role: role,
-          gender: _selectedGender,
-          regionId: _selectedRegionId ?? '',
-          regionName: selectedRegionName != 'your region' ? selectedRegionName : null,
-          citam_Assembly: _CitamAssembly.text.trim(),
-          if_Not: _ifNot.text.trim(),
-          regionalID: _regionalID ?? '',
-
+      // Show Disclaimer only for signup (not edit)
+      if (!isEditMode) {
+        final accepted = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => const DisclaimerPopup(),
         );
 
-        final success = await authProvider.updateProfile(userModel);
-
-        if (success) {
-          await userProvider.loadUser(widget.userId);
-          _showSuccess('Profile updated successfully!');
-
-          final isEditMode = ModalRoute.of(context)?.settings.arguments == 'edit_mode';
-          if (isEditMode) {
-            if (mounted) Navigator.of(context).pop(true);
-          } else {
-            if (mounted) {
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (context) => const AuthWrapper()),
-              );
-            }
-          }
-        } else {
-          _showError('Failed to update profile. Please try again.');
-        }
-      } catch (e) {
-        _showError('Error: ${e.toString()}');
-      } finally {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
+        if (accepted != true) {
+          setState(() => _isLoading = false);
+          return; // stop submission if user didn't accept
         }
       }
+
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+      await userProvider.loadUser(widget.userId);
+      final currentUser = userProvider.currentUser;
+      final role = currentUser?.role ?? _userRole;
+
+      String selectedRegionName = 'your place of residence';
+      if (_selectedRegionId != null) {
+        final selectedRegion = _regions.firstWhere(
+              (region) => region.id == _selectedRegionId,
+          orElse: () => GroupModel(id: '', name: '', region_id: 'not specified'),
+        );
+        if (selectedRegion.name.isNotEmpty) selectedRegionName = selectedRegion.name;
+      }
+
+      // Get the regional ID for the selected region
+      if (_selectedRegionId != null) fetchRegionIdForGroup(_selectedRegionId!);
+
+      final userModel = UserModel(
+        id: widget.userId,
+        fullName: _fullNameController.text.trim(),
+        email: widget.email,
+        contact: _contactController.text.trim(),
+        nextOfKin: _nextOfKinController.text.trim(),
+        nextOfKinContact: _nextOfKinContactController.text.trim(),
+        age: _selectedAgeGroup,
+        role: role,
+        gender: _selectedGender,
+        regionId: _selectedRegionId ?? '',
+        regionName: selectedRegionName != 'your region' ? selectedRegionName : null,
+        citam_Assembly: _CitamAssembly.text.trim(),
+        if_Not: _ifNot.text.trim(),
+        regionalID: _regionalID ?? '',
+      );
+
+      final success = await authProvider.updateProfile(userModel);
+
+      if (success) {
+        await userProvider.loadUser(widget.userId);
+        _showSuccess(isEditMode
+            ? 'Profile updated successfully!'
+            : 'Sign up completed successfully!');
+
+        if (isEditMode) {
+          if (mounted) Navigator.of(context).pop(true);
+        } else {
+          if (mounted) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (context) => const AuthWrapper()),
+            );
+          }
+        }
+      } else {
+        _showError('Failed to update profile. Please try again.');
+      }
+    } catch (e) {
+      _showError('Error: ${e.toString()}');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
+
 
   Future<void> _pickProfileImage() async {
     try {
@@ -449,7 +462,7 @@ String? _getRegionByGroup(String groupId) {
                   CustomButton(
                     label: ModalRoute.of(context)?.settings.arguments == 'edit_mode'
                       ? 'Save Changes'
-                      : 'Complete Setup',
+                      : 'Complete Sign Up',
                     onPressed: _submitForm,
                     isLoading: _isLoading,
                     color: AppColors.primaryColor,
@@ -772,7 +785,6 @@ String? _getRegionByGroup(String groupId) {
                               style: TextStyles.bodyText.copyWith(
                                 color: Theme.of(context).colorScheme.onBackground,
                                 fontWeight: FontWeight.bold,
-                                fontSize: 16,
                               ),
                             ),
                             const SizedBox(width: 4),
@@ -798,7 +810,6 @@ String? _getRegionByGroup(String groupId) {
                                 'View All',
                                 style: TextStyles.bodyText.copyWith(
                                   color: AppColors.primaryColor,
-                                  fontSize: 12,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -817,7 +828,6 @@ String? _getRegionByGroup(String groupId) {
                     Text(
                       'Select the region you belong to for group assignments',
                       style: TextStyles.bodyText.copyWith(
-                        fontSize: 12,
                         color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                       ),
                     ),
@@ -856,7 +866,6 @@ String? _getRegionByGroup(String groupId) {
                                 'No regions available. Please contact an administrator.',
                                 style: TextStyles.bodyText.copyWith(
                                   color: AppColors.errorColor,
-                                  fontSize: 14,
                                 ),
                               ),
                             ),
@@ -950,7 +959,6 @@ String? _getRegionByGroup(String groupId) {
                     child: Text(
                       'Please select your region to continue',
                       style: TextStyles.bodyText.copyWith(
-                        fontSize: 12,
                         color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                         fontWeight: FontWeight.w500,
                       ),
@@ -1157,7 +1165,6 @@ void _showAllRegions() {
                                 Text(
                                   region.description!,
                                   style: TextStyles.bodyText.copyWith(
-                                    fontSize: 14,
                                     color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                                   ),
                                   maxLines: 2,
@@ -1198,7 +1205,6 @@ void _showAllRegions() {
           title,
           style: TextStyles.heading2.copyWith(
             fontWeight: FontWeight.bold,
-            fontSize: 20,
           ),
         ),
       ],
@@ -1274,3 +1280,151 @@ void _showAllRegions() {
   }
 }
 
+class DisclaimerPopup extends StatefulWidget {
+  const DisclaimerPopup({super.key});
+
+  @override
+  State<DisclaimerPopup> createState() => _DisclaimerPopupState();
+}
+
+class _DisclaimerPopupState extends State<DisclaimerPopup> {
+  final ScrollController _scrollController = ScrollController();
+  bool _isAtBottom = false;
+  bool _accepted = false;
+  bool _showFull = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(() {
+      if (_scrollController.offset >= _scrollController.position.maxScrollExtent) {
+        setState(() {
+          _isAtBottom = true;
+        });
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(
+        "Data Protection & Privacy Disclaimer",
+        style: TextStyles.heading2.copyWith(
+          fontWeight: FontWeight.bold,
+          color: Theme.of(context).colorScheme.onBackground,
+        ),
+      ),
+      content: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.5,
+          maxWidth: MediaQuery.of(context).size.width * 0.6,
+        ),
+        child: _showFull ? _buildFullContent() : _buildShortContent(),
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 8,
+      backgroundColor: Theme.of(context).cardTheme.color,
+      actions: _showFull
+          ? [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: Text(
+            "Decline",
+            style: TextStyles.bodyText.copyWith(color: AppColors.errorColor),
+          ),
+        ),
+        ElevatedButton(
+          onPressed: _accepted
+              ? () => Navigator.pop(context, true)
+              : null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          child: Text(
+            "Continue",
+            style: TextStyles.bodyText.copyWith(
+              color: Theme.of(context).colorScheme.onBackground,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ]
+          : [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: Text(
+            "Cancel",
+            style: TextStyles.bodyText.copyWith(color: AppColors.errorColor),
+          ),
+        ),
+        ElevatedButton(
+          onPressed: () => setState(() => _showFull = true),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          child: Text(
+            "View More",
+            style: TextStyles.bodyText.copyWith(
+              color: Theme.of(context).colorScheme.onBackground,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildShortContent() {
+    return Text(
+      "By creating an account, you consent to the collection and use of your personal data for Safari group Ministry purposes in line with the Kenya Data Protection Act, 2019.",
+      style: TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+        color: Theme.of(context).colorScheme.onBackground,
+        height: 1.5,
+      ),
+      textAlign: TextAlign.justify,
+    );
+  }
+
+  Widget _buildFullContent() {
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            controller: _scrollController,
+            child: Text(
+              "By registering and using this application, you consent to the collection and processing of your personal information by Christ Is The Answer Ministries (CITAM) Valley Road Safari Groups administration, including enrollment, attendance tracking, communication and discipleship reporting. Your information will be stored securely and will not be shared with unauthorized third parties. Access will be restricted to designated Safari Group leaders, coordinators, and ministry administrators for official ministry purposes only. You have the right to request access, correction, or deletion of your personal data in line with the provisions of the Kenya Data Protection Act, 2019. For any questions or to exercise your rights, please contact the Citam valley road safari group leadership.",
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Theme.of(context).colorScheme.onBackground,
+                height: 1.5,
+              ),
+              textAlign: TextAlign.justify,
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Checkbox(
+              value: _accepted,
+              onChanged: _isAtBottom
+                  ? (val) => setState(() => _accepted = val ?? false)
+                  : null,
+            ),
+            const Flexible(child: Text("I Accept")),
+          ],
+        ),
+      ],
+    );
+  }
+}

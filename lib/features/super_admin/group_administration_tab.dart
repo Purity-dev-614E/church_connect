@@ -4,14 +4,12 @@ import 'package:flutter/rendering.dart';
 import 'package:group_management_church_app/core/constants/colors.dart';
 import 'package:group_management_church_app/core/constants/text_styles.dart';
 import 'package:group_management_church_app/data/models/group_model.dart';
-import 'package:group_management_church_app/data/models/user_model.dart';
 import 'package:group_management_church_app/data/providers/event_provider.dart';
 import 'package:group_management_church_app/data/providers/group_provider.dart';
-import 'package:group_management_church_app/data/providers/user_provider.dart';
+import 'package:group_management_church_app/data/services/group_services.dart';
 import 'package:group_management_church_app/data/services/user_services.dart';
 import 'package:provider/provider.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
-
 import '../admin/Admin_dashboard.dart';
 import '../region_manager/group_details_screen.dart';
 
@@ -122,6 +120,29 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
       type: NotificationType.info,
     );
   }
+
+  /// Helper function to get attendance data
+  Future<Map<String, dynamic>> _getGroupAttendance(String groupId) async {
+    final data = await GroupServices().fetchGroupAttendancePercentage(groupId)
+    ;
+    // Handle empty or null responses
+    if (data.isEmpty || data['percentage'] == null) {
+      return {
+        'status': 'No Data',
+        'percentage': 0.0,
+      };
+    }
+
+    final percentage = double.tryParse(data['percentage'].toString()) ?? 0.0;
+    final isActive = percentage > 75.0;
+
+    return {
+      'status': isActive ? 'Active' : 'Inactive',
+      'percentage': percentage,
+    };
+  }
+
+
 
   @override
   @override
@@ -306,7 +327,7 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
       ),
     );
   }
-  
+
   Widget _buildGroupList() {
     return RefreshIndicator(
       onRefresh: _loadGroups,
@@ -322,7 +343,7 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
      )
     );
   }
-  
+
   Widget _buildGroupListItem(GroupModel group) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -356,12 +377,17 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
                       FutureBuilder<String>(
                         future: _fetchAdminName(group.group_admin!),
                         builder: (context, snapshot) {
-                          final adminName = snapshot.data ?? (group.group_admin!.isNotEmpty ? "Loading..." : "No admin assigned");
+                          final adminName = snapshot.data ??
+                              (group.group_admin!.isNotEmpty
+                                  ? "Loading..."
+                                  : "No admin assigned");
                           return Text(
                             'Admin: $adminName',
                             style: TextStyles.bodyText.copyWith(
-                              fontSize: 14,
-                              color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onBackground
+                                  .withOpacity(0.7),
                             ),
                           );
                         },
@@ -369,20 +395,114 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
                     ],
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.successColor,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    'Active',
-                    style: TextStyles.bodyText.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w500,
-                      fontSize: 12,
+                // Container(
+                //   padding:
+                //   const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                //   decoration: BoxDecoration(
+                //     color: AppColors.successColor,
+                //     borderRadius: BorderRadius.circular(12),
+                //   ),
+                //   child: Text(
+                //     'Active',
+                //     style: TextStyles.bodyText.copyWith(
+                //       color: Colors.white,
+                //       fontWeight: FontWeight.w500,
+                //     ),
+                //   ),
+                // ),
+                FutureBuilder<Map<String, dynamic>>(
+                  future: _getGroupAttendance(group.id),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      );
+                    }
+
+                    if (!snapshot.hasData) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.grey,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Text('No Data', style: TextStyle(color: Colors.white)),
+                      );
+                    }
+
+                    final status = snapshot.data!['status'] as String;
+
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: status == "Active" ? Colors.green : Colors.redAccent,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        status,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+                      ),
+                    );
+                  },
+                ),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert),
+                      onSelected: (value) {
+                        if (value == 'view') {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => GroupDetailsScreen(
+                                groupId: group.id,
+                                groupName: group.name,
+                              ),
+                            ),
+                          );
+                        } else if (value == 'edit') {
+                          _showEditGroupDialog(context, group).then((updated) {
+                            if (updated) {
+                              _loadGroups();
+                            }
+                          });
+                        } else if (value == 'delete') {
+                          _showDeleteGroupDialog(context, group).then((deleted) {
+                            if (deleted) {
+                              _loadGroups();
+                            }
+                          });
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 'view',
+                          child: ListTile(
+                            leading: Icon(Icons.visibility),
+                            title: Text('View'),
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: ListTile(
+                            leading: Icon(Icons.edit),
+                            title: Text('Edit'),
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: ListTile(
+                            leading: Icon(Icons.delete, color: Colors.red),
+                            title: Text('Delete'),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),
@@ -392,13 +512,13 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
               builder: (context, snapshot) {
                 final memberCount = snapshot.data?['memberCount'] ?? '0';
                 final eventCount = snapshot.data?['eventCount'] ?? '0';
-                
+
                 return Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     _buildGroupStat(
-                      'Members', 
-                      memberCount.toString(), 
+                      'Members',
+                      memberCount.toString(),
                       Icons.people,
                       onTap: () {
                         Navigator.push(
@@ -414,8 +534,8 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
                       },
                     ),
                     _buildGroupStat(
-                      'Events', 
-                      eventCount.toString(), 
+                      'Events',
+                      eventCount.toString(),
                       Icons.event,
                       onTap: () {
                         Navigator.push(
@@ -430,71 +550,39 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
                         );
                       },
                     ),
-                    _buildGroupStat('Attendance', '0%', Icons.trending_up),
+                    FutureBuilder<Map<String, dynamic>>(
+                      future: _getGroupAttendance(group.id),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return _buildGroupStat('Attendance', '...', Icons.trending_up);
+                        }
+
+                        if (!snapshot.hasData) {
+                          return _buildGroupStat('Attendance', '0%', Icons.trending_up);
+                        }
+
+                        final percentage = snapshot.data!['percentage'] as double? ?? 0.0;
+
+                        return _buildGroupStat(
+                          'Attendance',
+                          '${percentage.toStringAsFixed(1)}%',
+                          Icons.trending_up,
+                        );
+                      },
+                    ),
                   ],
                 );
               },
             ),
             const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => GroupDetailsScreen(
-                          groupId: group.id,
-                          groupName: group.name,
-                        ),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.visibility, size: 18),
-                  label: const Text('View'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.primaryColor,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                TextButton.icon(
-                  onPressed: () {
-                    _showEditGroupDialog(context, group).then((updated) {
-                      if (updated) {
-                        _loadGroups();
-                      }
-                    });
-                  },
-                  icon: const Icon(Icons.edit, size: 18),
-                  label: const Text('Edit'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.secondaryColor,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                TextButton.icon(
-                  onPressed: () {
-                    _showDeleteGroupDialog(context, group).then((deleted) {
-                      if (deleted) {
-                        _loadGroups();
-                      }
-                    });
-                  },
-                  icon: const Icon(Icons.delete, size: 18),
-                  label: const Text('Delete'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: Colors.red,
-                  ),
-                ),
-              ],
-            ),
+
           ],
         ),
       ),
     );
   }
-  
+
+
   Widget _buildGroupStat(String label, String value, IconData icon, {VoidCallback? onTap}) {
     return GestureDetector(
       onTap: onTap,
@@ -512,7 +600,6 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
                 value,
                 style: TextStyles.bodyText.copyWith(
                   fontWeight: FontWeight.bold,
-                  fontSize: 16,
                 ),
               ),
             ],
@@ -521,7 +608,6 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
           Text(
             label,
             style: TextStyles.bodyText.copyWith(
-              fontSize: 12,
               color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
             ),
           ),

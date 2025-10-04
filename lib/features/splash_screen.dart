@@ -278,7 +278,6 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                             style: TextStyles.heading1.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
-                              fontSize: 36,
                               shadows: [
                                 Shadow(
                                   color: Colors.grey.withOpacity(0.3),
@@ -303,7 +302,6 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                         return DefaultTextStyle(
                           style: TextStyles.bodyText.copyWith(
                             color: Colors.white.withOpacity(0.9),
-                            fontSize: 18,
                           ),
                           child: AnimatedTextKit(
                             animatedTexts: [
@@ -356,7 +354,6 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                           'Version 1.0.0',
                           style: TextStyles.bodyText.copyWith(
                             color: Colors.white.withOpacity(0.7),
-                            fontSize: 14,
                           ),
                         ),
                       );

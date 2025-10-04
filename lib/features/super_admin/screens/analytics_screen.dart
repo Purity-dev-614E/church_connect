@@ -250,10 +250,10 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
               onPressed: _refreshData,
             ),
           ],
-          bottom: const TabBar(
+          bottom: TabBar(
             tabs: [
-              Tab(text: 'Quick Analytics'),
-              Tab(text: 'Detailed Analytics'),
+              Tab(text: "Quick Analytics",),
+              Tab(text: "Detailed Analytics"),
             ],
           ),
         ),
@@ -278,34 +278,39 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
                     ),
                   )
                 : SafeArea(
-                    child: FadeTransition(
-                      opacity: _fadeAnimation,
-                      child: TabBarView(
-                        children: [
-                          // Quick Analytics Tab
-                          ListView(
-                            padding: const EdgeInsets.all(16),
-                            children: [
-                              _buildQuickStatsCard(),
-                            ],
-                          ),
-                          // Detailed Analytics Tab
-                          ListView(
-                            padding: const EdgeInsets.all(16),
-                            children: [
-                              _buildPeriodSelector(),
-                              const SizedBox(height: 16),
-                              _buildOverallAttendanceChart(),
-                              const SizedBox(height: 16),
-                              _buildActivityStatusChart(),
-                              const SizedBox(height: 16),
-                              _buildRegionalAttendanceChart()
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+          child: TabBarView(
+            children: [
+              // Quick Analytics Tab
+              FadeTransition(
+                opacity: _fadeAnimation,
+                child: ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    _buildQuickStatsCard(),
+                  ],
+                ),
+              ),
+
+              // Detailed Analytics Tab
+              FadeTransition(
+                opacity: _fadeAnimation,
+                child: ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    _buildPeriodSelector(),
+                    const SizedBox(height: 16),
+                    _buildOverallAttendanceChart(),
+                    const SizedBox(height: 16),
+                    _buildActivityStatusChart(),
+                    const SizedBox(height: 16),
+                    _buildRegionalAttendanceChart(),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+
       ),
     );
   }
@@ -354,7 +359,6 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
                 Text(
                   'Quick Stats',
                   style: TextStyles.heading1.copyWith(
-                    fontSize: 24,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -565,9 +569,9 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+           Text(
               'Regional Attendance',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyles.heading2.copyWith(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             SizedBox(
@@ -605,7 +609,7 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
                               padding: const EdgeInsets.only(top: 8.0),
                               child: Text(
                                 _regionAttendance.keys.elementAt(index),
-                                style: const TextStyle(fontSize: 10),
+                                style: TextStyles.bodyText.copyWith(fontSize: 10),
                                 textAlign: TextAlign.center,
                               ),
                             );
@@ -648,9 +652,9 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+           Text(
               'Activity Status',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyles.bodyText.copyWith(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             SizedBox(
@@ -678,8 +682,7 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
                                 1)}%',
                             color: Colors.green,
                             radius: 80,
-                            titleStyle: const TextStyle(
-                              fontSize: 14,
+                            titleStyle: TextStyles.heading1.copyWith(
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
                             ),
@@ -691,8 +694,7 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
                                 .toStringAsFixed(1)}%',
                             color: Colors.red,
                             radius: 80,
-                            titleStyle: const TextStyle(
-                              fontSize: 14,
+                            titleStyle: TextStyles.heading1.copyWith(
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
                             ),
@@ -745,15 +747,16 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                 Text(
                   'Overall Attendance Trend',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyles.heading2.copyWith(
+                      fontWeight: FontWeight.bold
+                  ),
                 ),
                 _overallAttendance > 0
                     ? Text(
                   'Current: ${_overallAttendance.toStringAsFixed(1)}%',
-                  style: const TextStyle(
-                    fontSize: 16,
+                  style: TextStyles.heading1.copyWith(
                     fontWeight: FontWeight.bold,
                     color: Colors.blue,
                   ),

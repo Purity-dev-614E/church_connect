@@ -177,6 +177,7 @@ class _UserManagementTabState extends State<UserManagementTab> {
                   decoration: InputDecoration(
                     hintText: 'Search users...',
                     prefixIcon: const Icon(Icons.search),
+
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -273,7 +274,7 @@ class _UserManagementTabState extends State<UserManagementTab> {
         roleColor = AppColors.secondaryColor;
         break;
       case 'regional manager':
-        roleDisplay = 'Regional Manager';
+        roleDisplay = 'RFP';
         roleColor = AppColors.accentColor;
         break;
       case 'user':
@@ -302,7 +303,6 @@ class _UserManagementTabState extends State<UserManagementTab> {
         title: Text(
           user.fullName,
           style: TextStyles.heading2.copyWith(
-            fontSize: 16,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -329,7 +329,6 @@ class _UserManagementTabState extends State<UserManagementTab> {
                 style: TextStyles.bodyText.copyWith(
                   color: roleColor,
                   fontWeight: FontWeight.w500,
-                  fontSize: 12,
                 ),
               ),
             ),

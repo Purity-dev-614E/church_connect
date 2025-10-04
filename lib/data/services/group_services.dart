@@ -401,5 +401,22 @@ class GroupServices {
     } catch (e) {
       throw Exception("Failed to remove group from region: $e");
     }
+}
+
+  Future<Map<String, dynamic>> fetchGroupAttendancePercentage(String groupId) async {
+    try {
+      final response = await _httpClient.get(
+        ApiEndpoints.getGroupAttendancePercentage(groupId)
+      );
+
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        return body['data'] ?? {};
+      } else {
+        throw Exception('Failed to fetch attendance');
+      }
+    } catch (e) {
+      throw Exception("Failed to fetch group percentage: $e");
+    }
   }
 }

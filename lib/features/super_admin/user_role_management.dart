@@ -5,6 +5,7 @@ import 'package:group_management_church_app/core/constants/colors.dart';
 import 'package:group_management_church_app/core/constants/text_styles.dart';
 import 'package:group_management_church_app/data/models/region_model.dart';
 import 'package:group_management_church_app/data/models/user_model.dart';
+import 'package:group_management_church_app/data/providers/group_provider.dart';
 import 'package:group_management_church_app/data/providers/region_provider.dart';
 import 'package:group_management_church_app/data/providers/user_provider.dart';
 import 'package:group_management_church_app/widgets/custom_app_bar.dart';
@@ -117,31 +118,27 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
       }
     });
   }
-  
+
   Future<void> _updateUserRole(UserModel user, String newRole, {String? regionId}) async {
-    // Debug logging
     log('Attempting to update role for user:');
     log('User ID: ${user.id}');
     log('User Name: ${user.fullName}');
     log('Current Role: ${user.role}');
     log('New Role: $newRole');
-    log('Region ID: $regionId');
+    log('Region ID: $regionId (actually regionId)');
+    log('Group ID (from user.regionId): ${user.regionId}');
 
-    // Validate user ID
     if (user.id.isEmpty) {
       print('Error: User ID is empty');
       _showError('Invalid user ID. Please try again.');
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
-    
+    setState(() => _isLoading = true);
+
     try {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
-      
-      // Create updated user model with all required fields
+
       final updatedUser = UserModel(
         id: user.id,
         fullName: user.fullName,
@@ -151,7 +148,7 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
         nextOfKinContact: user.nextOfKinContact,
         role: newRole,
         gender: user.gender,
-        regionId: user.regionId,
+        regionId: user.regionId, // groupId
         regionName: user.regionName,
         regionalID: newRole == 'regional manager' ? regionId ?? user.regionalID : user.regionalID,
       );
@@ -159,55 +156,50 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
       print('Created updated user model:');
       print('ID: ${updatedUser.id}');
       print('Role: ${updatedUser.role}');
-      
-      // Update user role
+
       final success = await userProvider.updateUser(updatedUser);
-      
+
       if (!success) {
-        print('Failed to update user role');
         throw Exception('Failed to update user role');
       }
-      
-      // If the user is a regional manager, assign them to the region
+
+      // Assign regional manager to region
       if (newRole == 'regional manager' && regionId != null) {
-        print('Assigning user to region: $regionId');
         final regionSuccess = await userProvider.assignUserToRegion(user.id, regionId);
-        if (!regionSuccess) {
-          print('Failed to assign user to region');
-          throw Exception('Failed to assign user to region');
-        }
+        if (!regionSuccess) throw Exception('Failed to assign user to region');
       }
-      
+
+      // Assign admin to their group (user.regionId)
+      if (newRole == 'admin' && user.regionId.isNotEmpty) {
+        final adminSuccess = await GroupProvider().assignAdminToGroup(user.regionId, user.id);
+        if (!adminSuccess) throw Exception('Failed to assign admin to group');
+      }
+
       // Refresh user list
       await _loadUsers();
-      
+
       // Show success message
       if (mounted) {
         if (newRole == 'regional manager' && regionId != null) {
           final region = _regions.firstWhere(
-            (r) => r.id == regionId,
-            orElse: () => RegionModel(id: regionId, name: 'Unknown Region')
+                (r) => r.id == regionId,
+            orElse: () => RegionModel(id: regionId, name: 'Unknown Region'),
           );
           _showSuccess('${user.fullName}\'s role updated to Regional Manager for ${region.name}');
+        } else if (newRole == 'admin' && user.regionId.isNotEmpty) {
+          _showSuccess('${user.fullName}\'s role updated to Admin for Group ${user.regionId}');
         } else {
           _showSuccess('${user.fullName}\'s role updated to $newRole');
         }
       }
     } catch (e) {
       print('Error in _updateUserRole: $e');
-      setState(() {
-        _isLoading = false;
-      });
-      
-      // Show error message
       if (mounted) {
         _showError('Failed to update role: ${e.toString()}');
       }
     } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
       }
     }
   }
@@ -275,12 +267,13 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
             controller: _searchController,
             decoration: InputDecoration(
               hintText: 'Search users...',
+              hintStyle: TextStyles.bodyText.copyWith(color: Theme.of(context).colorScheme.onBackground),
               prefixIcon: const Icon(Icons.search),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
               filled: true,
-              fillColor: Colors.grey[100],
+              fillColor: Theme.of(context).colorScheme.background,
             ),
             onChanged: _filterUsers,
           ),
@@ -380,7 +373,6 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
                     style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
-                      fontSize: 18,
                     ),
                   ),
                 ),
@@ -394,7 +386,6 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
                       Text(
                         user.fullName,
                         style: TextStyles.heading2.copyWith(
-                          fontSize: 18,
                         ),
                       ),
                       const SizedBox(height: 4),

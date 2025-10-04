@@ -321,7 +321,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with SingleTi
                 'Check your spam folder or try again in a few minutes.',
                 style: TextStyles.bodyText.copyWith(
                   color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
-                  fontSize: 14,
                 ),
                 textAlign: TextAlign.center,
               ),

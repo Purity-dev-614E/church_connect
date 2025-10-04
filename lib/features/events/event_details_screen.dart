@@ -217,7 +217,6 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
               widget.event.title,
               style: TextStyles.heading1.copyWith(
                 color: Colors.white,
-                fontSize: 28,
               ),
             ),
             const SizedBox(height: 8),
@@ -270,7 +269,6 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
             Text(
               'Event Description',
               style: TextStyles.heading2.copyWith(
-                fontSize: 20,
               ),
             ),
             const SizedBox(height: 8),
@@ -298,7 +296,6 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
             Text(
               'Mark Your Attendance',
               style: TextStyles.heading2.copyWith(
-                fontSize: 20,
               ),
             ),
             const SizedBox(height: 16),
@@ -528,7 +525,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                   ? 'You have marked your attendance for this event!' 
                   : 'You have submitted your apology for this event.',
               style: TextStyles.heading2.copyWith(
-                fontSize: 18,
+
                 color: _isAttending ? AppColors.successColor : AppColors.errorColor,
               ),
               textAlign: TextAlign.center,

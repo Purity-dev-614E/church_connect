@@ -83,7 +83,6 @@ class EventServices {
     required String location,
   }) async {
     try {
-      await _checkGroupPermission(groupId);
 
       final response = await _httpClient.post(
         ApiEndpoints.createGroupEvent(groupId),

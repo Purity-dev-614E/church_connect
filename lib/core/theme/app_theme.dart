@@ -79,6 +79,22 @@ class AppTheme {
       bodyMedium: TextStyles.bodyText.copyWith(color: Colors.black87),
       labelLarge: TextStyles.buttonText.copyWith(color: Colors.white),
     ),
+
+    tabBarTheme: const TabBarTheme(
+      labelColor: Colors.white,               // active tab text
+      unselectedLabelColor: Colors.white70,   // inactive tab text
+      labelStyle: TextStyle(
+        fontWeight: FontWeight.bold,
+        fontSize: 16,
+      ),
+      unselectedLabelStyle: TextStyle(
+        fontWeight: FontWeight.normal,
+        fontSize: 14,
+      ),
+      indicator: UnderlineTabIndicator(
+        borderSide: BorderSide(color: Colors.white, width: 2),
+      ),
+    ),
   );
 
   // DARK THEME
@@ -156,5 +172,24 @@ class AppTheme {
       bodyMedium: TextStyles.bodyText.copyWith(color: Colors.white70),
       labelLarge: TextStyles.buttonText.copyWith(color: Colors.white),
     ),
+
+    // inside darkTheme
+    tabBarTheme: const TabBarTheme(
+      labelColor: Colors.white,
+      unselectedLabelColor: Colors.white70,
+      labelStyle: TextStyle(
+        fontWeight: FontWeight.bold,
+        fontSize: 16,
+      ),
+      unselectedLabelStyle: TextStyle(
+        fontWeight: FontWeight.normal,
+        fontSize: 14,
+      ),
+      indicator: UnderlineTabIndicator(
+        borderSide: BorderSide(color: Colors.white, width: 2),
+      ),
+    ),
   );
+
+
 }

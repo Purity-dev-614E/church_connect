@@ -362,7 +362,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   style: TextStyles.bodyText.copyWith(
                     color: AppColors.secondaryColor,
                     fontWeight: FontWeight.w500,
-                    fontSize: 18,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -536,7 +535,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       _getInitials(fullName),
                       style: TextStyles.heading1.copyWith(
                         color: Colors.white,
-                        fontSize: 42,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -549,7 +547,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _getInitials(fullName),
                 style: TextStyles.heading1.copyWith(
                   color: Colors.white,
-                  fontSize: 42,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -597,9 +594,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     onPressed: _isUploadingImage ? null : _uploadProfileImage,
                     icon: const Icon(
                         Icons.upload, color: Colors.white, size: 16),
-                    label: const Text(
+                    label:  Text(
                       'Upload',
-                      style: TextStyle(color: Colors.white, fontSize: 12),
+                      style: TextStyles.bodyText,
                     ),
                   ),
                   const SizedBox(width: 4),
@@ -730,7 +727,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         .colorScheme
                         .onBackground
                         .withOpacity(0.6),
-                    fontSize: 14,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -738,7 +734,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   value,
                   style: TextStyles.bodyText.copyWith(
                     fontWeight: FontWeight.w500,
-                    fontSize: 16,
                     color: Theme
                         .of(context)
                         .colorScheme

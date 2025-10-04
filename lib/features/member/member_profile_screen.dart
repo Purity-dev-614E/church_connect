@@ -378,7 +378,6 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
           _getInitials(fullName),
           style: TextStyles.heading1.copyWith(
             color: Colors.white,
-            fontSize: 42,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -562,7 +561,6 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
                   label,
                   style: TextStyles.bodyText.copyWith(
                     color: Theme.of(context).colorScheme.onBackground.withOpacity(0.6),
-                    fontSize: 14,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -570,7 +568,6 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
                   value.isEmpty ? 'Not provided' : value,
                   style: TextStyles.bodyText.copyWith(
                     fontWeight: FontWeight.w500,
-                    fontSize: 16,
                     color: label == 'Region' && (value.isEmpty || value == 'Not assigned') 
                         ? AppColors.errorColor.withOpacity(0.7)
                         : Theme.of(context).colorScheme.onBackground,
