@@ -203,10 +203,9 @@ class GroupServices {
         throw Exception('User is not authorized to assign admin');
       }
 
-      final response = await _httpClient.post(
-        ApiEndpoints.assignAdmin,
+      final response = await _httpClient.put(
+        ApiEndpoints.updateGroup(groupId),
         body: {
-          'group_id': groupId,
           'group_admin_id': userId,
         },
       );
