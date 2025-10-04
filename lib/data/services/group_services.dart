@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer';
 
 import 'package:group_management_church_app/core/constants/app_endpoints.dart';
 import 'package:group_management_church_app/data/models/group_model.dart';
@@ -196,10 +197,11 @@ class GroupServices {
       // Check if current user has permission
       final userServices = UserServices();
       final userRole = await userServices.getUserRole();
+      log("User Role: $userRole");
 
       if (userRole == null) {
         throw Exception('User role is null');
-      } else if (userRole != 'super admin' && userRole != 'region_manager') {
+      } else if (userRole != 'super_admin' && userRole != 'region_manager') {
         throw Exception('User is not authorized to assign admin');
       }
 

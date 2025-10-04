@@ -297,7 +297,13 @@ class _RoleBasedNavigator extends StatelessWidget {
 
       case 'user':
         log('Navigating to UserDashboard');
-        return const UserDashboard(groupId: 'default');
+
+        if (user.regionId.isEmpty) {
+          log('User has no group assigned, showing NoGroupScreen');
+          return const NoGroupScreen();
+        }
+
+        return UserDashboard(groupId: user.regionId);
 
       default:
         log('Unknown role: ${user.role}, navigating to default UserDashboard');
