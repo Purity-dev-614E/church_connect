@@ -100,7 +100,6 @@ class EventProvider extends ChangeNotifier {
       _setLoading(false);
     }
   }
-
   /// Create a new event
   Future<EventModel?> createEvent({
     required String groupId,
@@ -111,6 +110,7 @@ class EventProvider extends ChangeNotifier {
   }) async {
     _setLoading(true);
     try {
+      // 1️⃣ Create the event via your service
       final event = await _eventServices.createEvent(
         groupId: groupId,
         title: title,
@@ -118,15 +118,20 @@ class EventProvider extends ChangeNotifier {
         dateTime: dateTime,
         location: location,
       );
-      await fetchEventsByGroup(groupId);
+      await fetchUpcomingEvents(groupId);
+
       _errorMessage = null;
       return event;
     } catch (error) {
       _handleError('creating event', error);
-      _setLoading(false); // Set loading to false here since fetchEventsByGroup won't be called
       return null;
+    } finally {
+      _setLoading(false);
     }
   }
+
+
+
 
   /// Update an existing event
   Future<EventModel?> updateEvent({
@@ -190,8 +195,19 @@ class EventProvider extends ChangeNotifier {
   Future<void> fetchUpcomingEvents(String groupId) async {
     _setLoading(true);
     try {
-      _upcomingEvents = await _eventServices.getUpcomingEvents(groupId);
+      // Fetch all upcoming events from backend
+      final events = await _eventServices.getUpcomingEvents(groupId);
+
+      // Filter only events that are in the future
+      _upcomingEvents = events
+          .where((event) => event.dateTime.isAfter(DateTime.now()))
+          .toList();
+
+      // Sort by soonest first
+      _upcomingEvents.sort((a, b) => a.dateTime.compareTo(b.dateTime));
+
       _errorMessage = null;
+      notifyListeners();
     } catch (error) {
       _handleError('fetching upcoming events', error);
     } finally {

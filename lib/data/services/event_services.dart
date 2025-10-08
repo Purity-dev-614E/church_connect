@@ -89,7 +89,8 @@ class EventServices {
         body: {
           'title': title,
           'description': description,
-          'date': dateTime.toIso8601String(),
+          // Send UTC to avoid server timezone reinterpretation
+          'date': dateTime.toUtc().toIso8601String(),
           'location': location,
           'group_id': groupId,
         },
@@ -160,7 +161,8 @@ class EventServices {
         body: {
           'title': title,
           'description': description,
-          'date': dateTime.toIso8601String(),
+          // Send UTC to avoid server timezone reinterpretation
+          'date': dateTime.toUtc().toIso8601String(),
           'location': location,
           'group_id': groupId,
         },

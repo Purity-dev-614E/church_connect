@@ -39,6 +39,10 @@ class _UserDashboardState extends State<UserDashboard> {
   List<EventModel> _allEvents = [];
   GroupModel? _currentGroup;
 
+  bool _isLoading = false;
+
+  late String groupId;
+
   // Loading states
   bool _isLoadingUser = true;
   bool _isLoadingGroup = true;
@@ -47,9 +51,11 @@ class _UserDashboardState extends State<UserDashboard> {
   @override
   void initState() {
     super.initState();
+    final eventProvider = Provider.of<EventProvider>(context, listen: false);
+    groupId = eventProvider.currentGroupId ?? 'defaultGroupId';
     // Schedule data loading after the current build is complete
     Future.microtask(() => _loadData());
-    
+
     // Add a timeout to reset loading state if it takes too long
     Future.delayed(const Duration(seconds: 10), () {
       if (mounted && (_isLoadingUser || _isLoadingGroup)) {
@@ -69,7 +75,7 @@ class _UserDashboardState extends State<UserDashboard> {
       // First check authentication
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final userId = authProvider.currentUser?.id;
-      
+
       if (userId == null) {
         print('User not authenticated, redirecting to login');
         if (mounted) {
@@ -81,15 +87,15 @@ class _UserDashboardState extends State<UserDashboard> {
       }
 
       print('User authenticated with ID: $userId');
-      
+
       // Load user data first
       await _loadUserData();
-      
+
       // Get user's groups
       final groupProvider = Provider.of<GroupProvider>(context, listen: false);
       print('Fetching user groups for ID: $userId');
       final userGroups = await groupProvider.getUserGroups(userId);
-      
+
       if (userGroups.isEmpty) {
         print('No groups found for user, redirecting to no group screen');
         if (mounted) {
@@ -99,26 +105,26 @@ class _UserDashboardState extends State<UserDashboard> {
         }
         return;
       }
-      
+
       // Use the first group if no specific group is provided
       final groupId = widget.groupId == 'default' ? userGroups.first.id : widget.groupId;
       print('Using group ID: $groupId');
-      
+
       // Update the current group ID
       if (mounted) {
         setState(() {
           _currentGroupId = groupId;
         });
       }
-      
+
       // Load group and event data
       await _loadGroupData();
       await _loadEventData();
-      
+
       print('All data loaded successfully');
     } catch (e) {
       print('Error loading data: $e');
-      
+
       // Reset loading states if there was an error
       if (mounted) {
         setState(() {
@@ -152,7 +158,7 @@ class _UserDashboardState extends State<UserDashboard> {
       print('Widget not mounted in _loadUserData');
       return;
     }
-    
+
     setState(() {
       _isLoadingUser = true;
     });
@@ -163,7 +169,7 @@ class _UserDashboardState extends State<UserDashboard> {
 
       final userId = authProvider.currentUser?.id;
       print('User ID from auth provider: $userId');
-      
+
       if (userId != null) {
         print('Loading user with ID: $userId');
         await userProvider.loadUser(userId);
@@ -194,7 +200,7 @@ class _UserDashboardState extends State<UserDashboard> {
       }
     } catch (e) {
       print('Error loading user data: $e');
-      
+
       // Only update state if the widget is still mounted
       if (mounted) {
         setState(() {
@@ -212,7 +218,7 @@ class _UserDashboardState extends State<UserDashboard> {
       print('Widget not mounted in _loadGroupData');
       return;
     }
-    
+
     setState(() {
       _isLoadingGroup = true;
     });
@@ -221,26 +227,26 @@ class _UserDashboardState extends State<UserDashboard> {
       // Get the provider outside of the build context
       final groupProvider = Provider.of<GroupProvider>(context, listen: false);
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      
+
       // Get current user ID
       final userId = authProvider.currentUser?.id;
       print('Current user ID: $userId');
-      
+
       if (userId == null) {
         print('No user ID found, cannot fetch groups');
         throw Exception('User not authenticated');
       }
-      
+
       // Fetch user's groups
       print('Fetching user groups for user ID: $userId');
       final userGroups = await groupProvider.getUserGroups(userId);
       print('User groups fetched: ${userGroups.length} groups found');
-      
+
       if (userGroups.isEmpty) {
         print('No groups found for user');
         throw Exception('User is not a member of any group');
       }
-      
+
       // Find the group with matching ID
       final groupId = _currentGroupId ?? widget.groupId;
       print('Looking for group with ID: $groupId');
@@ -251,7 +257,7 @@ class _UserDashboardState extends State<UserDashboard> {
           throw Exception('Group not found');
         },
       );
-      
+
       print('Group found: ${group.name} (${group.id})');
 
       // Only update state if the widget is still mounted
@@ -273,7 +279,7 @@ class _UserDashboardState extends State<UserDashboard> {
       }
     } catch (e) {
       print('Error loading group data: $e');
-      
+
       // Only update state if the widget is still mounted
       if (mounted) {
         setState(() {
@@ -286,53 +292,28 @@ class _UserDashboardState extends State<UserDashboard> {
 
   // Load event data
   Future<void> _loadEventData() async {
-    // Only set loading state if the widget is still mounted
-    if (!mounted) return;
-    
-    setState(() {
-      _isLoadingEvents = true;
-    });
+    setState(() => _isLoading = true);
+
+    final eventProvider = Provider.of<EventProvider>(context, listen: false);
 
     try {
-      final eventProvider = Provider.of<EventProvider>(context, listen: false);
-
-      // Set current group in provider
-      final groupId = _currentGroupId ?? widget.groupId;
       eventProvider.setCurrentGroup(groupId);
+      await eventProvider.refreshAllEventData();
 
-      // Load upcoming events
-      await eventProvider.fetchUpcomingEvents(groupId);
-
-      // Get the current date
-      final now = DateTime.now();
-
-      // Calculate the date one week from now
-      final oneWeekFromNow = now.add(const Duration(days: 7));
-
-      // Filter upcoming events to get events for this week
-      final weekEvents = eventProvider.upcomingEvents
-          .where((event) => event.dateTime.isBefore(oneWeekFromNow))
-          .toList();
-
-      // Only update state if the widget is still mounted
-      if (mounted) {
-        setState(() {
-          _weekEvents = weekEvents;
-          _allEvents = eventProvider.upcomingEvents;
-          _isLoadingEvents = false;
-        });
-      }
+      setState(() {
+        _allEvents = [
+          ...eventProvider.upcomingEvents,
+          ...eventProvider.pastEvents,
+        ];
+        _isLoading = false;
+      });
     } catch (e) {
-      print('Error loading event data: $e');
-      
-      // Only update state if the widget is still mounted
-      if (mounted) {
-        setState(() {
-          _isLoadingEvents = false;
-        });
-      }
+      debugPrint('Error loading events: $e');
+      setState(() => _isLoading = false);
     }
   }
+
+
 
   void _showError(String message) {
     CustomNotification.show(
@@ -362,9 +343,9 @@ class _UserDashboardState extends State<UserDashboard> {
   Future<void> _refreshData() async {
     // Check if widget is mounted before starting refresh
     if (!mounted) return;
-    
+
     await _loadData();
-    
+
     // Check again if widget is still mounted after data load
     if (mounted) {
       _showSuccess('Data refreshed');
@@ -387,8 +368,6 @@ class _UserDashboardState extends State<UserDashboard> {
         )
       )
     ).then((_) {
-      // Refresh events when returning from event details
-      // Use microtask to ensure we're not in the build phase
       if (mounted) {
         print('Returned from event details, refreshing events');
         Future.microtask(() => _loadEventData());
@@ -402,8 +381,6 @@ class _UserDashboardState extends State<UserDashboard> {
       context,
       MaterialPageRoute(builder: (context) => const ProfileScreen())
     ).then((_) {
-      // Refresh user data when returning from profile screen
-      // Use microtask to ensure we're not in the build phase
       if (mounted) {
         print('Returned from profile, refreshing user data');
         Future.microtask(() => _loadUserData());
@@ -413,11 +390,10 @@ class _UserDashboardState extends State<UserDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    // Listen to providers for changes but with listen: false to avoid rebuild loops
     final eventProvider = Provider.of<EventProvider>(context, listen: false);
     final groupProvider = Provider.of<GroupProvider>(context, listen: false);
 
-    // Use a post-frame callback to check for errors after the build is complete
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Check for errors
       final hasEventError = eventProvider.errorMessage != null;
@@ -568,7 +544,7 @@ class _UserDashboardState extends State<UserDashboard> {
           });
         }
       });
-      
+
       return Column(
         children: [
           _buildLoadingCard(),
@@ -595,7 +571,7 @@ class _UserDashboardState extends State<UserDashboard> {
         ],
       );
     }
-    
+
     // If not loading, show the actual card
     return CardWidget(
       userName: _userName,
@@ -806,114 +782,43 @@ class _UserDashboardState extends State<UserDashboard> {
   }
 
   Widget _buildPastEventsTab() {
-    final now = DateTime.now();
-    final pastEvents = _allEvents.where((event) => event.dateTime.isBefore(now)).toList();
+    final eventProvider = Provider.of<EventProvider>(context);
 
-    return _isLoadingEvents
-        ? Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const CircularProgressIndicator(),
-                const SizedBox(height: 16),
-                Text(
-                  'Loading events...',
-                  style: TextStyles.bodyText.copyWith(
-                    color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
-                  ),
-                ),
-              ],
+    // Show loader if still fetching
+    if (eventProvider.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    // Access directly from provider
+    final pastEvents = eventProvider.pastEvents;
+
+    if (pastEvents.isEmpty) {
+      return const Center(child: Text('No past events available.'));
+    }
+
+    return ListView.builder(
+      itemCount: pastEvents.length,
+      itemBuilder: (context, index) {
+        final event = pastEvents[index];
+        return Card(
+          margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          child: ListTile(
+            title: Text(event.title),
+            subtitle: Text(
+              '${event.description}\n${event.dateTime.toLocal()}',
+              style: const TextStyle(fontSize: 13),
             ),
-          )
-        : pastEvents.isEmpty
-            ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.event_busy,
-                      size: 64,
-                      color: Theme.of(context).colorScheme.onBackground.withOpacity(0.5),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No past events',
-                      style: TextStyles.bodyText.copyWith(
-                        color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            : RefreshIndicator(
-                onRefresh: () async {
-                  await Future.microtask(() => _loadEventData());
-                },
-                child: ListView.builder(
-                  itemCount: pastEvents.length,
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  itemBuilder: (context, index) {
-                    final event = pastEvents[index];
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12.0),
-                      child: Card(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 2,
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.all(16),
-                          title: Text(
-                            event.title,
-                            style: TextStyles.heading2.copyWith(
-                              color: Theme.of(context).colorScheme.onBackground,
-                            ),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SizedBox(height: 8),
-                              Text(
-                                _formatEventDate(event.dateTime),
-                                style: TextStyles.bodyText.copyWith(
-                                  color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                event.location,
-                                style: TextStyles.bodyText.copyWith(
-                                  color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
-                                ),
-                              ),
-                            ],
-                          ),
-                          trailing: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              'Past Event',
-                              style: TextStyles.bodyText.copyWith(
-                                color: Colors.grey,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          onTap: () => _navigateToEventDetails(event),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              );
+            isThreeLine: true,
+            leading: const Icon(Icons.event),
+            onTap: () {
+              // Open details or attendance summary
+            },
+          ),
+        );
+      },
+    );
   }
-}
+  }
 
 //card widget for user
 class CardWidget extends StatefulWidget {

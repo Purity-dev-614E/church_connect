@@ -20,11 +20,27 @@ class EventModel {
   factory EventModel.fromJson(Map<String, dynamic> json) {
     final rawDate = json['date_time'] ?? json['date'];
 
+    // Parse as DateTime, then normalize to local if UTC
+    DateTime parsed;
+    if (rawDate != null) {
+      try {
+        parsed = DateTime.parse(rawDate);
+        // If the parsed value is UTC, convert to local for app display/comparison
+        if (parsed.isUtc) {
+          parsed = parsed.toLocal();
+        }
+      } catch (_) {
+        parsed = DateTime.now();
+      }
+    } else {
+      parsed = DateTime.now();
+    }
+
     return EventModel(
       id: json['id'] ?? '',
       title: json['title'] ?? '',
       description: json['description'] ?? '',
-      dateTime: rawDate != null ? DateTime.parse(rawDate) : DateTime.now(),
+      dateTime: parsed,
       location: json['location'] ?? '',
       groupId: json['group_id'] ?? '',
       regionId: json['region_id'] ?? '',
@@ -37,6 +53,7 @@ class EventModel {
     'id': id,
     'title': title,
     'description': description,
+    // Store as UTC ISO to avoid ambiguity
     'date_time': dateTime.toUtc().toIso8601String(),
     'location': location,
     'group_id': groupId,

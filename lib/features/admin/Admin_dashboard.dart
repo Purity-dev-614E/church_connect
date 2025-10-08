@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:group_management_church_app/core/constants/colors.dart';
 import 'package:group_management_church_app/core/constants/text_styles.dart';
@@ -23,6 +24,8 @@ import 'package:group_management_church_app/data/providers/group_provider.dart';
 import 'package:group_management_church_app/data/providers/user_provider.dart';
 import 'package:intl/intl.dart';
 
+import '../../data/models/attendance_model.dart';
+
 class AdminDashboard extends StatefulWidget {
   final String groupId;
   final String groupName;
@@ -41,17 +44,14 @@ class AdminDashboard extends StatefulWidget {
 
 class _AdminDashboardState extends State<AdminDashboard>
     with TickerProviderStateMixin {
-
   // Search controllers
   late final TextEditingController _memberSearchController;
   late final TextEditingController _eventSearchController;
-
 
   // Filtered lists
   List<UserModel> _filteredMembers = [];
   List<EventModel> _filteredUpcomingEvents = [];
   List<EventModel> _filteredPastEvents = [];
-
 
   final PageController _pageController = PageController();
   int _selectedIndex = 0;
@@ -77,14 +77,13 @@ class _AdminDashboardState extends State<AdminDashboard>
   DateTime _selectedDate = DateTime.now();
   TimeOfDay _selectedTime = TimeOfDay.now();
 
-
-
   // Theme settings
   bool _isDarkMode = false;
   Color _accentColor = AppColors.primaryColor;
 
   // Animation controllers
   late AnimationController _refreshAnimationController;
+  Timer? _clockTimer; // periodic UI refresh for time-based event transitions
 
   // Settings
   bool _notificationsEnabled = true;
@@ -98,40 +97,79 @@ class _AdminDashboardState extends State<AdminDashboard>
   // Getter for group members
   List<UserModel> get groupMembers => _groupMembers;
 
+  late Future<Map<String, double>> _statisticsFuture;
+
+  // Simple in-memory cache
+  Map<String, double>? _cachedStats;
+  DateTime? _cacheTime;
+  final Duration _cacheDuration = const Duration(minutes: 5);
+
+  Future<List<List<AttendanceModel>>> _fetchAttendancesBatched(
+      List<EventModel> events,
+      AttendanceProvider attendanceProvider, {
+        int batchSize = 20,
+      }) async {
+    final results = <List<AttendanceModel>>[];
+
+    for (var i = 0; i < events.length; i += batchSize) {
+      final batch = events.sublist(
+        i,
+        (i + batchSize > events.length) ? events.length : i + batchSize,
+      );
+      final batchFutures =
+      batch.map((event) => attendanceProvider.fetchEventAttendance(event.id));
+      final batchResults = await Future.wait(batchFutures);
+      results.addAll(batchResults);
+    }
+
+    return results;
+  }
+
+
   // Getter for group events
   List<EventModel> get groupEvents => _groupEvents;
   List<EventModel> get _upcomingEvents {
     final now = DateTime.now();
-    final threshold = now.add(const Duration(minutes: 1)); // 1 minute from now
-    return _groupEvents
-        .where((event) => event.dateTime.isAfter(threshold))
+    final upcoming = _groupEvents
+        .where((event) => event.dateTime.toLocal().isAfter(now))
         .toList()
-      ..sort((a, b) => a.dateTime.compareTo(b.dateTime)); // soonest first
+      ..sort((a, b) => a.dateTime.toLocal().compareTo(b.dateTime.toLocal())); // soonest first
+
+    // Debug classification output (limited to first few events)
+    try {
+      final sample = _groupEvents.take(5).toList();
+      debugPrint('[EventsDebug] now(local)=${now.toIso8601String()}');
+      for (final e in sample) {
+        final local = e.dateTime.toLocal();
+        debugPrint('[EventsDebug] ${e.title}: ${local.toIso8601String()} => upcoming=${local.isAfter(now)}');
+      }
+    } catch (_) {}
+
+    return upcoming;
   }
 
   List<EventModel> get _pastEvents {
     final now = DateTime.now();
-    final threshold = now.add(const Duration(minutes: 1)); // match same cutoff
     return _groupEvents
-        .where((event) => event.dateTime.isBefore(threshold))
+        .where((event) =>
+            event.dateTime.toLocal().isBefore(now) ||
+            event.dateTime.toLocal().isAtSameMomentAs(now))
         .toList()
-      ..sort((a, b) => b.dateTime.compareTo(a.dateTime)); // latest first
+      ..sort((a, b) => b.dateTime.toLocal().compareTo(a.dateTime.toLocal())); // latest first
   }
 
-  @override
   @override
   void initState() {
     super.initState();
 
-    // Initialize the search controllers
+    _statisticsFuture = _getDirectStatistics();
+
     _memberSearchController = TextEditingController();
     _eventSearchController = TextEditingController();
 
-    // Add listeners for search functionality
     _memberSearchController.addListener(_filterMembers);
     _eventSearchController.addListener(_filterEvents);
 
-    // Initialize animation controller
     _refreshAnimationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1000),
@@ -140,16 +178,32 @@ class _AdminDashboardState extends State<AdminDashboard>
     _analyticsProvider = Provider.of<AdminAnalyticsProvider>(context, listen: false);
     _superAdminAnalyticsProvider = Provider.of<SuperAdminAnalyticsProvider>(context, listen: false);
 
-    // Load initial data
     _loadSettings();
     _loadInitialLists();
 
-    // Set up auto-refresh if enabled
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final eventProvider = Provider.of<EventProvider>(context, listen: false);
+      if (eventProvider.currentGroupId != null) {
+        eventProvider.fetchUpcomingEvents(eventProvider.currentGroupId!);
+      }
+    });
+
     if (_autoRefreshEnabled) {
       _setupAutoRefresh();
     }
+
+    // Periodically rebuild to move events between Upcoming/Past as time passes
+    _clockTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() {});
+    });
   }
 
+
+  void refreshStatistics() {
+    setState(() {
+      _statisticsFuture = _getDirectStatistics(); // ignores cache if expired
+    });
+  }
   void _loadInitialLists() {
     // Make copies of the original lists for filtering
     setState(() {
@@ -159,39 +213,40 @@ class _AdminDashboardState extends State<AdminDashboard>
     });
   }
 
-
-// Filter members based on search query
+  // Filter members based on search query
   void _filterMembers() {
     final query = _memberSearchController.text.toLowerCase();
 
     setState(() {
-      _filteredMembers = _groupMembers.where((member) {
-        final name = member.fullName.toLowerCase();
-        final email = member.email.toLowerCase();
-        return name.contains(query) || email.contains(query);
-      }).toList();
+      _filteredMembers =
+          _groupMembers.where((member) {
+            final name = member.fullName.toLowerCase();
+            final email = member.email.toLowerCase();
+            return name.contains(query) || email.contains(query);
+          }).toList();
     });
   }
 
-// Filter events based on search query
+  // Filter events based on search query
   void _filterEvents() {
     final query = _eventSearchController.text.toLowerCase();
 
     setState(() {
-      _filteredUpcomingEvents = _upcomingEvents.where((event) {
-        final title = event.title.toLowerCase();
-        final location = event.location.toLowerCase();
-        return title.contains(query) || location.contains(query);
-      }).toList();
+      _filteredUpcomingEvents =
+          _upcomingEvents.where((event) {
+            final title = event.title.toLowerCase();
+            final location = event.location.toLowerCase();
+            return title.contains(query) || location.contains(query);
+          }).toList();
 
-      _filteredPastEvents = _pastEvents.where((event) {
-        final title = event.title.toLowerCase();
-        final location = event.location.toLowerCase();
-        return title.contains(query) || location.contains(query);
-      }).toList();
+      _filteredPastEvents =
+          _pastEvents.where((event) {
+            final title = event.title.toLowerCase();
+            final location = event.location.toLowerCase();
+            return title.contains(query) || location.contains(query);
+          }).toList();
     });
   }
-
 
 
 
@@ -199,18 +254,17 @@ class _AdminDashboardState extends State<AdminDashboard>
   void didChangeDependencies() {
     super.didChangeDependencies();
 
-    // Move the page jump to didChangeDependencies to ensure PageView is ready
     if (_pageController.hasClients) {
       _pageController.jumpToPage(widget.initialTabIndex);
     }
 
-    // Schedule data loading after the build is complete
     Future.microtask(() {
       if (mounted) {
         _loadInitialData();
       }
     });
   }
+
 
   Future<void> _loadSettings() async {
     setState(() {
@@ -453,6 +507,16 @@ class _AdminDashboardState extends State<AdminDashboard>
       setState(() {
         _groupEvents = events;
       });
+
+      // Debug: print counts for classification sanity
+      try {
+        final now = DateTime.now();
+        final upcomingCount = _groupEvents
+            .where((e) => e.dateTime.toLocal().isAfter(now))
+            .length;
+        final pastCount = _groupEvents.length - upcomingCount;
+        debugPrint('[EventsDebug] loaded total=${_groupEvents.length} upcoming=$upcomingCount past=$pastCount');
+      } catch (_) {}
     } catch (e) {
       print('Error loading group events: $e');
       if (!mounted) return;
@@ -462,10 +526,12 @@ class _AdminDashboardState extends State<AdminDashboard>
       });
     }
   }
+
   @override
   void dispose() {
     _pageController.dispose();
     _refreshAnimationController.dispose();
+    _clockTimer?.cancel();
     super.dispose();
   }
 
@@ -910,7 +976,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                       ),
                     ),
                     ElevatedButton(
-                      onPressed: () {
+                      onPressed: () async {
                         // Create event using provider
                         if (titleController.text.isEmpty ||
                             descriptionController.text.isEmpty ||
@@ -933,13 +999,20 @@ class _AdminDashboardState extends State<AdminDashboard>
                           context,
                           listen: false,
                         );
-                        eventProvider.createEvent(
+                        await eventProvider.createEvent(
                           groupId: widget.groupId,
                           title: titleController.text,
                           description: descriptionController.text,
                           dateTime: eventDateTime,
                           location: locationController.text,
                         );
+
+                        // Refresh events and filtered lists
+                        await _loadGroupEvents();
+                        setState(() {
+                          _filteredUpcomingEvents = List.from(_upcomingEvents);
+                          _filteredPastEvents = List.from(_pastEvents);
+                        });
 
                         // Close the dialog
                         Navigator.pop(context);
@@ -1177,18 +1250,25 @@ class _AdminDashboardState extends State<AdminDashboard>
                 child: const Text('Cancel'),
               ),
               ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   final eventProvider = Provider.of<EventProvider>(
                     context,
                     listen: false,
                   );
-                  eventProvider.deleteEvent(event.id, widget.groupId).then((
-                    success,
-                  ) {
-                    if (success) {
-                      _showSuccess('Event deleted successfully');
-                    }
-                  });
+                  final success = await eventProvider.deleteEvent(
+                    event.id,
+                    widget.groupId,
+                  );
+
+                  if (success) {
+                    // Refresh events and filtered lists
+                    await _loadGroupEvents();
+                    setState(() {
+                      _filteredUpcomingEvents = List.from(_upcomingEvents);
+                      _filteredPastEvents = List.from(_pastEvents);
+                    });
+                    _showSuccess('Event deleted successfully');
+                  }
                   Navigator.pop(context);
                 },
                 style: ElevatedButton.styleFrom(
@@ -1353,7 +1433,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                       ),
                     ),
                     ElevatedButton(
-                      onPressed: () {
+                      onPressed: () async {
                         // Update event using provider
                         if (titleController.text.isEmpty ||
                             descriptionController.text.isEmpty ||
@@ -1376,7 +1456,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                           context,
                           listen: false,
                         );
-                        eventProvider
+                        final updatedEvent = await eventProvider
                             .updateEvent(
                               eventId: event.id,
                               title: titleController.text,
@@ -1384,21 +1464,27 @@ class _AdminDashboardState extends State<AdminDashboard>
                               dateTime: eventDateTime,
                               location: locationController.text,
                               groupId: widget.groupId,
-                            )
-                            .then((updatedEvent) {
-                              if (updatedEvent != null) {
-                                // Close the dialog
-                                Navigator.pop(context);
+                            );
 
-                                // Show success message
-                                _showSuccess('Event updated successfully');
+                        if (updatedEvent != null) {
+                          // Refresh events and filtered lists
+                          await _loadGroupEvents();
+                          setState(() {
+                            _filteredUpcomingEvents = List.from(_upcomingEvents);
+                            _filteredPastEvents = List.from(_pastEvents);
+                          });
 
-                                // Refresh UI in the parent widget
-                                setState(() {});
-                              } else {
-                                _showError('Failed to update event');
-                              }
-                            });
+                          // Close the dialog
+                          Navigator.pop(context);
+
+                          // Show success message
+                          _showSuccess('Event updated successfully');
+
+                          // Refresh UI in the parent widget
+                          setState(() {});
+                        } else {
+                          _showError('Failed to update event');
+                        }
 
                         // Dispose controllers to prevent memory leaks
                         titleController.dispose();
@@ -1584,13 +1670,15 @@ class _AdminDashboardState extends State<AdminDashboard>
             _onItemTapped(1); // Navigate to Members tab
           }),
           const SizedBox(height: 16),
-          _buildMembersList(showLimit: true, members: _filteredMembers,),
+          _buildMembersList(showLimit: true, members: _filteredMembers),
           const SizedBox(height: 24),
           _buildSectionHeader('Upcoming Events', Icons.event, () {
             _onItemTapped(2); // Navigate to Events tab
           }),
           const SizedBox(height: 16),
-          _buildUpcomingEventsList(showLimit: false, events: _filteredUpcomingEvents),
+          _buildUpcomingEventsList(
+            showLimit: false,
+          ),
           const SizedBox(height: 32),
         ],
       ),
@@ -1675,7 +1763,6 @@ class _AdminDashboardState extends State<AdminDashboard>
     );
   }
 
-
   Widget _createQuickActionButton(
     String label,
     IconData icon,
@@ -1710,7 +1797,7 @@ class _AdminDashboardState extends State<AdminDashboard>
 
   Widget _buildStatisticsGrid() {
     return FutureBuilder<Map<String, double>>(
-      future: _getDirectStatistics(),
+      future: _statisticsFuture, // use the cached Future from state
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -1719,7 +1806,11 @@ class _AdminDashboardState extends State<AdminDashboard>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                const Icon(
+                  Icons.error_outline,
+                  color: Colors.red,
+                  size: 48,
+                ),
                 const SizedBox(height: 16),
                 Text(
                   'Error loading statistics: ${snapshot.error}',
@@ -1731,108 +1822,104 @@ class _AdminDashboardState extends State<AdminDashboard>
           );
         } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return const Center(child: Text('No data available'));
-        } else {
-          final data = snapshot.data!;
-          return GridView.count(
-            crossAxisCount: 2,
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            children: [
-              _buildStatCard(
-                'Total Members',
-                '${data['totalMembers']?.toInt() ?? 0}',
-                Icons.people,
-                AppColors.primaryColor,
-              ),
-              _buildStatCard(
-                'Active Members',
-                '${data['activeMembers']?.toInt() ?? 0}',
-                Icons.person_outline,
-                AppColors.secondaryColor,
-              ),
-              _buildStatCard(
-                'Events This Month',
-                '${data['eventsThisMonth'] ?? 0}',
-                Icons.event,
-                AppColors.buttonColor,
-              ),
-            ],
-          );
         }
+
+        final data = snapshot.data!;
+        return GridView.count(
+          crossAxisCount: 2,
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          children: [
+            _buildStatCard(
+              'Total Members',
+              '${data['totalMembers']?.toInt() ?? 0}',
+              Icons.people,
+              AppColors.primaryColor,
+            ),
+            _buildStatCard(
+              'Active Members',
+              '${data['activeMembers']?.toInt() ?? 0}',
+              Icons.person_outline,
+              AppColors.secondaryColor,
+            ),
+            // _buildStatCard(
+            //   'Events This Month',
+            //   '${data['eventsThisMonth']?.toInt() ?? 0}',
+            //   Icons.event,
+            //   AppColors.buttonColor,
+            // ),
+          ],
+        );
       },
     );
   }
 
   Future<Map<String, double>> _getDirectStatistics() async {
+    // Return cached result if recent
+    if (_cachedStats != null &&
+        _cacheTime != null &&
+        DateTime.now().difference(_cacheTime!) < _cacheDuration) {
+      return _cachedStats!;
+    }
+
     try {
-      // Get providers
       final groupProvider = Provider.of<GroupProvider>(context, listen: false);
       final eventProvider = Provider.of<EventProvider>(context, listen: false);
-      final attendanceProvider = Provider.of<AttendanceProvider>(
-        context,
-        listen: false,
-      );
+      final attendanceProvider =
+      Provider.of<AttendanceProvider>(context, listen: false);
 
-      // Get current date range for this month
       final now = DateTime.now();
       final firstDayOfMonth = DateTime(now.year, now.month, 1);
       final lastDayOfMonth = DateTime(now.year, now.month + 1, 0);
 
-      // Get total members
+      // Total members
       final members = await groupProvider.getGroupMembers(widget.groupId);
       final totalMembers = members.length.toDouble();
 
-      // Get active members (attended at least one event in last 30 days)
+      // Past events in last 30 days
       final thirtyDaysAgo = now.subtract(const Duration(days: 30));
       final pastEvents = await eventProvider.fetchPastEvents(widget.groupId);
-      final recentEvents =
-          pastEvents
-              .where(
-                (event) =>
-                    event.dateTime.isAfter(thirtyDaysAgo) &&
-                    event.dateTime.isBefore(now),
-              )
-              .toList();
+      final recentEvents = pastEvents
+          .where((e) => e.dateTime.isAfter(thirtyDaysAgo) && e.dateTime.isBefore(now))
+          .toList();
 
-      Set<String> activeUserIds = {};
-      for (var event in recentEvents) {
-        final attendanceList = await attendanceProvider.fetchEventAttendance(
-          event.id,
-        );
+      // Fetch attendance in batches
+      final attendanceResults =
+      await _fetchAttendancesBatched(recentEvents, attendanceProvider);
+
+      final activeUserIds = <String>{};
+      for (var attendanceList in attendanceResults) {
         for (var attendance in attendanceList) {
-          if (attendance.isPresent) {
-            activeUserIds.add(attendance.userId);
-          }
+          if (attendance.isPresent) activeUserIds.add(attendance.userId);
         }
       }
       final activeMembers = activeUserIds.length.toDouble();
 
-      // Get events this month
+      // Events this month
       final upcomingEvents = eventProvider.upcomingEvents;
       final allEvents = [...pastEvents, ...upcomingEvents];
-      final eventsThisMonth =
-          allEvents
-              .where(
-                (event) =>
-                    event.dateTime.isAfter(
-                      firstDayOfMonth.subtract(const Duration(days: 1)),
-                    ) &&
-                    event.dateTime.isBefore(
-                      lastDayOfMonth.add(const Duration(days: 1)),
-                    ),
-              )
-              .length
-              .toDouble();
+      final eventsThisMonth = allEvents
+          .where((e) =>
+      e.dateTime.isAfter(firstDayOfMonth.subtract(const Duration(days: 1))) &&
+          e.dateTime.isBefore(lastDayOfMonth.add(const Duration(days: 1))))
+          .length
+          .toDouble();
 
-      return {
+      final result = {
         'totalMembers': totalMembers,
         'activeMembers': activeMembers,
         'eventsThisMonth': eventsThisMonth,
       };
-    } catch (e) {
-      print('Error getting direct statistics: $e');
+
+      // Cache result
+      _cachedStats = result;
+      _cacheTime = DateTime.now();
+
+      return result;
+    } catch (e, st) {
+      debugPrint('Error getting direct statistics: $e\n$st');
       return {
         'totalMembers': 0.0,
         'activeMembers': 0.0,
@@ -1840,6 +1927,7 @@ class _AdminDashboardState extends State<AdminDashboard>
       };
     }
   }
+
 
   Widget _buildStatCard(
     String title,
@@ -1942,8 +2030,6 @@ class _AdminDashboardState extends State<AdminDashboard>
               contentPadding: const EdgeInsets.symmetric(vertical: 12),
             ),
           ),
-
-
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -1971,21 +2057,28 @@ class _AdminDashboardState extends State<AdminDashboard>
           ),
         ),
         const SizedBox(height: 8),
-        Expanded(child: _buildMembersList(showLimit: false, members: _filteredMembers)),
+        Expanded(
+          child: _buildMembersList(showLimit: false, members: _filteredMembers),
+        ),
       ],
     );
   }
 
-  Widget _buildMembersList({required bool showLimit, required List<UserModel> members}) {
-    final displayMembers = showLimit && members.length > 3 ? members.sublist(0, 3) : members;
+  Widget _buildMembersList({
+    required bool showLimit,
+    required List<UserModel> members,
+  }) {
+    final displayMembers =
+        showLimit && members.length > 3 ? members.sublist(0, 3) : members;
 
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       itemCount: displayMembers.length,
       shrinkWrap: true,
-      physics: showLimit
-          ? const NeverScrollableScrollPhysics()
-          : const AlwaysScrollableScrollPhysics(),
+      physics:
+          showLimit
+              ? const NeverScrollableScrollPhysics()
+              : const AlwaysScrollableScrollPhysics(),
       itemBuilder: (context, index) {
         final member = displayMembers[index];
         return Card(
@@ -1995,13 +2088,29 @@ class _AdminDashboardState extends State<AdminDashboard>
             borderRadius: BorderRadius.circular(12),
           ),
           child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 8,
+            ),
             leading: CircleAvatar(
               backgroundColor: AppColors.primaryColor,
-              child: Text(member.fullName.substring(0, 1), style: const TextStyle(color: Colors.white)),
+              child: Text(
+                member.fullName.substring(0, 1),
+                style: const TextStyle(color: Colors.white),
+              ),
             ),
-            title: Text(member.fullName, style: TextStyles.bodyText.copyWith(fontWeight: FontWeight.w600)),
-            subtitle: Text(member.email, style: TextStyles.bodyText.copyWith(color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7))),
+            title: Text(
+              member.fullName,
+              style: TextStyles.bodyText.copyWith(fontWeight: FontWeight.w600),
+            ),
+            subtitle: Text(
+              member.email,
+              style: TextStyles.bodyText.copyWith(
+                color: Theme.of(
+                  context,
+                ).colorScheme.onBackground.withOpacity(0.7),
+              ),
+            ),
             trailing: IconButton(
               icon: const Icon(Icons.more_vert),
               onPressed: () => _showMemberOptionsDialog(member),
@@ -2032,8 +2141,6 @@ class _AdminDashboardState extends State<AdminDashboard>
                 contentPadding: const EdgeInsets.symmetric(vertical: 12),
               ),
             ),
-
-
           ),
           const TabBar(
             tabs: [Tab(text: 'Upcoming'), Tab(text: 'Past')],
@@ -2044,8 +2151,13 @@ class _AdminDashboardState extends State<AdminDashboard>
           Expanded(
             child: TabBarView(
               children: [
-                _buildUpcomingEventsList(showLimit: false, events: _filteredUpcomingEvents),
-                _buildPastEventsList(showLimit: false, events: _filteredPastEvents)
+                _buildUpcomingEventsList(
+                  showLimit: false,
+                ),
+                _buildPastEventsList(
+                  showLimit: false,
+                  events: _filteredPastEvents,
+                ),
               ],
             ),
           ),
@@ -2054,10 +2166,28 @@ class _AdminDashboardState extends State<AdminDashboard>
     );
   }
 
-  Widget _buildUpcomingEventsList({required bool showLimit, required List<EventModel> events}) {
-    final displayEvents = showLimit && events.length > 2 ? events.sublist(0, 2) : events;
-        // ? _upcomingEvents.sublist(0, 2)
-        // : _upcomingEvents;
+  List<EventModel> _filterEventsByQuery(List<EventModel> source) {
+    final query = _eventSearchController.text.trim().toLowerCase();
+    if (query.isEmpty) return source;
+    return source.where((event) {
+      final title = event.title.toLowerCase();
+      final location = event.location.toLowerCase();
+      return title.contains(query) || location.contains(query);
+    }).toList();
+  }
+
+  Widget _buildUpcomingEventsList({required bool showLimit}) {
+    final events = _filterEventsByQuery(_upcomingEvents);
+    final displayEvents =
+        showLimit && events.length > 2 ? events.sublist(0, 2) : events;
+
+    // Debug: show what we're about to render
+    try {
+      debugPrint('[EventsDebug] render Upcoming count=${displayEvents.length} (filtered from ${events.length})');
+      for (final e in displayEvents.take(5)) {
+        debugPrint('[EventsDebug] Upcoming item: ${e.title} @ ${e.dateTime.toLocal().toIso8601String()}');
+      }
+    } catch (_) {}
 
     if (displayEvents.isEmpty) {
       return Center(
@@ -2067,19 +2197,25 @@ class _AdminDashboardState extends State<AdminDashboard>
             Icon(
               Icons.event_busy,
               size: 64,
-              color: Theme.of(context).colorScheme.onBackground.withOpacity(0.5),
+              color: Theme.of(context)
+                  .colorScheme
+                  .onBackground
+                  .withOpacity(0.5),
             ),
             const SizedBox(height: 16),
             Text(
               'No upcoming events',
-              style: TextStyles.bodyText.copyWith(
-                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context)
+                    .colorScheme
+                    .onBackground
+                    .withOpacity(0.7),
               ),
             ),
             const SizedBox(height: 24),
             CustomButton(
               label: 'Create Event',
-              onPressed: _showCreateEventDialog,
+              onPressed: () => _showCreateEventDialog(),
               icon: Icons.add,
               color: const Color(0xffc62828),
               isFullWidth: false,
@@ -2115,10 +2251,14 @@ class _AdminDashboardState extends State<AdminDashboard>
     );
   }
 
-  Widget _buildPastEventsList({bool showLimit = false, required List<EventModel> events}) {
-    final displayEvents = showLimit && events.length > 2 ? events.sublist(0, 2) : events;
-        // ? _pastEvents.sublist(0, 2)
-        // : _pastEvents;
+  Widget _buildPastEventsList({
+    bool showLimit = false,
+    required List<EventModel> events,
+  }) {
+    final filtered = _filterEventsByQuery(events);
+    final displayEvents =
+        showLimit && filtered.length > 2 ? filtered.sublist(0, 2) : filtered;
+
 
     if (displayEvents.isEmpty) {
       return Center(
@@ -2128,13 +2268,17 @@ class _AdminDashboardState extends State<AdminDashboard>
             Icon(
               Icons.event_busy,
               size: 64,
-              color: Theme.of(context).colorScheme.onBackground.withOpacity(0.5),
+              color: Theme.of(
+                context,
+              ).colorScheme.onBackground.withOpacity(0.5),
             ),
             const SizedBox(height: 16),
             Text(
               'No past events',
               style: TextStyles.bodyText.copyWith(
-                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onBackground.withOpacity(0.7),
               ),
             ),
           ],
@@ -2162,7 +2306,6 @@ class _AdminDashboardState extends State<AdminDashboard>
       },
     );
   }
-
 
   // ANALYTICS TAB
   Widget _buildAnalyticsTab() {

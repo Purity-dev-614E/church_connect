@@ -1235,6 +1235,7 @@ void _showAllRegions() {
           Expanded(
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
+                dropdownColor: Theme.of(context).colorScheme.background,
                 value: value,
                 isExpanded: true,
                 icon: const Icon(Icons.arrow_drop_down, color: AppColors.primaryColor),
@@ -1243,7 +1244,9 @@ void _showAllRegions() {
                 items: items.map<DropdownMenuItem<String>>((String value) {
                   return DropdownMenuItem<String>(
                     value: value,
-                    child: Text(value),
+                    child: Text(value,
+                      style: TextStyles.bodyText.copyWith(color: Theme.of(context).colorScheme.onBackground),
+                    ),
                   );
                 }).toList(),
               ),
