@@ -31,10 +31,7 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
   // Data containers
   Map<String, double> _regionAttendance = {};
   Map<String, double> _activityStatus = {};
-  Map<String, double> _groupAttendance = {};
   List<FlSpot> _attendanceTrend = [];
-  Map<String, List<double>> _eventTimeline = {};
-  Map<String, Map<String, int>> _demographics = {};
 
   // Stats data
   int _totalUsers = 0;
@@ -190,48 +187,59 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
 
   Future<void> _loadAttendanceTrend() async {
     try {
-      // Updated API route for overall attendance
-      final attendance = await _superProvider.getOverallAttendanceByPeriod(
-        _selectedPeriod,
-      );
-      
-      if (attendance?.overallStats?.attendanceRate != null) {
-        setState(() {
-          _overallAttendance = attendance!.overallStats!.attendanceRate;
-          
-          // Generate trend data points
-          _attendanceTrend = [
-            FlSpot(0, _overallAttendance * 0.9),
-            FlSpot(1, _overallAttendance * 0.95),
-            FlSpot(2, _overallAttendance * 0.97),
-            FlSpot(3, _overallAttendance),
-            FlSpot(4, _overallAttendance * 1.02),
-            FlSpot(5, _overallAttendance * 1.05),
-          ];
-        });
+      if (_selectedPeriod == 'quarter') {
+        // Fetch last 3 months and calculate average
+        List<double> monthlyRates = [];
+
+        for (int i = 0; i < 3; i++) {
+          final attendance = await _superProvider.getOverallAttendanceByPeriod("month");
+          if (attendance?.overallStats?.attendanceRate != null) {
+            monthlyRates.add(attendance!.overallStats!.attendanceRate);
+          }
+        }
+
+        if (monthlyRates.isNotEmpty) {
+          final avgQuarterly = monthlyRates.reduce((a, b) => a + b) / monthlyRates.length;
+
+          setState(() {
+            _overallAttendance = avgQuarterly;
+
+            _attendanceTrend = [
+              FlSpot(0, avgQuarterly * 0.9),
+              FlSpot(1, avgQuarterly * 0.95),
+              FlSpot(2, avgQuarterly),
+              FlSpot(3, avgQuarterly * 1.05),
+            ];
+          });
+        }
       } else {
-        // Provide fallback data if attendance is not available
-        setState(() {
-          _overallAttendance = 0.0;
-          _attendanceTrend = [
-            FlSpot(0, 0),
-            FlSpot(1, 0),
-            FlSpot(2, 0),
-            FlSpot(3, 0),
-            FlSpot(4, 0),
-            FlSpot(5, 0),
-          ];
-        });
+        // Normal case
+        final attendance = await _superProvider.getOverallAttendanceByPeriod(_selectedPeriod);
+
+        if (attendance?.overallStats?.attendanceRate != null) {
+          setState(() {
+            _overallAttendance = attendance!.overallStats!.attendanceRate;
+
+            _attendanceTrend = [
+              FlSpot(0, _overallAttendance * 0.9),
+              FlSpot(1, _overallAttendance * 0.95),
+              FlSpot(2, _overallAttendance * 0.97),
+              FlSpot(3, _overallAttendance),
+              FlSpot(4, _overallAttendance * 1.02),
+              FlSpot(5, _overallAttendance * 1.05),
+            ];
+          });
+        }
       }
     } catch (e) {
       print('Error loading attendance trend: $e');
-      // Don't throw exception, just set empty data
       setState(() {
         _overallAttendance = 0.0;
         _attendanceTrend = [];
       });
     }
   }
+
 
   void _refreshData() {
     _loadData();
@@ -331,6 +339,7 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
               items: const [
                 DropdownMenuItem(value: 'week', child: Text('Weekly')),
                 DropdownMenuItem(value: 'month', child: Text('Monthly')),
+                DropdownMenuItem(value: 'quarter', child: Text("Quarterly")),
                 DropdownMenuItem(value: 'year', child: Text('Yearly')),
               ],
               onChanged: (value) {

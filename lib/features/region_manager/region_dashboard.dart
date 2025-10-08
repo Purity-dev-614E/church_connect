@@ -8,6 +8,7 @@ import 'package:group_management_church_app/data/models/regional_analytics_model
 import 'package:group_management_church_app/data/services/analytics_services/regional_manager_analytics_service.dart';
 import 'package:group_management_church_app/data/services/user_services.dart';
 import 'package:group_management_church_app/features/profile_screen.dart';
+import 'package:group_management_church_app/features/region_manager/group_details_screen.dart';
 import 'package:group_management_church_app/features/region_manager/region_user_management_tab.dart';
 import 'package:group_management_church_app/features/region_manager/region_group_administration_tab.dart';
 import 'package:group_management_church_app/features/region_manager/screens/analytics_screen.dart';
@@ -52,8 +53,6 @@ class _RegionDashboardState extends State<RegionDashboard> {
   List<GroupModel> _regionGroups = [];
   List<EventModel> _upcomingEvents = [];
   DashboardSummary? _dashboardSummary;
-  Map<String, dynamic> _attendanceTrends = {};
-  RegionGrowthAnalytics? _growthTrends;
   RegionModel? _region;
   bool _isLoading = true;
   String? _errorMessage;
@@ -63,11 +62,11 @@ class _RegionDashboardState extends State<RegionDashboard> {
   bool _darkModeEnabled = false;
   final String _selectedDateRange = 'Last 6 Months';
   final List<String> _availableDateRanges = ['Last Month', 'Last 3 Months', 'Last 6 Months', 'Last Year'];
-  
+
   // Export options
   final List<String> _exportFormats = ['CSV', 'PDF', 'Excel'];
   String _selectedExportFormat = 'CSV';
-  
+
   // Chart data
   List<FlSpot> _attendanceSpots = [];
   List<String> _attendanceLabels = [];
@@ -382,11 +381,6 @@ class _RegionDashboardState extends State<RegionDashboard> {
             const SizedBox(height: 24),
             _buildStatisticsGrid(),
             const SizedBox(height: 24),
-            _buildSectionHeader('Region Users', Icons.people, () {
-              _onItemTapped(1); // Navigate to Users tab
-            }),
-            const SizedBox(height: 16),
-            _buildRecentUsersList(),
             const SizedBox(height: 24),
             _buildSectionHeader('Region Groups', Icons.groups, () {
               _onItemTapped(2); // Navigate to Groups tab
@@ -394,9 +388,7 @@ class _RegionDashboardState extends State<RegionDashboard> {
             const SizedBox(height: 16),
             _buildRecentGroupsList(),
             const SizedBox(height: 24),
-            _buildSectionHeader('Quick Analytics', Icons.analytics, () {
-              _onItemTapped(3); // Navigate to Analytics tab
-            }),
+            // }),
             const SizedBox(height: 32),
           ],
         ),
@@ -466,11 +458,6 @@ class _RegionDashboardState extends State<RegionDashboard> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildQuickActionButton(
-                  'Add User',
-                  Icons.person_add,
-                  () => _onItemTapped(1),
-                ),
                 _buildQuickActionButton(
                   'Add Group',
                   Icons.group_add,
@@ -544,7 +531,7 @@ class _RegionDashboardState extends State<RegionDashboard> {
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+  Widget _buildStatCard(String title, String value, IconData icon, Color color ) {
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(
@@ -734,14 +721,6 @@ class _RegionDashboardState extends State<RegionDashboard> {
                     color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                   ),
                 ),
-                const SizedBox(height: 8),
-                ElevatedButton(
-                  onPressed: () => _showCreateGroupDialog(),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryColor,
-                  ),
-                  child: const Text('Add Groups'),
-                ),
               ],
             ),
           ),
@@ -778,27 +757,12 @@ class _RegionDashboardState extends State<RegionDashboard> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                subtitle: Text(
-                  'Members: ${group.members?.length ?? 0}',
-                  style: TextStyles.bodyText.copyWith(
-                    color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
-                  ),
-                ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
-                  // Navigate to group details
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => GroupDetailsScreen(groupId: group.id, groupName: group.name)));
                 },
               );
             },
-          ),
-        ),
-        const SizedBox(height: 16),
-        ElevatedButton.icon(
-          onPressed: () => _showCreateGroupDialog(),
-          icon: const Icon(Icons.add),
-          label: const Text('Add New Group'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primaryColor,
           ),
         ),
       ],

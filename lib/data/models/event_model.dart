@@ -17,23 +17,29 @@ class EventModel {
     this.regionId = '',
   });
 
-  EventModel.fromJson(Map<String, dynamic> json)
-      : id = json['id'] ?? '',
-        title = json['title'] ?? '',
-        description = json['description'] ?? '',
-        dateTime = json['date'] != null ? DateTime.parse(json['date']) : DateTime.now(),
-        location = json['location'] ?? '',
-        groupId = json['group_id'] ?? '',
-        regionId = json['region_id'] ?? '';
+  factory EventModel.fromJson(Map<String, dynamic> json) {
+    final rawDate = json['date_time'] ?? json['date'];
+
+    return EventModel(
+      id: json['id'] ?? '',
+      title: json['title'] ?? '',
+      description: json['description'] ?? '',
+      dateTime: rawDate != null ? DateTime.parse(rawDate) : DateTime.now(),
+      location: json['location'] ?? '',
+      groupId: json['group_id'] ?? '',
+      regionId: json['region_id'] ?? '',
+    );
+  }
+
+
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'title': title,
-        'description': description,
-        'date_time': dateTime.toIso8601String(),
-        'location': location,
-        'group_id': groupId,
-        'region_id': regionId,
-      };
-
+    'id': id,
+    'title': title,
+    'description': description,
+    'date_time': dateTime.toUtc().toIso8601String(),
+    'location': location,
+    'group_id': groupId,
+    'region_id': regionId,
+  };
 }

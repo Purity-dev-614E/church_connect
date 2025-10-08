@@ -180,9 +180,9 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
               const SizedBox(height: 32),
               
               // Attendance Section
-              _hasMarkedAttendance
-                ? _buildAttendanceConfirmation()
-                : _buildAttendanceForm(),
+              // _hasMarkedAttendance
+              //   ? _buildAttendanceConfirmation()
+                // : _buildAttendanceForm(),
             ],
           ),
         ),
@@ -282,279 +282,279 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
     );
   }
   
-  Widget _buildAttendanceForm() {
-    return Card(
-      elevation: 3,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Mark Your Attendance',
-              style: TextStyles.heading2.copyWith(
-              ),
-            ),
-            const SizedBox(height: 16),
-            
-            // Attendance Options
-            Row(
-              children: [
-                Expanded(
-                  child: _buildAttendanceOption(
-                    title: 'Attending',
-                    icon: Icons.check_circle,
-                    color: AppColors.successColor,
-                    isSelected: _isAttending,
-                    onTap: () {
-                      setState(() {
-                        _isAttending = true;
-                      });
-                    },
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildAttendanceOption(
-                    title: 'Not Attending',
-                    icon: Icons.cancel,
-                    color: AppColors.errorColor,
-                    isSelected: !_isAttending,
-                    onTap: () {
-                      setState(() {
-                        _isAttending = false;
-                      });
-                    },
-                  ),
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: 24),
-            
-            // Form based on selection
-            _isAttending
-                ? _buildAttendingForm()
-                : _buildNotAttendingForm(),
-                
-            const SizedBox(height: 16),
-            
-            // Submit Button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _submitAttendance,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _isAttending 
-                      ? AppColors.successColor 
-                      : AppColors.errorColor,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      )
-                    : Text(
-                        _isAttending 
-                            ? 'Confirm Attendance' 
-                            : 'Submit Apology',
-                        style: TextStyles.buttonText.copyWith(
-                          color: Colors.white,
-                        ),
-                      ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildAttendanceOption({
-    required String title,
-    required IconData icon,
-    required Color color,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isSelected ? color : Colors.grey.shade300,
-            width: 2,
-          ),
-        ),
-        child: Column(
-          children: [
-            Icon(
-              icon,
-              color: color,
-              size: 32,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              style: TextStyles.bodyText.copyWith(
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? color : Theme.of(context).colorScheme.onBackground,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildAttendingForm() {
-    return Form(
-      key: _attendedFormKey,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Please provide feedback:',
-            style: TextStyles.bodyText.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 12),
-          
-          // Topic Field
-          TextFormField(
-            controller: _topicController,
-            decoration: const InputDecoration(
-              labelText: 'Topic Discussed',
-              hintText: 'Enter the main topic discussed',
-              border: OutlineInputBorder(),
-            ),
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Please enter the topic discussed';
-              }
-              return null;
-            },
-            maxLines: 2,
-          ),
-          const SizedBox(height: 16),
-          
-          // AOB Field
-          TextFormField(
-            controller: _aobController,
-            decoration: const InputDecoration(
-              labelText: 'Any Other Business (AOB)',
-              hintText: 'Enter any other business discussed',
-              border: OutlineInputBorder(),
-            ),
-            maxLines: 3,
-          ),
-        ],
-      ),
-    );
-  }
-  
-  Widget _buildNotAttendingForm() {
-    return Form(
-      key: _notAttendedFormKey,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Please provide an apology:',
-            style: TextStyles.bodyText.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 12),
-          
-          // Apology Field
-          TextFormField(
-            controller: _apologyController,
-            decoration: const InputDecoration(
-              labelText: 'Reason for Absence',
-              hintText: 'Enter your reason for not attending',
-              border: OutlineInputBorder(),
-            ),
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Please provide a reason for your absence';
-              }
-              return null;
-            },
-            maxLines: 3,
-          ),
-        ],
-      ),
-    );
-  }
-  
-  Widget _buildAttendanceConfirmation() {
-    return Card(
-      elevation: 3,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            Icon(
-              _isAttending ? Icons.check_circle : Icons.cancel,
-              color: _isAttending ? AppColors.successColor : AppColors.errorColor,
-              size: 64,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              _isAttending 
-                  ? 'You have marked your attendance for this event!' 
-                  : 'You have submitted your apology for this event.',
-              style: TextStyles.heading2.copyWith(
-
-                color: _isAttending ? AppColors.successColor : AppColors.errorColor,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            OutlinedButton(
-              onPressed: () {
-                setState(() {
-                  _hasMarkedAttendance = false;
-                });
-              },
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(
-                  color: _isAttending ? AppColors.successColor : AppColors.errorColor,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: Text(
-                'Change Response',
-                style: TextStyles.bodyText.copyWith(
-                  color: _isAttending ? AppColors.successColor : AppColors.errorColor,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  // Widget _buildAttendanceForm() {
+  //   return Card(
+  //     elevation: 3,
+  //     shape: RoundedRectangleBorder(
+  //       borderRadius: BorderRadius.circular(12),
+  //     ),
+  //     child: Padding(
+  //       padding: const EdgeInsets.all(16.0),
+  //       child: Column(
+  //         crossAxisAlignment: CrossAxisAlignment.start,
+  //         children: [
+  //           Text(
+  //             'Mark Your Attendance',
+  //             style: TextStyles.heading2.copyWith(
+  //             ),
+  //           ),
+  //           const SizedBox(height: 16),
+  //
+  //           // Attendance Options
+  //           Row(
+  //             children: [
+  //               Expanded(
+  //                 child: _buildAttendanceOption(
+  //                   title: 'Attending',
+  //                   icon: Icons.check_circle,
+  //                   color: AppColors.successColor,
+  //                   isSelected: _isAttending,
+  //                   onTap: () {
+  //                     setState(() {
+  //                       _isAttending = true;
+  //                     });
+  //                   },
+  //                 ),
+  //               ),
+  //               const SizedBox(width: 16),
+  //               Expanded(
+  //                 child: _buildAttendanceOption(
+  //                   title: 'Not Attending',
+  //                   icon: Icons.cancel,
+  //                   color: AppColors.errorColor,
+  //                   isSelected: !_isAttending,
+  //                   onTap: () {
+  //                     setState(() {
+  //                       _isAttending = false;
+  //                     });
+  //                   },
+  //                 ),
+  //               ),
+  //             ],
+  //           ),
+  //
+  //           const SizedBox(height: 24),
+  //
+  //           // Form based on selection
+  //           _isAttending
+  //               ? _buildAttendingForm()
+  //               : _buildNotAttendingForm(),
+  //
+  //           const SizedBox(height: 16),
+  //
+  //           // Submit Button
+  //           SizedBox(
+  //             width: double.infinity,
+  //             child: ElevatedButton(
+  //               onPressed: _isLoading ? null : _submitAttendance,
+  //               style: ElevatedButton.styleFrom(
+  //                 backgroundColor: _isAttending
+  //                     ? AppColors.successColor
+  //                     : AppColors.errorColor,
+  //                 padding: const EdgeInsets.symmetric(vertical: 12),
+  //                 shape: RoundedRectangleBorder(
+  //                   borderRadius: BorderRadius.circular(8),
+  //                 ),
+  //               ),
+  //               child: _isLoading
+  //                   ? const SizedBox(
+  //                       height: 20,
+  //                       width: 20,
+  //                       child: CircularProgressIndicator(
+  //                         strokeWidth: 2,
+  //                         valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+  //                       ),
+  //                     )
+  //                   : Text(
+  //                       _isAttending
+  //                           ? 'Confirm Attendance'
+  //                           : 'Submit Apology',
+  //                       style: TextStyles.buttonText.copyWith(
+  //                         color: Colors.white,
+  //                       ),
+  //                     ),
+  //             ),
+  //           ),
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
+  //
+  // Widget _buildAttendanceOption({
+  //   required String title,
+  //   required IconData icon,
+  //   required Color color,
+  //   required bool isSelected,
+  //   required VoidCallback onTap,
+  // }) {
+  //   return GestureDetector(
+  //     onTap: onTap,
+  //     child: Container(
+  //       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+  //       decoration: BoxDecoration(
+  //         color: isSelected ? color.withOpacity(0.1) : Colors.transparent,
+  //         borderRadius: BorderRadius.circular(8),
+  //         border: Border.all(
+  //           color: isSelected ? color : Colors.grey.shade300,
+  //           width: 2,
+  //         ),
+  //       ),
+  //       child: Column(
+  //         children: [
+  //           Icon(
+  //             icon,
+  //             color: color,
+  //             size: 32,
+  //           ),
+  //           const SizedBox(height: 8),
+  //           Text(
+  //             title,
+  //             style: TextStyles.bodyText.copyWith(
+  //               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+  //               color: isSelected ? color : Theme.of(context).colorScheme.onBackground,
+  //             ),
+  //             textAlign: TextAlign.center,
+  //           ),
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
+  //
+  // Widget _buildAttendingForm() {
+  //   return Form(
+  //     key: _attendedFormKey,
+  //     child: Column(
+  //       crossAxisAlignment: CrossAxisAlignment.start,
+  //       children: [
+  //         Text(
+  //           'Please provide feedback:',
+  //           style: TextStyles.bodyText.copyWith(
+  //             fontWeight: FontWeight.bold,
+  //           ),
+  //         ),
+  //         const SizedBox(height: 12),
+  //
+  //         // Topic Field
+  //         TextFormField(
+  //           controller: _topicController,
+  //           decoration: const InputDecoration(
+  //             labelText: 'Topic Discussed',
+  //             hintText: 'Enter the main topic discussed',
+  //             border: OutlineInputBorder(),
+  //           ),
+  //           validator: (value) {
+  //             if (value == null || value.isEmpty) {
+  //               return 'Please enter the topic discussed';
+  //             }
+  //             return null;
+  //           },
+  //           maxLines: 2,
+  //         ),
+  //         const SizedBox(height: 16),
+  //
+  //         // AOB Field
+  //         TextFormField(
+  //           controller: _aobController,
+  //           decoration: const InputDecoration(
+  //             labelText: 'Any Other Business (AOB)',
+  //             hintText: 'Enter any other business discussed',
+  //             border: OutlineInputBorder(),
+  //           ),
+  //           maxLines: 3,
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
+  //
+  // Widget _buildNotAttendingForm() {
+  //   return Form(
+  //     key: _notAttendedFormKey,
+  //     child: Column(
+  //       crossAxisAlignment: CrossAxisAlignment.start,
+  //       children: [
+  //         Text(
+  //           'Please provide an apology:',
+  //           style: TextStyles.bodyText.copyWith(
+  //             fontWeight: FontWeight.bold,
+  //           ),
+  //         ),
+  //         const SizedBox(height: 12),
+  //
+  //         // Apology Field
+  //         TextFormField(
+  //           controller: _apologyController,
+  //           decoration: const InputDecoration(
+  //             labelText: 'Reason for Absence',
+  //             hintText: 'Enter your reason for not attending',
+  //             border: OutlineInputBorder(),
+  //           ),
+  //           validator: (value) {
+  //             if (value == null || value.isEmpty) {
+  //               return 'Please provide a reason for your absence';
+  //             }
+  //             return null;
+  //           },
+  //           maxLines: 3,
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
+  //
+  // Widget _buildAttendanceConfirmation() {
+  //   return Card(
+  //     elevation: 3,
+  //     shape: RoundedRectangleBorder(
+  //       borderRadius: BorderRadius.circular(12),
+  //     ),
+  //     child: Padding(
+  //       padding: const EdgeInsets.all(16.0),
+  //       child: Column(
+  //         children: [
+  //           Icon(
+  //             _isAttending ? Icons.check_circle : Icons.cancel,
+  //             color: _isAttending ? AppColors.successColor : AppColors.errorColor,
+  //             size: 64,
+  //           ),
+  //           const SizedBox(height: 16),
+  //           Text(
+  //             _isAttending
+  //                 ? 'You have marked your attendance for this event!'
+  //                 : 'You have submitted your apology for this event.',
+  //             style: TextStyles.heading2.copyWith(
+  //
+  //               color: _isAttending ? AppColors.successColor : AppColors.errorColor,
+  //             ),
+  //             textAlign: TextAlign.center,
+  //           ),
+  //           const SizedBox(height: 24),
+  //           OutlinedButton(
+  //             onPressed: () {
+  //               setState(() {
+  //                 _hasMarkedAttendance = false;
+  //               });
+  //             },
+  //             style: OutlinedButton.styleFrom(
+  //               side: BorderSide(
+  //                 color: _isAttending ? AppColors.successColor : AppColors.errorColor,
+  //               ),
+  //               shape: RoundedRectangleBorder(
+  //                 borderRadius: BorderRadius.circular(8),
+  //               ),
+  //             ),
+  //             child: Text(
+  //               'Change Response',
+  //               style: TextStyles.bodyText.copyWith(
+  //                 color: _isAttending ? AppColors.successColor : AppColors.errorColor,
+  //               ),
+  //             ),
+  //           ),
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
 }

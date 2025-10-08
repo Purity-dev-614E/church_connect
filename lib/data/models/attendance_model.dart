@@ -1,5 +1,5 @@
 class AttendanceModel {
-  String id;
+  String? id;
   String userId;
   String eventId;
   bool isPresent;
@@ -8,7 +8,7 @@ class AttendanceModel {
   String? aob;
 
   AttendanceModel({
-    required this.id,
+    this.id,
     required this.userId,
     required this.eventId,
     required this.isPresent,

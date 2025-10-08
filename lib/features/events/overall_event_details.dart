@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:group_management_church_app/data/providers/group_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:group_management_church_app/core/constants/colors.dart';
 import 'package:group_management_church_app/core/constants/text_styles.dart';
@@ -45,81 +46,85 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
     super.dispose();
   }
 
- Future<Map<String, dynamic>> _fetchEventData() async {
-   final eventProvider = Provider.of<EventProvider>(context, listen: false);
-   final attendanceProvider = Provider.of<AttendanceProvider>(context, listen: false);
-   final userProvider = Provider.of<UserProvider>(context, listen: false);
+  Future<Map<String, dynamic>> _fetchEventData() async {
+    final eventProvider = Provider.of<EventProvider>(context, listen: false);
+    final attendanceProvider = Provider.of<AttendanceProvider>(context, listen: false);
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final groupProvider = Provider.of<GroupProvider>(context, listen: false);
 
-   try {
-     // Fetch event details
-     final event = await eventProvider.fetchEventById(widget.eventId);
-     if (event == null) {
-       throw Exception('Event not found');
-     }
-     
-     // Fetch attendance records
-     final attendanceList = await attendanceProvider.fetchEventAttendance(widget.eventId);
-     print('Fetched ${attendanceList.length} attendance records for event ${widget.eventId}');
+    try {
+      // Fetch event details
+      final event = await eventProvider.fetchEventById(widget.eventId);
+      if (event == null) throw Exception('Event not found');
 
-     final attendees = <Map<String, dynamic>>[];
-     final nonAttendees = <Map<String, dynamic>>[];
+      // Fetch group members and convert JSON -> UserModel
+      final groupMembersJson = await groupProvider.getGroupMembers(event.groupId);
+      final groupMembers = groupMembersJson
+          .map((json) => UserModel.fromJson(json as Map<String, dynamic>))
+          .toList();
 
-     // Process each attendance record
-     for (final record in attendanceList) {
-       try {
-         if (record.userId.isEmpty) {
-           print('Skipping attendance record with empty userId');
-           continue;
-         }
-         
-         final user = await userProvider.getUserById(record.userId);
-         if (user != null) {
-           final attendanceData = {
-             'user': user,
-             'attendance': record,
-           };
-           
-           if (record.isPresent) {
-             attendees.add(attendanceData);
-           } else {
-             nonAttendees.add(attendanceData);
-           }
-         } else {
-           print('User not found for userId: ${record.userId}');
-         }
-       } catch (e) {
-         print('Error processing attendance record: $e');
-         // Continue with the next record
-       }
-     }
+      // Fetch attendance records
+      final attendanceList = await attendanceProvider.fetchEventAttendance(widget.eventId);
 
-     print('Processed ${attendees.length} attendees and ${nonAttendees.length} non-attendees');
-     
-     return {
-       'event': event,
-       'attendees': attendees,
-       'nonAttendees': nonAttendees,
-     };
-   } catch (e) {
-     print('Error in _fetchEventData: $e');
-     // Return empty data structure on error
-     return {
-       'event': EventModel(
-         id: widget.eventId,
-         title: widget.eventTitle,
-         description: 'Error loading event details',
-         dateTime: DateTime.now(),
-         location: 'Unknown',
-         groupId: '',
-       ),
-       'attendees': [],
-       'nonAttendees': [],
-       'error': e.toString(),
-     };
-   }
- }
+      // Create a map of attendance by userId for quick lookup
+      final Map<String, AttendanceModel> attendanceMap = {
+        for (var record in attendanceList) record.userId: record
+      };
 
- void _showAttendanceDetailsDialog(UserModel user, bool markAsPresent, {AttendanceModel? attendance}) {
+      final attendees = <Map<String, dynamic>>[];
+      final nonAttendees = <Map<String, dynamic>>[];
+
+      // Process each group member
+      for (final user in groupMembers) {
+        final record = attendanceMap[user.id];
+        final attendanceData = {
+          'user': user,
+          'attendance': record ??
+              AttendanceModel(
+                eventId: widget.eventId,
+                userId: user.id,
+                isPresent: false,
+                apology: null,
+                aob: null,
+                topic: null,
+              ),
+        };
+
+        if (record != null && record.isPresent) {
+          attendees.add(attendanceData);
+        } else {
+          nonAttendees.add(attendanceData);
+        }
+      }
+
+      return {
+        'event': event,
+        'attendees': attendees,
+        'nonAttendees': nonAttendees,
+        'groupMembers': groupMembers,
+      };
+    } catch (e) {
+      print('Error in _fetchEventData: $e');
+      return {
+        'event': EventModel(
+          id: widget.eventId,
+          title: widget.eventTitle,
+          description: 'Error loading event details',
+          dateTime: DateTime.now(),
+          location: 'Unknown',
+          groupId: '',
+        ),
+        'attendees': <Map<String, dynamic>>[],
+        'nonAttendees': <Map<String, dynamic>>[],
+        'groupMembers': <UserModel>[],
+        'error': e.toString(),
+      };
+    }
+  }
+
+
+
+  void _showAttendanceDetailsDialog(UserModel user, bool markAsPresent, {AttendanceModel? attendance}) {
    final aobController = TextEditingController(text: attendance?.aob);
    final topicController = TextEditingController(text: attendance?.topic);
    final apologyController = TextEditingController(text: attendance?.apology);
@@ -275,36 +280,6 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
     }
   }
 
-  Future<void> _searchMembers(String query) async {
-    if (query.isEmpty) {
-      setState(() {
-        _searchResults = [];
-        _isSearching = false;
-      });
-      return;
-    }
-
-    setState(() {
-      _isSearching = true;
-    });
-
-    try {
-      final userProvider = Provider.of<UserProvider>(context, listen: false);
-      final results = await userProvider.searchUsers(query);
-      
-      setState(() {
-        _searchResults = results;
-        _isSearching = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isSearching = false;
-        _searchResults = [];
-      });
-      
-      _showError('Error searching members: $e');
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -312,22 +287,6 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
       appBar: AppBar(
         title: Text(widget.eventTitle),
         backgroundColor: AppColors.primaryColor,
-        // actions: [
-        //   IconButton(
-        //     icon: const Icon(Icons.share),
-        //     onPressed: () {
-        //       // Share event details functionality
-        //       _showInfo('Sharing event details...');
-        //     },
-        //   ),
-        //   IconButton(
-        //     icon: const Icon(Icons.download),
-        //     onPressed: () {
-        //       // Export attendance list functionality
-        //       _showInfo('Exporting attendance list...');
-        //     },
-        //   ),
-        // ],
       ),
       body: FutureBuilder<Map<String, dynamic>>(
         future: _eventDataFuture,
@@ -341,8 +300,16 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
           }
 
           final eventDetails = snapshot.data!['event'] as EventModel;
-          final attendees = snapshot.data!['attendees'] as List<Map<String, dynamic>>;
-          final nonAttendees = snapshot.data!['nonAttendees'] as List<Map<String, dynamic>>;
+
+          final attendeesJson = snapshot.data!['attendees'] as List<dynamic>;
+          final attendees = attendeesJson.map((e) => e as Map<String, dynamic>).toList();
+
+          final nonAttendeesJson = snapshot.data!['nonAttendees'] as List<dynamic>;
+          final nonAttendees = nonAttendeesJson.map((e) => e as Map<String, dynamic>).toList();
+
+          final groupMembersJson = snapshot.data!['groupMembers'] as List<dynamic>;
+          final groupMembers = groupMembersJson.map((e) => e as UserModel).toList();
+
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16.0),
@@ -364,13 +331,16 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
         },
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          _showMarkAttendanceDialog(context);
+        onPressed: () async {
+          final eventData = await _eventDataFuture;
+          final groupMembers = eventData['groupMembers'] as List<UserModel>;
+          _showMarkAttendanceDialog(context, groupMembers);
         },
         backgroundColor: AppColors.primaryColor,
         icon: const Icon(Icons.person_add),
         label: const Text('Mark Attendance'),
       ),
+
     );
   }
 
@@ -670,94 +640,104 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
     );
   }
 
-  void _showMarkAttendanceDialog(BuildContext context) {
+  void _showMarkAttendanceDialog(BuildContext context, List<UserModel> groupMembers) {
+    final Map<String, bool> isAbsentTapped = {}; // tracks which members have tapped "absent"
+    final Map<String, TextEditingController> apologyControllers = {}; // stores apology text
+
+    // Initialize controllers
+    for (var user in groupMembers) {
+      isAbsentTapped[user.id] = false;
+      apologyControllers[user.id] = TextEditingController();
+    }
+
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: Text(
-            'Mark Attendance',
-            style: TextStyles.heading2,
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  labelText: 'Search member',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  prefixIcon: const Icon(Icons.search),
-                ),
-                onChanged: (value) {
-                  _searchMembers(value);
-                },
-              ),
-              const SizedBox(height: 16),
-              if (_isSearching)
-                const CircularProgressIndicator()
-              else if (_searchResults.isNotEmpty)
-                Flexible(
-                  child: Container(
-                    constraints: const BoxConstraints(maxHeight: 200),
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: _searchResults.length,
-                      itemBuilder: (context, index) {
-                        final user = _searchResults[index];
-                        return ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: AppColors.primaryColor,
-                            child: Text(
-                              user.fullName.substring(0, 1),
-                              style: const TextStyle(color: Colors.white),
-                            ),
+          title: Text('Mark Attendance', style: TextStyles.heading2),
+          content: Container(
+            constraints: const BoxConstraints(maxHeight: 400),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: groupMembers.map((user) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: AppColors.primaryColor,
+                          child: Text(
+                            user.fullName.substring(0, 1),
+                            style: const TextStyle(color: Colors.white),
                           ),
-                          title: Text(user.fullName),
-                          subtitle: Text(user.email),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
+                        ),
+                        title: Text(user.fullName),
+                        subtitle: Text(user.email),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.check_circle, color: Colors.green),
+                              onPressed: () {
+                                Navigator.pop(context);
+                                _markAttendance(user.id, true); // mark present
+                              },
+                              tooltip: 'Mark as present',
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.cancel, color: Colors.red),
+                              onPressed: () {
+                                setState(() {
+                                  isAbsentTapped[user.id] = true; // show apology field
+                                });
+                              },
+                              tooltip: 'Mark as absent',
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (isAbsentTapped[user.id] == true)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                          child: Column(
                             children: [
-                              IconButton(
-                                icon: const Icon(Icons.check_circle, color: Colors.green),
-                                onPressed: () {
-                                  Navigator.pop(context);
-                                  _markAttendance(user.id, true);
-                                },
-                                tooltip: 'Mark as present',
+                              TextField(
+                                controller: apologyControllers[user.id],
+                                decoration: const InputDecoration(
+                                  labelText: 'Apology (optional)',
+                                  border: OutlineInputBorder(),
+                                ),
+                                maxLines: 2,
                               ),
-                              IconButton(
-                                icon: const Icon(Icons.cancel, color: Colors.red),
-                                onPressed: () {
-                                  Navigator.pop(context);
-                                  _markAttendance(user.id, false);
-                                },
-                                tooltip: 'Mark as absent',
+                              const SizedBox(height: 8),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: ElevatedButton(
+                                  onPressed: () {
+                                    Navigator.pop(context); // close dialog
+                                    _markAttendance(
+                                      user.id,
+                                      false,
+                                      apology: apologyControllers[user.id]!.text, // send apology
+                                    );
+                                  },
+                                  child: const Text('Save Absent'),
+                                ),
                               ),
                             ],
                           ),
-                        );
-                      },
-                    ),
-                  ),
-                )
-              else if (_searchController.text.isNotEmpty)
-                Text(
-                  'No members found',
-                  style: TextStyles.bodyText.copyWith(
-                    color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
-                  ),
-                ),
-            ],
+                        ),
+                      const Divider(),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ),
           ),
           actions: [
             TextButton(
-              onPressed: () {
-                _searchController.clear();
-                Navigator.pop(context);
-              },
+              onPressed: () => Navigator.pop(context),
               child: Text(
                 'Cancel',
                 style: TextStyles.bodyText.copyWith(
@@ -770,4 +750,6 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
       ),
     );
   }
+
+
 }

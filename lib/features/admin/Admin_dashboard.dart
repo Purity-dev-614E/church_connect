@@ -1,5 +1,3 @@
-import 'dart:io';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:group_management_church_app/core/constants/colors.dart';
@@ -41,7 +39,20 @@ class AdminDashboard extends StatefulWidget {
   State<AdminDashboard> createState() => _AdminDashboardState();
 }
 
-class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStateMixin {
+class _AdminDashboardState extends State<AdminDashboard>
+    with TickerProviderStateMixin {
+
+  // Search controllers
+  late final TextEditingController _memberSearchController;
+  late final TextEditingController _eventSearchController;
+
+
+  // Filtered lists
+  List<UserModel> _filteredMembers = [];
+  List<EventModel> _filteredUpcomingEvents = [];
+  List<EventModel> _filteredPastEvents = [];
+
+
   final PageController _pageController = PageController();
   int _selectedIndex = 0;
   bool _isLoading = true;
@@ -66,6 +77,8 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
   DateTime _selectedDate = DateTime.now();
   TimeOfDay _selectedTime = TimeOfDay.now();
 
+
+
   // Theme settings
   bool _isDarkMode = false;
   Color _accentColor = AppColors.primaryColor;
@@ -87,31 +100,49 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
 
   // Getter for group events
   List<EventModel> get groupEvents => _groupEvents;
-
-  // Getter for upcoming events
   List<EventModel> get _upcomingEvents {
-    return _groupEvents.where((event) => event.dateTime.isAfter(DateTime.now())).toList();
+    final now = DateTime.now();
+    final threshold = now.add(const Duration(minutes: 1)); // 1 minute from now
+    return _groupEvents
+        .where((event) => event.dateTime.isAfter(threshold))
+        .toList()
+      ..sort((a, b) => a.dateTime.compareTo(b.dateTime)); // soonest first
   }
 
-  // Getter for past events
   List<EventModel> get _pastEvents {
-    return _groupEvents.where((event) => event.dateTime.isBefore(DateTime.now())).toList();
+    final now = DateTime.now();
+    final threshold = now.add(const Duration(minutes: 1)); // match same cutoff
+    return _groupEvents
+        .where((event) => event.dateTime.isBefore(threshold))
+        .toList()
+      ..sort((a, b) => b.dateTime.compareTo(a.dateTime)); // latest first
   }
 
   @override
+  @override
   void initState() {
     super.initState();
-    _analyticsProvider = Provider.of<AdminAnalyticsProvider>(context, listen: false);
-    _superAdminAnalyticsProvider = Provider.of<SuperAdminAnalyticsProvider>(context, listen: false);
-    
-    // Initialize animation controllers
+
+    // Initialize the search controllers
+    _memberSearchController = TextEditingController();
+    _eventSearchController = TextEditingController();
+
+    // Add listeners for search functionality
+    _memberSearchController.addListener(_filterMembers);
+    _eventSearchController.addListener(_filterEvents);
+
+    // Initialize animation controller
     _refreshAnimationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1000),
     );
 
-    // Load settings from shared preferences
+    _analyticsProvider = Provider.of<AdminAnalyticsProvider>(context, listen: false);
+    _superAdminAnalyticsProvider = Provider.of<SuperAdminAnalyticsProvider>(context, listen: false);
+
+    // Load initial data
     _loadSettings();
+    _loadInitialLists();
 
     // Set up auto-refresh if enabled
     if (_autoRefreshEnabled) {
@@ -119,10 +150,55 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
     }
   }
 
+  void _loadInitialLists() {
+    // Make copies of the original lists for filtering
+    setState(() {
+      _filteredMembers = List.from(_groupMembers);
+      _filteredUpcomingEvents = List.from(_upcomingEvents);
+      _filteredPastEvents = List.from(_pastEvents);
+    });
+  }
+
+
+// Filter members based on search query
+  void _filterMembers() {
+    final query = _memberSearchController.text.toLowerCase();
+
+    setState(() {
+      _filteredMembers = _groupMembers.where((member) {
+        final name = member.fullName.toLowerCase();
+        final email = member.email.toLowerCase();
+        return name.contains(query) || email.contains(query);
+      }).toList();
+    });
+  }
+
+// Filter events based on search query
+  void _filterEvents() {
+    final query = _eventSearchController.text.toLowerCase();
+
+    setState(() {
+      _filteredUpcomingEvents = _upcomingEvents.where((event) {
+        final title = event.title.toLowerCase();
+        final location = event.location.toLowerCase();
+        return title.contains(query) || location.contains(query);
+      }).toList();
+
+      _filteredPastEvents = _pastEvents.where((event) {
+        final title = event.title.toLowerCase();
+        final location = event.location.toLowerCase();
+        return title.contains(query) || location.contains(query);
+      }).toList();
+    });
+  }
+
+
+
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    
+
     // Move the page jump to didChangeDependencies to ensure PageView is ready
     if (_pageController.hasClients) {
       _pageController.jumpToPage(widget.initialTabIndex);
@@ -137,8 +213,6 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
   }
 
   Future<void> _loadSettings() async {
-    // In a real app, you would load these from SharedPreferences
-    // For now, we'll just use default values
     setState(() {
       _isDarkMode = false;
       _accentColor = AppColors.primaryColor;
@@ -150,7 +224,6 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
   }
 
   void _setupAutoRefresh() {
-    // Set up a timer to refresh data at the specified interval
     Future.delayed(Duration(minutes: _autoRefreshInterval), () {
       if (mounted && _autoRefreshEnabled) {
         _refreshData();
@@ -187,21 +260,27 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
 
   Future<void> _loadInitialData() async {
     if (!mounted) return;
-    
+
     try {
       setState(() {
         _isLoading = true;
         _errorMessage = null;
       });
 
+      // Load all data concurrently
       await Future.wait([
         _loadAnalyticsData(),
         _loadGroupMembers(),
         _loadGroupEvents(),
       ]);
-      
+
+      // Once data is loaded, initialize filtered lists
       if (mounted) {
         setState(() {
+          _filteredMembers = List.from(_groupMembers);
+          _filteredUpcomingEvents = List.from(_upcomingEvents);
+          _filteredPastEvents = List.from(_pastEvents);
+
           _isLoading = false;
         });
       }
@@ -216,26 +295,19 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
     }
   }
 
-  Future<void> _retryLoading() async {
-    if (mounted) {
-      setState(() {
-        _isLoading = true;
-        _errorMessage = null;
-      });
-    }
-    await _loadInitialData();
-  }
-
   Future<void> _loadAnalyticsData() async {
     try {
       if (!mounted) return;
-      
+
       print('Loading analytics data for group: ${widget.groupId}');
-      
+
       // Get providers
       final groupProvider = Provider.of<GroupProvider>(context, listen: false);
       final eventProvider = Provider.of<EventProvider>(context, listen: false);
-      final attendanceProvider = Provider.of<AttendanceProvider>(context, listen: false);
+      final attendanceProvider = Provider.of<AttendanceProvider>(
+        context,
+        listen: false,
+      );
 
       // Get current date range for this month
       final now = DateTime.now();
@@ -252,16 +324,22 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       print('Fetching active members...');
       // Get active members (attended at least one event in last 30 days)
       final pastEvents = await eventProvider.fetchPastEvents(widget.groupId);
-      final recentEvents = pastEvents.where((event) => 
-        event.dateTime.isAfter(thirtyDaysAgo) && 
-        event.dateTime.isBefore(now)
-      ).toList();
+      final recentEvents =
+          pastEvents
+              .where(
+                (event) =>
+                    event.dateTime.isAfter(thirtyDaysAgo) &&
+                    event.dateTime.isBefore(now),
+              )
+              .toList();
       print('Found ${recentEvents.length} recent events');
 
       Set<String> activeUserIds = {};
       for (var event in recentEvents) {
         print('Checking attendance for event: ${event.title}');
-        final attendanceList = await attendanceProvider.fetchEventAttendance(event.id);
+        final attendanceList = await attendanceProvider.fetchEventAttendance(
+          event.id,
+        );
         for (var attendance in attendanceList) {
           if (attendance.isPresent) {
             activeUserIds.add(attendance.userId);
@@ -275,14 +353,23 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       // Get events this month
       final upcomingEvents = await eventProvider.getGroupEvents(widget.groupId);
       final allEvents = [...pastEvents, ...upcomingEvents];
-      final eventsThisMonth = allEvents.where((event) => 
-        event.dateTime.isAfter(firstDayOfMonth.subtract(const Duration(days: 1))) &&
-        event.dateTime.isBefore(lastDayOfMonth.add(const Duration(days: 1)))
-      ).length.toDouble();
+      final eventsThisMonth =
+          allEvents
+              .where(
+                (event) =>
+                    event.dateTime.isAfter(
+                      firstDayOfMonth.subtract(const Duration(days: 1)),
+                    ) &&
+                    event.dateTime.isBefore(
+                      lastDayOfMonth.add(const Duration(days: 1)),
+                    ),
+              )
+              .length
+              .toDouble();
       print('Events this month: $eventsThisMonth');
 
       if (!mounted) return;
-      
+
       setState(() {
         _analyticsData = {
           'totalMembers': totalMembers,
@@ -294,7 +381,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
     } catch (e) {
       print('Error fetching analytics data: $e');
       if (!mounted) return;
-      
+
       setState(() {
         _errorMessage = 'Error loading analytics data: ${e.toString()}';
       });
@@ -304,39 +391,40 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
   Future<void> _loadGroupMembers() async {
     try {
       if (!mounted) return;
-      
+
       print('Loading group members for group: ${widget.groupId}');
-      
+
       // Get provider
       final groupProvider = Provider.of<GroupProvider>(context, listen: false);
-      
+
       // Get members
       final members = await groupProvider.getGroupMembers(widget.groupId);
-      
+
       // Convert members to UserModel
-      final userModels = members.map((member) {
-        if (member is UserModel) {
-          return member;
-        } else if (member is Map<String, dynamic>) {
-          return UserModel.fromJson(member);
-        } else {
-          print('Invalid member data type: ${member.runtimeType}');
-          // Return a default UserModel for invalid data
-          return UserModel(
-            id: 'unknown',
-            fullName: 'Unknown Member',
-            email: '',
-            contact: '',
-            nextOfKin: '',
-            nextOfKinContact: '',
-            role: 'user',
-            gender: '',
-            regionId: '',
-            regionalID: ''
-          );
-        }
-      }).toList();
-      
+      final userModels =
+          members.map((member) {
+            if (member is UserModel) {
+              return member;
+            } else if (member is Map<String, dynamic>) {
+              return UserModel.fromJson(member);
+            } else {
+              print('Invalid member data type: ${member.runtimeType}');
+              // Return a default UserModel for invalid data
+              return UserModel(
+                id: 'unknown',
+                fullName: 'Unknown Member',
+                email: '',
+                contact: '',
+                nextOfKin: '',
+                nextOfKinContact: '',
+                role: 'user',
+                gender: '',
+                regionId: '',
+                regionalID: '',
+              );
+            }
+          }).toList();
+
       if (mounted) {
         setState(() {
           _groupMembers = userModels;
@@ -355,30 +443,25 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
   Future<void> _loadGroupEvents() async {
     try {
       if (!mounted) return;
-      
+
       // Load events directly
       final _eventProvider = Provider.of<EventProvider>(context, listen: false);
       final events = await _eventProvider.getGroupEvents(widget.groupId);
-      
+
       if (!mounted) return;
-      
+
       setState(() {
         _groupEvents = events;
       });
     } catch (e) {
       print('Error loading group events: $e');
       if (!mounted) return;
-      
+
       setState(() {
         _errorMessage = 'Error loading group events: ${e.toString()}';
       });
     }
   }
-
-  // Group members from provider
-  List<UserModel> _cachedGroupMembers = [];
-  bool _isLoadingMembers = false;
-
   @override
   void dispose() {
     _pageController.dispose();
@@ -442,14 +525,11 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
 
     showDialog(
       context: context,
-      builder: (dialogContext) =>
-          StatefulBuilder(
-            builder: (context, setDialogState) =>
-                AlertDialog(
-                  title: Text(
-                    'Add New Member',
-                    style: TextStyles.heading2,
-                  ),
+      builder:
+          (dialogContext) => StatefulBuilder(
+            builder:
+                (context, setDialogState) => AlertDialog(
+                  title: Text('Add New Member', style: TextStyles.heading2),
                   content: SizedBox(
                     width: double.maxFinite,
                     child: Column(
@@ -490,16 +570,25 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                                   return;
                                 }
 
-                                print('Initiating user search with query: ${searchController.text}');
+                                print(
+                                  'Initiating user search with query: ${searchController.text}',
+                                );
                                 setDialogState(() {
                                   isSearching = true;
                                 });
 
                                 try {
-                                  final userProvider = Provider.of<UserProvider>(context, listen: false);
+                                  final userProvider =
+                                      Provider.of<UserProvider>(
+                                        context,
+                                        listen: false,
+                                      );
                                   print('Fetching users from provider...');
-                                  final results = await userProvider.searchUsers(searchController.text);
-                                  print('Search completed. Found ${results.length} users');
+                                  final results = await userProvider
+                                      .searchUsers(searchController.text);
+                                  print(
+                                    'Search completed. Found ${results.length} users',
+                                  );
 
                                   setDialogState(() {
                                     searchResults = results;
@@ -530,49 +619,58 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                         const SizedBox(height: 16),
                         if (isSearching)
                           const Center(child: CircularProgressIndicator())
-                        else
-                          if (searchResults.isNotEmpty)
-                            Flexible(
-                              child: Container(
-                                constraints: BoxConstraints(maxHeight: 300),
-                                child: ListView.builder(
-                                  shrinkWrap: true,
-                                  itemCount: searchResults.length,
-                                  itemBuilder: (context, index) {
-                                    final user = searchResults[index];
-                                    final isSelected = selectedUser?.id == user.id;
+                        else if (searchResults.isNotEmpty)
+                          Flexible(
+                            child: Container(
+                              constraints: BoxConstraints(maxHeight: 300),
+                              child: ListView.builder(
+                                shrinkWrap: true,
+                                itemCount: searchResults.length,
+                                itemBuilder: (context, index) {
+                                  final user = searchResults[index];
+                                  final isSelected =
+                                      selectedUser?.id == user.id;
 
-                                    return ListTile(
-                                      title: Text(user.fullName),
-                                      subtitle: Text(user.email),
-                                      selected: isSelected,
-                                      tileColor: isSelected ? AppColors.primaryColor.withOpacity(0.1) : null,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                        side: isSelected
-                                            ? BorderSide(color: AppColors.primaryColor, width: 1)
-                                            : BorderSide.none,
-                                      ),
-                                      onTap: () {
-                                        print('User selected: ${user.fullName} (${user.id})');
-                                        setDialogState(() {
-                                          selectedUser = user;
-                                        });
-                                      },
-                                    );
-                                  },
-                                ),
+                                  return ListTile(
+                                    title: Text(user.fullName),
+                                    subtitle: Text(user.email),
+                                    selected: isSelected,
+                                    tileColor:
+                                        isSelected
+                                            ? AppColors.primaryColor
+                                                .withOpacity(0.1)
+                                            : null,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      side:
+                                          isSelected
+                                              ? BorderSide(
+                                                color: AppColors.primaryColor,
+                                                width: 1,
+                                              )
+                                              : BorderSide.none,
+                                    ),
+                                    onTap: () {
+                                      print(
+                                        'User selected: ${user.fullName} (${user.id})',
+                                      );
+                                      setDialogState(() {
+                                        selectedUser = user;
+                                      });
+                                    },
+                                  );
+                                },
                               ),
-                            )
-                          else
-                            if (searchController.text.isNotEmpty)
-                              Center(
-                                child: Text(
-                                  'No users found matching "${searchController.text}"',
-                                  style: TextStyles.bodyText,
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
+                            ),
+                          )
+                        else if (searchController.text.isNotEmpty)
+                          Center(
+                            child: Text(
+                              'No users found matching "${searchController.text}"',
+                              style: TextStyles.bodyText,
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -591,48 +689,70 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                       ),
                     ),
                     ElevatedButton(
-                      onPressed: selectedUser == null ? null : () async {
-                        print('Attempting to add member: ${selectedUser!.fullName} (${selectedUser!.id}) to group: ${widget.groupId}');
-                        final groupProvider = Provider.of<GroupProvider>(context, listen: false);
+                      onPressed:
+                          selectedUser == null
+                              ? null
+                              : () async {
+                                print(
+                                  'Attempting to add member: ${selectedUser!.fullName} (${selectedUser!.id}) to group: ${widget.groupId}',
+                                );
+                                final groupProvider =
+                                    Provider.of<GroupProvider>(
+                                      context,
+                                      listen: false,
+                                    );
 
-                        try {
-                          print('Sending request to add member...');
-                          print('Request details:');
-                          print('Group ID: ${widget.groupId}');
-                          print('User ID: ${selectedUser!.id}');
-                          print('User Name: ${selectedUser!.fullName}');
-                          print('User Email: ${selectedUser!.email}');
+                                try {
+                                  print('Sending request to add member...');
+                                  print('Request details:');
+                                  print('Group ID: ${widget.groupId}');
+                                  print('User ID: ${selectedUser!.id}');
+                                  print('User Name: ${selectedUser!.fullName}');
+                                  print('User Email: ${selectedUser!.email}');
 
-                          final success = await groupProvider.addMemberToGroup(widget.groupId, selectedUser!.id);
-                          
-                          if (success) {
-                            print('Member added successfully');
-                            _showSuccess('${selectedUser!.fullName} added to group successfully');
-                            // Refresh the members list
-                            await _loadGroupMembers();
-                          } else {
-                            print('Failed to add member - success returned false');
-                            _showError('Failed to add ${selectedUser!.fullName} to group');
-                          }
-                        } catch (e) {
-                          print('Error adding member: $e');
-                          print('Error type: ${e.runtimeType}');
-                          print('Error details:');
-                          if (e is Exception) {
-                            print('Exception message: ${e.toString()}');
-                          }
-                          _showError('Error adding member: ${e.toString()}');
-                        } finally {
-                          searchController.dispose();
-                          Navigator.pop(context);
-                        }
-                      },
+                                  final success = await groupProvider
+                                      .addMemberToGroup(
+                                        widget.groupId,
+                                        selectedUser!.id,
+                                      );
+
+                                  if (success) {
+                                    print('Member added successfully');
+                                    _showSuccess(
+                                      '${selectedUser!.fullName} added to group successfully',
+                                    );
+                                    // Refresh the members list
+                                    await _loadGroupMembers();
+                                  } else {
+                                    print(
+                                      'Failed to add member - success returned false',
+                                    );
+                                    _showError(
+                                      'Failed to add ${selectedUser!.fullName} to group',
+                                    );
+                                  }
+                                } catch (e) {
+                                  print('Error adding member: $e');
+                                  print('Error type: ${e.runtimeType}');
+                                  print('Error details:');
+                                  if (e is Exception) {
+                                    print('Exception message: ${e.toString()}');
+                                  }
+                                  _showError(
+                                    'Error adding member: ${e.toString()}',
+                                  );
+                                } finally {
+                                  searchController.dispose();
+                                  Navigator.pop(context);
+                                }
+                              },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primaryColor,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        disabledBackgroundColor: AppColors.primaryColor.withOpacity(0.5),
+                        disabledBackgroundColor: AppColors.primaryColor
+                            .withOpacity(0.5),
                       ),
                       child: Text(
                         'Add',
@@ -659,14 +779,11 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
 
     showDialog(
       context: context,
-      builder: (dialogContext) =>
-          StatefulBuilder(
-            builder: (context, setDialogState) =>
-                AlertDialog(
-                  title: Text(
-                    'Create New Event',
-                    style: TextStyles.heading2,
-                  ),
+      builder:
+          (dialogContext) => StatefulBuilder(
+            builder:
+                (context, setDialogState) => AlertDialog(
+                  title: Text('Create New Event', style: TextStyles.heading2),
                   content: SingleChildScrollView(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -720,7 +837,8 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                                     initialDate: selectedDate,
                                     firstDate: DateTime.now(),
                                     lastDate: DateTime.now().add(
-                                        const Duration(days: 365)),
+                                      const Duration(days: 365),
+                                    ),
                                   );
                                   if (date != null) {
                                     setDialogState(() {
@@ -734,8 +852,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                                 },
                                 icon: const Icon(Icons.calendar_today),
                                 label: Text(
-                                  '${selectedDate.day}/${selectedDate
-                                      .month}/${selectedDate.year}',
+                                  '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
                                 ),
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: AppColors.primaryColor,
@@ -762,8 +879,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                                 },
                                 icon: const Icon(Icons.access_time),
                                 label: Text(
-                                  '${selectedTime.hour}:${selectedTime.minute
-                                      .toString().padLeft(2, '0')}',
+                                  '${selectedTime.hour}:${selectedTime.minute.toString().padLeft(2, '0')}',
                                 ),
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: AppColors.primaryColor,
@@ -814,7 +930,9 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
 
                         // Create new event
                         final eventProvider = Provider.of<EventProvider>(
-                            context, listen: false);
+                          context,
+                          listen: false,
+                        );
                         eventProvider.createEvent(
                           groupId: widget.groupId,
                           title: titleController.text,
@@ -859,12 +977,9 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
   void _showMemberOptionsDialog(UserModel member) {
     showDialog(
       context: context,
-      builder: (context) =>
-          AlertDialog(
-            title: Text(
-              member.fullName,
-              style: TextStyles.heading2,
-            ),
+      builder:
+          (context) => AlertDialog(
+            title: Text(member.fullName, style: TextStyles.heading2),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -877,8 +992,8 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) =>
-                            MemberProfileScreen(
+                        builder:
+                            (context) => MemberProfileScreen(
                               userId: member.id,
                               groupId: widget.groupId,
                             ),
@@ -895,8 +1010,8 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) =>
-                            MemberAttendanceScreen(
+                        builder:
+                            (context) => MemberAttendanceScreen(
                               userId: member.id,
                               groupId: widget.groupId,
                             ),
@@ -932,11 +1047,12 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
   void _showRemoveMemberConfirmation(UserModel member) {
     showDialog(
       context: context,
-      builder: (context) =>
-          AlertDialog(
+      builder:
+          (context) => AlertDialog(
             title: const Text('Remove Member'),
-            content: Text('Are you sure you want to remove ${member
-                .fullName} from this group?'),
+            content: Text(
+              'Are you sure you want to remove ${member.fullName} from this group?',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
@@ -946,24 +1062,31 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                 onPressed: () {
                   // Remove member using provider
                   final groupProvider = Provider.of<GroupProvider>(
-                      context, listen: false);
-                  groupProvider.removeMemberFromGroup(widget.groupId, member.id)
+                    context,
+                    listen: false,
+                  );
+                  groupProvider
+                      .removeMemberFromGroup(widget.groupId, member.id)
                       .then((success) {
-                    if (success) {
-                      _showSuccess(
-                          '${member.fullName} has been removed from the group');
-                      // Refresh UI
-                      setState(() {});
-                    } else {
-                      _showError(
-                          'Failed to remove ${member.fullName} from the group');
-                    }
-                  });
+                        if (success) {
+                          _showSuccess(
+                            '${member.fullName} has been removed from the group',
+                          );
+                          // Refresh UI
+                          setState(() {});
+                        } else {
+                          _showError(
+                            'Failed to remove ${member.fullName} from the group',
+                          );
+                        }
+                      });
 
                   Navigator.pop(context);
                 },
                 child: const Text(
-                    'Remove', style: TextStyle(color: Colors.red)),
+                  'Remove',
+                  style: TextStyle(color: Colors.red),
+                ),
               ),
             ],
           ),
@@ -973,12 +1096,9 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
   void _showEventOptionsDialog(EventModel event) {
     showDialog(
       context: context,
-      builder: (context) =>
-          AlertDialog(
-            title: Text(
-              event.title,
-              style: TextStyles.heading2,
-            ),
+      builder:
+          (context) => AlertDialog(
+            title: Text(event.title, style: TextStyles.heading2),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -999,8 +1119,8 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) =>
-                            OverallEventDetailsScreen(
+                        builder:
+                            (context) => OverallEventDetailsScreen(
                               eventId: event.id,
                               eventTitle: event.title,
                             ),
@@ -1045,11 +1165,12 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
   void _showDeleteEventConfirmation(EventModel event) {
     showDialog(
       context: context,
-      builder: (context) =>
-          AlertDialog(
+      builder:
+          (context) => AlertDialog(
             title: const Text('Delete Event'),
-            content: Text('Are you sure you want to delete "${event
-                .title}"? This action cannot be undone.'),
+            content: Text(
+              'Are you sure you want to delete "${event.title}"? This action cannot be undone.',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
@@ -1058,13 +1179,14 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
               ElevatedButton(
                 onPressed: () {
                   final eventProvider = Provider.of<EventProvider>(
-                      context, listen: false);
+                    context,
+                    listen: false,
+                  );
                   eventProvider.deleteEvent(event.id, widget.groupId).then((
-                      success) {
+                    success,
+                  ) {
                     if (success) {
                       _showSuccess('Event deleted successfully');
-                    } else {
-                      _showError('Failed to delete event');
                     }
                   });
                   Navigator.pop(context);
@@ -1076,7 +1198,9 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                   ),
                 ),
                 child: const Text(
-                    'Delete', style: TextStyle(color: Colors.red)),
+                  'Delete',
+                  style: TextStyle(color: Colors.red),
+                ),
               ),
             ],
           ),
@@ -1086,11 +1210,14 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
   void _showEditEventDialog(EventModel event) {
     // Create controllers and initialize with existing event data
     final TextEditingController titleController = TextEditingController(
-        text: event.title);
+      text: event.title,
+    );
     final TextEditingController descriptionController = TextEditingController(
-        text: event.description);
+      text: event.description,
+    );
     final TextEditingController locationController = TextEditingController(
-        text: event.location);
+      text: event.location,
+    );
 
     // Use event's date and time
     DateTime selectedDate = event.dateTime;
@@ -1101,14 +1228,11 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
 
     showDialog(
       context: context,
-      builder: (dialogContext) =>
-          StatefulBuilder(
-            builder: (context, setDialogState) =>
-                AlertDialog(
-                  title: Text(
-                    'Edit Event',
-                    style: TextStyles.heading2,
-                  ),
+      builder:
+          (dialogContext) => StatefulBuilder(
+            builder:
+                (context, setDialogState) => AlertDialog(
+                  title: Text('Edit Event', style: TextStyles.heading2),
                   content: SingleChildScrollView(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -1161,9 +1285,11 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                                     context: context,
                                     initialDate: selectedDate,
                                     firstDate: DateTime.now().subtract(
-                                        const Duration(days: 365)),
+                                      const Duration(days: 365),
+                                    ),
                                     lastDate: DateTime.now().add(
-                                        const Duration(days: 365)),
+                                      const Duration(days: 365),
+                                    ),
                                   );
                                   if (date != null) {
                                     setDialogState(() {
@@ -1173,8 +1299,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                                 },
                                 icon: const Icon(Icons.calendar_today),
                                 label: Text(
-                                  '${selectedDate.day}/${selectedDate
-                                      .month}/${selectedDate.year}',
+                                  '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
                                 ),
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: AppColors.primaryColor,
@@ -1197,8 +1322,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                                 },
                                 icon: const Icon(Icons.access_time),
                                 label: Text(
-                                  '${selectedTime.hour}:${selectedTime.minute
-                                      .toString().padLeft(2, '0')}',
+                                  '${selectedTime.hour}:${selectedTime.minute.toString().padLeft(2, '0')}',
                                 ),
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: AppColors.primaryColor,
@@ -1249,28 +1373,32 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
 
                         // Update event
                         final eventProvider = Provider.of<EventProvider>(
-                            context, listen: false);
-                        eventProvider.updateEvent(
-                          eventId: event.id,
-                          title: titleController.text,
-                          description: descriptionController.text,
-                          dateTime: eventDateTime,
-                          location: locationController.text,
-                          groupId: widget.groupId,
-                        ).then((updatedEvent) {
-                          if (updatedEvent != null) {
-                            // Close the dialog
-                            Navigator.pop(context);
+                          context,
+                          listen: false,
+                        );
+                        eventProvider
+                            .updateEvent(
+                              eventId: event.id,
+                              title: titleController.text,
+                              description: descriptionController.text,
+                              dateTime: eventDateTime,
+                              location: locationController.text,
+                              groupId: widget.groupId,
+                            )
+                            .then((updatedEvent) {
+                              if (updatedEvent != null) {
+                                // Close the dialog
+                                Navigator.pop(context);
 
-                            // Show success message
-                            _showSuccess('Event updated successfully');
+                                // Show success message
+                                _showSuccess('Event updated successfully');
 
-                            // Refresh UI in the parent widget
-                            setState(() {});
-                          } else {
-                            _showError('Failed to update event');
-                          }
-                        });
+                                // Refresh UI in the parent widget
+                                setState(() {});
+                              } else {
+                                _showError('Failed to update event');
+                              }
+                            });
 
                         // Dispose controllers to prevent memory leaks
                         titleController.dispose();
@@ -1305,7 +1433,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       'Thursday',
       'Friday',
       'Saturday',
-      'Sunday'
+      'Sunday',
     ];
     final List<String> months = [
       'Jan',
@@ -1319,7 +1447,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       'Sep',
       'Oct',
       'Nov',
-      'Dec'
+      'Dec',
     ];
 
     final String weekday = weekdays[dateTime.weekday - 1];
@@ -1407,14 +1535,8 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
             icon: Icon(Icons.dashboard),
             label: 'Dashboard',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.people),
-            label: 'Members',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.event),
-            label: 'Events',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Members'),
+          BottomNavigationBarItem(icon: Icon(Icons.event), label: 'Events'),
           BottomNavigationBarItem(
             icon: Icon(Icons.analytics),
             label: 'Analytics',
@@ -1462,13 +1584,13 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
             _onItemTapped(1); // Navigate to Members tab
           }),
           const SizedBox(height: 16),
-          _buildMembersList(showLimit: true),
+          _buildMembersList(showLimit: true, members: _filteredMembers,),
           const SizedBox(height: 24),
           _buildSectionHeader('Upcoming Events', Icons.event, () {
             _onItemTapped(2); // Navigate to Events tab
           }),
           const SizedBox(height: 16),
-          _buildUpcomingEventsList(showLimit: true),
+          _buildUpcomingEventsList(showLimit: false, events: _filteredUpcomingEvents),
           const SizedBox(height: 32),
         ],
       ),
@@ -1478,9 +1600,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
   Widget _buildWelcomeCard() {
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(20),
@@ -1489,10 +1609,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              AppColors.primaryColor,
-              AppColors.secondaryColor,
-            ],
+            colors: [AppColors.primaryColor, AppColors.secondaryColor],
           ),
         ),
         child: Column(
@@ -1500,11 +1617,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
           children: [
             Row(
               children: [
-                const Icon(
-                  Icons.groups,
-                  color: Colors.white,
-                  size: 48,
-                ),
+                const Icon(Icons.groups, color: Colors.white, size: 48),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
@@ -1519,8 +1632,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Manage your ${widget
-                            .groupName} group from this dashboard',
+                        'Manage your ${widget.groupName} group from this dashboard',
                         style: TextStyles.bodyText.copyWith(
                           color: Colors.white.withOpacity(0.9),
                         ),
@@ -1534,20 +1646,16 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _createQuickActionButton(
-                  'Add Member',
-                  Icons.person_add,
-                      () {
-                    _onItemTapped(1);
-                    Future.delayed(const Duration(milliseconds: 500), () {
-                      _showAddMemberDialog();
-                    });
-                  },
-                ),
+                _createQuickActionButton('Add Member', Icons.person_add, () {
+                  _onItemTapped(1);
+                  Future.delayed(const Duration(milliseconds: 500), () {
+                    _showAddMemberDialog();
+                  });
+                }),
                 _createQuickActionButton(
                   'Create Event',
                   Icons.event_available,
-                      () {
+                  () {
                     _onItemTapped(2);
                     Future.delayed(const Duration(milliseconds: 500), () {
                       _showCreateEventDialog();
@@ -1557,7 +1665,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                 _createQuickActionButton(
                   'Analytics',
                   Icons.analytics,
-                      () => _onItemTapped(3),
+                  () => _onItemTapped(3),
                 ),
               ],
             ),
@@ -1567,38 +1675,12 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
     );
   }
 
-  Widget _createActionButton(String label, IconData icon, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          children: [
-            Icon(
-              icon,
-              color: Colors.white,
-              size: 24,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: TextStyles.bodyText.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
-  Widget _createQuickActionButton(String label, IconData icon,
-      VoidCallback onTap) {
+  Widget _createQuickActionButton(
+    String label,
+    IconData icon,
+    VoidCallback onTap,
+  ) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -1611,11 +1693,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              color: Colors.white,
-              size: 24,
-            ),
+            Icon(icon, color: Colors.white, size: 24),
             const SizedBox(height: 6),
             Text(
               label,
@@ -1676,7 +1754,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
               ),
               _buildStatCard(
                 'Events This Month',
-                '${data['eventsThisMonth']?.toInt() ?? 0}',
+                '${data['eventsThisMonth'] ?? 0}',
                 Icons.event,
                 AppColors.buttonColor,
               ),
@@ -1692,7 +1770,10 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       // Get providers
       final groupProvider = Provider.of<GroupProvider>(context, listen: false);
       final eventProvider = Provider.of<EventProvider>(context, listen: false);
-      final attendanceProvider = Provider.of<AttendanceProvider>(context, listen: false);
+      final attendanceProvider = Provider.of<AttendanceProvider>(
+        context,
+        listen: false,
+      );
 
       // Get current date range for this month
       final now = DateTime.now();
@@ -1706,14 +1787,20 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       // Get active members (attended at least one event in last 30 days)
       final thirtyDaysAgo = now.subtract(const Duration(days: 30));
       final pastEvents = await eventProvider.fetchPastEvents(widget.groupId);
-      final recentEvents = pastEvents.where((event) => 
-        event.dateTime.isAfter(thirtyDaysAgo) && 
-        event.dateTime.isBefore(now)
-      ).toList();
+      final recentEvents =
+          pastEvents
+              .where(
+                (event) =>
+                    event.dateTime.isAfter(thirtyDaysAgo) &&
+                    event.dateTime.isBefore(now),
+              )
+              .toList();
 
       Set<String> activeUserIds = {};
       for (var event in recentEvents) {
-        final attendanceList = await attendanceProvider.fetchEventAttendance(event.id);
+        final attendanceList = await attendanceProvider.fetchEventAttendance(
+          event.id,
+        );
         for (var attendance in attendanceList) {
           if (attendance.isPresent) {
             activeUserIds.add(attendance.userId);
@@ -1725,10 +1812,19 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       // Get events this month
       final upcomingEvents = eventProvider.upcomingEvents;
       final allEvents = [...pastEvents, ...upcomingEvents];
-      final eventsThisMonth = allEvents.where((event) => 
-        event.dateTime.isAfter(firstDayOfMonth.subtract(const Duration(days: 1))) &&
-        event.dateTime.isBefore(lastDayOfMonth.add(const Duration(days: 1)))
-      ).length.toDouble();
+      final eventsThisMonth =
+          allEvents
+              .where(
+                (event) =>
+                    event.dateTime.isAfter(
+                      firstDayOfMonth.subtract(const Duration(days: 1)),
+                    ) &&
+                    event.dateTime.isBefore(
+                      lastDayOfMonth.add(const Duration(days: 1)),
+                    ),
+              )
+              .length
+              .toDouble();
 
       return {
         'totalMembers': totalMembers,
@@ -1745,23 +1841,21 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
     }
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon,
-      Color color) {
+  Widget _buildStatCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Card(
       elevation: 3,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              size: 32,
-              color: color,
-            ),
+            Icon(icon, size: 32, color: color),
             const SizedBox(height: 12),
             Text(
               value,
@@ -1774,7 +1868,9 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
             Text(
               title,
               style: TextStyles.bodyText.copyWith(
-                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onBackground.withOpacity(0.7),
               ),
               textAlign: TextAlign.center,
             ),
@@ -1784,18 +1880,17 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
     );
   }
 
-  Widget _buildSectionHeader(String title, IconData icon,
-      VoidCallback onSeeAll) {
+  Widget _buildSectionHeader(
+    String title,
+    IconData icon,
+    VoidCallback onSeeAll,
+  ) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Row(
           children: [
-            Icon(
-              icon,
-              color: AppColors.primaryColor,
-              size: 24,
-            ),
+            Icon(icon, color: AppColors.primaryColor, size: 24),
             const SizedBox(width: 8),
             Text(
               title,
@@ -1837,6 +1932,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         Padding(
           padding: const EdgeInsets.all(16.0),
           child: TextField(
+            controller: _memberSearchController, // connect controller
             decoration: InputDecoration(
               hintText: 'Search members...',
               prefixIcon: const Icon(Icons.search),
@@ -1846,13 +1942,15 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
               contentPadding: const EdgeInsets.symmetric(vertical: 12),
             ),
           ),
+
+
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
           child: Row(
             children: [
               Text(
-                'All Members (${groupMembers.length})',
+                'All Members (${_filteredMembers.length})',
                 style: TextStyles.heading2.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -1866,24 +1964,20 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                   DropdownMenuItem(value: 'Inactive', child: Text('Inactive')),
                 ],
                 onChanged: (value) {
-                  // Filter members by status
+                  // Optional: add status filtering later
                 },
               ),
             ],
           ),
         ),
         const SizedBox(height: 8),
-        Expanded(
-          child: _buildMembersList(showLimit: false),
-        ),
+        Expanded(child: _buildMembersList(showLimit: false, members: _filteredMembers)),
       ],
     );
   }
 
-  Widget _buildMembersList({required bool showLimit}) {
-    final displayMembers = showLimit && groupMembers.length > 3
-        ? groupMembers.sublist(0, 3)
-        : groupMembers;
+  Widget _buildMembersList({required bool showLimit, required List<UserModel> members}) {
+    final displayMembers = showLimit && members.length > 3 ? members.sublist(0, 3) : members;
 
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1901,27 +1995,13 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
             borderRadius: BorderRadius.circular(12),
           ),
           child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16, vertical: 8),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             leading: CircleAvatar(
               backgroundColor: AppColors.primaryColor,
-              child: Text(
-                member.fullName.substring(0, 1),
-                style: const TextStyle(color: Colors.white),
-              ),
+              child: Text(member.fullName.substring(0, 1), style: const TextStyle(color: Colors.white)),
             ),
-            title: Text(
-              member.fullName,
-              style: TextStyles.bodyText.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            subtitle: Text(
-              member.email,
-              style: TextStyles.bodyText.copyWith(
-                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
-              ),
-            ),
+            title: Text(member.fullName, style: TextStyles.bodyText.copyWith(fontWeight: FontWeight.w600)),
+            subtitle: Text(member.email, style: TextStyles.bodyText.copyWith(color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7))),
             trailing: IconButton(
               icon: const Icon(Icons.more_vert),
               onPressed: () => _showMemberOptionsDialog(member),
@@ -1942,6 +2022,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: TextField(
+              controller: _eventSearchController, // connect controller
               decoration: InputDecoration(
                 hintText: 'Search events...',
                 prefixIcon: const Icon(Icons.search),
@@ -1951,12 +2032,11 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                 contentPadding: const EdgeInsets.symmetric(vertical: 12),
               ),
             ),
+
+
           ),
           const TabBar(
-            tabs: [
-              Tab(text: 'Upcoming'),
-              Tab(text: 'Past'),
-            ],
+            tabs: [Tab(text: 'Upcoming'), Tab(text: 'Past')],
             labelColor: AppColors.primaryColor,
             unselectedLabelColor: Colors.grey,
             indicatorColor: AppColors.primaryColor,
@@ -1964,8 +2044,8 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
           Expanded(
             child: TabBarView(
               children: [
-                _buildUpcomingEventsList(showLimit: false),
-                _buildPastEventsList(),
+                _buildUpcomingEventsList(showLimit: false, events: _filteredUpcomingEvents),
+                _buildPastEventsList(showLimit: false, events: _filteredPastEvents)
               ],
             ),
           ),
@@ -1974,112 +2054,119 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
     );
   }
 
-  Widget _buildUpcomingEventsList({required bool showLimit}) {
-    final displayEvents = showLimit && _upcomingEvents.length > 2
-        ? _upcomingEvents.sublist(0, 2)
-        : _upcomingEvents;
+  Widget _buildUpcomingEventsList({required bool showLimit, required List<EventModel> events}) {
+    final displayEvents = showLimit && events.length > 2 ? events.sublist(0, 2) : events;
+        // ? _upcomingEvents.sublist(0, 2)
+        // : _upcomingEvents;
 
-    return displayEvents.isEmpty
-        ? Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.event_busy,
-                  size: 64,
-                  color: Theme.of(context).colorScheme.onBackground.withOpacity(0.5),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'No upcoming events',
-                  style: TextStyles.bodyText.copyWith(
-                    color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                CustomButton(
-                  label: 'Create Event',
-                  onPressed: _showCreateEventDialog,
-                  icon: Icons.add,
-                  color: Color(0xffc62828),
-                  isFullWidth: false,
-                  horizontalPadding: 24,
-                ),
-              ],
+    if (displayEvents.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.event_busy,
+              size: 64,
+              color: Theme.of(context).colorScheme.onBackground.withOpacity(0.5),
             ),
-          )
-        : ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: displayEvents.length,
-            shrinkWrap: true,
-            physics: showLimit
-                ? const NeverScrollableScrollPhysics()
-                : const AlwaysScrollableScrollPhysics(),
-            itemBuilder: (context, index) {
-              final event = displayEvents[index];
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12.0),
-                child: GestureDetector(
-                  onTap: () => _showEventOptionsDialog(event),
-                  child: EventCard(
-                    eventTitle: event.title,
-                    eventDate: _formatEventDate(event.dateTime),
-                    eventLocation: event.location,
-                    onTap: () => _showEventOptionsDialog(event),
-                  ),
-                ),
-              );
-            },
-          );
+            const SizedBox(height: 16),
+            Text(
+              'No upcoming events',
+              style: TextStyles.bodyText.copyWith(
+                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+              ),
+            ),
+            const SizedBox(height: 24),
+            CustomButton(
+              label: 'Create Event',
+              onPressed: _showCreateEventDialog,
+              icon: Icons.add,
+              color: const Color(0xffc62828),
+              isFullWidth: false,
+              horizontalPadding: 24,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: displayEvents.length,
+      shrinkWrap: true,
+      physics: showLimit
+          ? const NeverScrollableScrollPhysics()
+          : const AlwaysScrollableScrollPhysics(),
+      itemBuilder: (context, index) {
+        final event = displayEvents[index];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12.0),
+          child: GestureDetector(
+            onTap: () => _showEventOptionsDialog(event),
+            child: EventCard(
+              eventTitle: event.title,
+              eventDate: _formatEventDate(event.dateTime),
+              eventLocation: event.location,
+              onTap: () => _showEventOptionsDialog(event),
+            ),
+          ),
+        );
+      },
+    );
   }
 
-  Widget _buildPastEventsList() {
-    return _pastEvents.isEmpty
-        ? Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.event_busy,
-                  size: 64,
-                  color: Theme.of(context).colorScheme.onBackground.withOpacity(0.5),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'No past events',
-                  style: TextStyles.bodyText.copyWith(
-                    color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
-                  ),
-                ),
-              ],
+  Widget _buildPastEventsList({bool showLimit = false, required List<EventModel> events}) {
+    final displayEvents = showLimit && events.length > 2 ? events.sublist(0, 2) : events;
+        // ? _pastEvents.sublist(0, 2)
+        // : _pastEvents;
+
+    if (displayEvents.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.event_busy,
+              size: 64,
+              color: Theme.of(context).colorScheme.onBackground.withOpacity(0.5),
             ),
-          )
-        : ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: _pastEvents.length,
-            itemBuilder: (context, index) {
-              final event = _pastEvents[index];
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12.0),
-                child: GestureDetector(
-                  onTap: () => _showEventOptionsDialog(event),
-                  child: EventCard(
-                    eventTitle: event.title,
-                    eventDate: _formatEventDate(event.dateTime),
-                    eventLocation: event.location,
-                    onTap: () => _showEventOptionsDialog(event),
-                  ),
-                ),
-              );
-            },
-          );
+            const SizedBox(height: 16),
+            Text(
+              'No past events',
+              style: TextStyles.bodyText.copyWith(
+                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: displayEvents.length,
+      itemBuilder: (context, index) {
+        final event = displayEvents[index];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12.0),
+          child: GestureDetector(
+            onTap: () => _showEventOptionsDialog(event),
+            child: EventCard(
+              eventTitle: event.title,
+              eventDate: _formatEventDate(event.dateTime),
+              eventLocation: event.location,
+              onTap: () => _showEventOptionsDialog(event),
+            ),
+          ),
+        );
+      },
+    );
   }
+
 
   // ANALYTICS TAB
   Widget _buildAnalyticsTab() {
-    return AdminAnalyticsScreen(
-      groupId: widget.groupId,
-    );
+    return AdminAnalyticsScreen(groupId: widget.groupId);
   }
 
   // SETTINGS TAB
@@ -2093,7 +2180,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
             title: 'Appearance',
             icon: Icons.palette,
             children: [
-              _buildThemeSelector(_isDarkMode,(bool newValue){
+              _buildThemeSelector(_isDarkMode, (bool newValue) {
                 setState(() {
                   _isDarkMode = newValue;
                 });
@@ -2128,7 +2215,8 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
               SwitchListTile(
                 title: const Text('Auto-Refresh Data'),
                 subtitle: Text(
-                    'Automatically refresh data every $_autoRefreshInterval minutes'),
+                  'Automatically refresh data every $_autoRefreshInterval minutes',
+                ),
                 value: _autoRefreshEnabled,
                 onChanged: (value) {
                   setState(() {
@@ -2168,8 +2256,10 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                 title: const Text('Refresh All Data Now'),
                 subtitle: const Text('Update all dashboard information'),
                 trailing: RotationTransition(
-                  turns: Tween(begin: 0.0, end: 1.0).animate(
-                      _refreshAnimationController),
+                  turns: Tween(
+                    begin: 0.0,
+                    end: 1.0,
+                  ).animate(_refreshAnimationController),
                   child: IconButton(
                     icon: const Icon(Icons.refresh),
                     onPressed: _refreshData,
@@ -2183,7 +2273,8 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                 trailing: const Icon(Icons.backup),
                 onTap: () {
                   _showInfo(
-                      'Backup feature will be available in the next update');
+                    'Backup feature will be available in the next update',
+                  );
                 },
               ),
               ListTile(
@@ -2192,7 +2283,8 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                 trailing: const Icon(Icons.restore),
                 onTap: () {
                   _showInfo(
-                      'Restore feature will be available in the next update');
+                    'Restore feature will be available in the next update',
+                  );
                 },
               ),
             ],
@@ -2220,11 +2312,12 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                 onTap: () {
                   showDialog(
                     context: context,
-                    builder: (context) =>
-                        AlertDialog(
+                    builder:
+                        (context) => AlertDialog(
                           title: const Text('Clear Analytics Cache'),
                           content: const Text(
-                              'Are you sure you want to clear all cached analytics data? This will not affect your actual group data.'),
+                            'Are you sure you want to clear all cached analytics data? This will not affect your actual group data.',
+                          ),
                           actions: [
                             TextButton(
                               onPressed: () => Navigator.pop(context),
@@ -2238,8 +2331,10 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.red,
                               ),
-                              child: const Text('Clear',
-                                  style: TextStyle(color: Colors.white)),
+                              child: const Text(
+                                'Clear',
+                                style: TextStyle(color: Colors.white),
+                              ),
                             ),
                           ],
                         ),
@@ -2263,7 +2358,8 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                 trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                 onTap: () {
                   _showInfo(
-                      'Terms of Service will be available in the next update');
+                    'Terms of Service will be available in the next update',
+                  );
                 },
               ),
               ListTile(
@@ -2271,7 +2367,8 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                 trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                 onTap: () {
                   _showInfo(
-                      'Privacy Policy will be available in the next update');
+                    'Privacy Policy will be available in the next update',
+                  );
                 },
               ),
             ],
@@ -2316,7 +2413,9 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
 
   Widget _buildThemeSelector(bool? isDarkMode, Function(bool) onChanged) {
     // default to false if null for UI selection
-    final selected = isDarkMode ?? WidgetsBinding.instance.window.platformBrightness == Brightness.dark;
+    final selected =
+        isDarkMode ??
+        WidgetsBinding.instance.window.platformBrightness == Brightness.dark;
 
     return Row(
       children: [
@@ -2346,7 +2445,6 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
     );
   }
 
-
   Widget _buildAccentColorSelector() {
     final List<Color> colorOptions = [
       AppColors.primaryColor,
@@ -2366,44 +2464,45 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
-              children: colorOptions.map((color) {
-                final isSelected = _accentColor == color;
-                return GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _accentColor = color;
-                    });
-                  },
-                  child: Container(
-                    margin: const EdgeInsets.only(right: 8),
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: color,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: isSelected ? Colors.white : Colors.transparent,
-                        width: 2,
-                      ),
-                      boxShadow: isSelected
-                          ? [
-                        BoxShadow(
-                          color: color.withOpacity(0.5),
-                          spreadRadius: 2,
-                          blurRadius: 5,
+              children:
+                  colorOptions.map((color) {
+                    final isSelected = _accentColor == color;
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _accentColor = color;
+                        });
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 8),
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color:
+                                isSelected ? Colors.white : Colors.transparent,
+                            width: 2,
+                          ),
+                          boxShadow:
+                              isSelected
+                                  ? [
+                                    BoxShadow(
+                                      color: color.withOpacity(0.5),
+                                      spreadRadius: 2,
+                                      blurRadius: 5,
+                                    ),
+                                  ]
+                                  : null,
                         ),
-                      ]
-                          : null,
-                    ),
-                    child: isSelected
-                        ? const Icon(
-                      Icons.check,
-                      color: Colors.white,
-                    )
-                        : null,
-                  ),
-                );
-              }).toList(),
+                        child:
+                            isSelected
+                                ? const Icon(Icons.check, color: Colors.white)
+                                : null,
+                      ),
+                    );
+                  }).toList(),
             ),
           ),
         ),
@@ -2417,20 +2516,14 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       return FloatingActionButton(
         onPressed: _showAddMemberDialog,
         backgroundColor: _accentColor,
-        child: const Icon(
-          Icons.person_add,
-          color: Colors.white,
-        ),
+        child: const Icon(Icons.person_add, color: Colors.white),
       );
     } else if (_selectedIndex == 2) {
       // Events tab
       return FloatingActionButton(
         onPressed: _showCreateEventDialog,
         backgroundColor: _accentColor,
-        child: const Icon(
-          Icons.add,
-          color: Colors.white,
-        ),
+        child: const Icon(Icons.add, color: Colors.white),
       );
     } else if (_selectedIndex == 0 || _selectedIndex == 3) {
       // Dashboard or Analytics tab - show refresh button
@@ -2438,17 +2531,15 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         onPressed: _refreshData,
         backgroundColor: _accentColor,
         child: RotationTransition(
-          turns: Tween(begin: 0.0, end: 1.0).animate(
-              _refreshAnimationController),
-          child: const Icon(
-            Icons.refresh,
-            color: Colors.white,
-          ),
+          turns: Tween(
+            begin: 0.0,
+            end: 1.0,
+          ).animate(_refreshAnimationController),
+          child: const Icon(Icons.refresh, color: Colors.white),
         ),
       );
     }
 
     return Container(); // No FAB for settings tab
   }
-
 }

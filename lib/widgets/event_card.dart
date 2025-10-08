@@ -27,7 +27,7 @@ class EventCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(12.0),
           side: BorderSide(color: AppColors.primaryColor.withOpacity(0.1), width: 1),
         ),
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.background,
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Row(

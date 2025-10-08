@@ -243,13 +243,13 @@ class _RoleBasedNavigator extends StatelessWidget {
       case 'super_admin':
         log('Navigating to SuperAdminDashboard');
         return const SuperAdminDashboard();
-      
+
       case 'regional manager':
         log('Navigating to RegionDashboard');
-        
-        // Check if user has a region assigned
-        if (user.regionId.isEmpty) {
-          log('Region manager has no region assigned');
+
+        // Correct check for Regional Managers
+        if (user.regionalID.isEmpty) {
+          log('Regional Manager has no region assigned');
           return Scaffold(
             body: Center(
               child: Column(
@@ -257,13 +257,13 @@ class _RoleBasedNavigator extends StatelessWidget {
                 children: [
                   const Icon(Icons.error_outline, size: 64, color: Colors.red),
                   const SizedBox(height: 16),
-                   Text(
+                  Text(
                     'No Region Assigned',
                     style: TextStyles.bodyText,
                   ),
                   const SizedBox(height: 8),
-                   Text(
-                    'You have been assigned as a Region Manager but no region has been assigned to you yet.',
+                  Text(
+                    'You have been assigned as a Regional Manager but no region has been assigned to you yet.',
                     textAlign: TextAlign.center,
                     style: TextStyles.bodyText,
                   ),
@@ -279,7 +279,8 @@ class _RoleBasedNavigator extends StatelessWidget {
                         );
                       }
                     },
-                    child: Text('Logout',
+                    child: Text(
+                      'Logout',
                       style: TextStyles.bodyText,
                     ),
                   ),
@@ -288,8 +289,9 @@ class _RoleBasedNavigator extends StatelessWidget {
             ),
           );
         }
-        
+
         return RegionDashboard(regionId: user.regionalID);
+
 
       case 'admin':
         log('Navigating to AdminDashboard');

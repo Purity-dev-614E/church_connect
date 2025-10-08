@@ -82,8 +82,7 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
         // Filter by role
         final matchesRole = _selectedRole == 'All' || 
             (_selectedRole == 'Members' && user.role.toLowerCase() == 'user') ||
-            (_selectedRole == 'Group Leaders' && user.role.toLowerCase() == 'admin') ||
-            (_selectedRole == 'Admins' && user.role.toLowerCase() == 'super_admin');
+            (_selectedRole == 'Group Leaders' && user.role.toLowerCase() == 'admin');
             
         return matchesQuery && matchesRole;
       }).toList();
@@ -182,7 +181,6 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
                   DropdownMenuItem(value: 'All', child: Text('All')),
                   DropdownMenuItem(value: 'Members', child: Text('Members')),
                   DropdownMenuItem(value: 'Group Leaders', child: Text('Group Leaders')),
-                  DropdownMenuItem(value: 'Admins', child: Text('Admins')),
                 ],
                 onChanged: (newValue) {
                   if (newValue != null) {
@@ -227,6 +225,9 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
         roleDisplay = 'Super Admin';
         roleColor = AppColors.primaryColor;
         break;
+      case 'regional manager':
+        roleDisplay = 'Regional Manager';
+        roleColor = AppColors.buttonColor;
       case 'admin':
         roleDisplay = 'Group Leader';
         roleColor = AppColors.secondaryColor;
@@ -369,6 +370,10 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
                   value: 'admin',
                   child: Text('Group Leader'),
                 ),
+                DropdownMenuItem(
+                  value: 'regional manager',
+                  child: Text('Regional Manager'),
+                )
               ],
               onChanged: (value) {
                 if (value != null) {

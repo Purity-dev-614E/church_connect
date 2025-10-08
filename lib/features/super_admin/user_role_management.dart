@@ -119,17 +119,16 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
     });
   }
 
-  Future<void> _updateUserRole(UserModel user, String newRole, {String? regionId}) async {
+  Future<void> _updateUserRole(UserModel user, String newRole, {String? regionId, String? groupId}) async {
     log('Attempting to update role for user:');
     log('User ID: ${user.id}');
     log('User Name: ${user.fullName}');
     log('Current Role: ${user.role}');
     log('New Role: $newRole');
-    log('Region ID: $regionId (actually regionId)');
-    log('Group ID (from user.regionId): ${user.regionId}');
+    log('Region ID (for Regional Manager): $regionId');
+    log('Group ID (for Admin): $groupId or from user: ${user.regionId}');
 
     if (user.id.isEmpty) {
-      print('Error: User ID is empty');
       _showError('Invalid user ID. Please try again.');
       return;
     }
@@ -139,6 +138,7 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
     try {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
 
+      // Build updated user object
       final updatedUser = UserModel(
         id: user.id,
         fullName: user.fullName,
@@ -148,14 +148,25 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
         nextOfKinContact: user.nextOfKinContact,
         role: newRole,
         gender: user.gender,
-        regionId: user.regionId, // groupId
+
+        // Groups are tied to Admins
+        regionId: newRole == 'admin'
+            ? groupId ?? user.regionId
+            : user.regionId,
+
         regionName: user.regionName,
-        regionalID: newRole == 'regional manager' ? regionId ?? user.regionalID : user.regionalID,
+
+        // Regions are tied to Regional Managers
+        regionalID: newRole == 'regional manager'
+            ? regionId ?? user.regionalID
+            : user.regionalID,
       );
 
-      print('Created updated user model:');
-      print('ID: ${updatedUser.id}');
-      print('Role: ${updatedUser.role}');
+      log('Created updated user model:');
+      log('ID: ${updatedUser.id}');
+      log('Role: ${updatedUser.role}');
+      log('Group ID (regionId): ${updatedUser.regionId}');
+      log('Region ID (regionalID): ${updatedUser.regionalID}');
 
       final success = await userProvider.updateUser(updatedUser);
 
@@ -164,36 +175,36 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
       }
 
       // Assign regional manager to region
-      if (newRole == 'regional manager' && regionId != null) {
-        final regionSuccess = await userProvider.assignUserToRegion(user.id, regionId);
+      if (newRole == 'regional manager' && updatedUser.regionalID.isNotEmpty) {
+        final regionSuccess = await userProvider.assignUserToRegion(user.id, updatedUser.regionalID);
         if (!regionSuccess) throw Exception('Failed to assign user to region');
       }
 
-      // Assign admin to their group (user.regionId)
-      if (newRole == 'admin' && user.regionId.isNotEmpty) {
-        final adminSuccess = await GroupProvider().assignAdminToGroup(user.regionId, user.id);
+      // Assign admin to group
+      if (newRole == 'admin' && updatedUser.regionId.isNotEmpty) {
+        final adminSuccess = await GroupProvider().assignAdminToGroup(updatedUser.regionId, user.id);
         if (!adminSuccess) throw Exception('Failed to assign admin to group');
       }
 
       // Refresh user list
       await _loadUsers();
 
-      // Show success message
+      // Success message
       if (mounted) {
-        if (newRole == 'regional manager' && regionId != null) {
+        if (newRole == 'regional manager' && updatedUser.regionalID.isNotEmpty) {
           final region = _regions.firstWhere(
-                (r) => r.id == regionId,
-            orElse: () => RegionModel(id: regionId, name: 'Unknown Region'),
+                (r) => r.id == updatedUser.regionalID,
+            orElse: () => RegionModel(id: updatedUser.regionalID, name: 'Unknown Region'),
           );
           _showSuccess('${user.fullName}\'s role updated to Regional Manager for ${region.name}');
-        } else if (newRole == 'admin' && user.regionId.isNotEmpty) {
-          _showSuccess('${user.fullName}\'s role updated to Admin for Group ${user.regionId}');
+        } else if (newRole == 'admin' && updatedUser.regionId.isNotEmpty) {
+          _showSuccess('${user.fullName}\'s role updated to Admin for Group ${updatedUser.regionId}');
         } else {
           _showSuccess('${user.fullName}\'s role updated to $newRole');
         }
       }
     } catch (e) {
-      print('Error in _updateUserRole: $e');
+      log('Error in _updateUserRole: $e');
       if (mounted) {
         _showError('Failed to update role: ${e.toString()}');
       }
@@ -203,6 +214,7 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
       }
     }
   }
+
 
   @override
   Widget build(BuildContext context) {

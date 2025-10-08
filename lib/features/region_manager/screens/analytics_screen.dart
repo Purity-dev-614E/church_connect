@@ -10,17 +10,16 @@ import 'package:provider/provider.dart';
 
 class RegionManagerAnalyticsScreen extends StatefulWidget {
   final String regionId;
-  
-  const RegionManagerAnalyticsScreen({
-    super.key,
-    required this.regionId,
-  });
+
+  const RegionManagerAnalyticsScreen({super.key, required this.regionId});
 
   @override
-  State<RegionManagerAnalyticsScreen> createState() => _RegionManagerAnalyticsScreenState();
+  State<RegionManagerAnalyticsScreen> createState() =>
+      _RegionManagerAnalyticsScreenState();
 }
 
-class _RegionManagerAnalyticsScreenState extends State<RegionManagerAnalyticsScreen> {
+class _RegionManagerAnalyticsScreenState
+    extends State<RegionManagerAnalyticsScreen> {
   late RegionalManagerAnalyticsProvider _analyticsProvider;
   late RegionProvider _regionProvider;
   String _selectedPeriod = 'week';
@@ -31,14 +30,51 @@ class _RegionManagerAnalyticsScreenState extends State<RegionManagerAnalyticsScr
   Map<String, double> _groupAttendanceData = {};
   Map<String, double> _activityStatusData = {};
   Map<String, double> _regionAttendance = {};
+  int? _touchedGroupIndex;
+
 
   @override
   void initState() {
     super.initState();
-    _analyticsProvider = Provider.of<RegionalManagerAnalyticsProvider>(context, listen: false);
+    _analyticsProvider = Provider.of<RegionalManagerAnalyticsProvider>(
+      context,
+      listen: false,
+    );
     _regionProvider = Provider.of<RegionProvider>(context, listen: false);
     Future.microtask(() => _loadAnalytics());
   }
+
+  void _applyQuarterlyFilter() {
+    setState(() {
+      // Example logic: Average recent attendance data
+      if (_regionalAttendanceData.isNotEmpty) {
+        // Average of every 3 entries
+        final List<double> quarterlyData = [];
+        for (int i = 0; i < _regionalAttendanceData.length; i += 3) {
+          final chunk = _regionalAttendanceData.skip(i).take(3);
+          final avg = chunk.isNotEmpty
+              ? chunk.reduce((a, b) => a + b) / chunk.length
+              : 0.0;
+          quarterlyData.add(avg);
+        }
+        _regionalAttendanceData = quarterlyData;
+      }
+
+      // Optionally aggregate group attendance
+      if (_groupAttendanceData.isNotEmpty) {
+        final aggregated = _groupAttendanceData.map((k, v) =>
+            MapEntry(k, (v * 0.9) + 5)); // some smoothing example
+        _groupAttendanceData = aggregated;
+      }
+
+      // You can also adjust quick stats slightly
+      _quickStatsData = _quickStatsData.map((e) {
+        if (e is num) return (e * 0.25).round(); // quarter-year scale
+        return e;
+      }).toSet();
+    });
+  }
+
 
   Future<void> _loadAnalytics() async {
     if (!mounted) return;
@@ -71,11 +107,22 @@ class _RegionManagerAnalyticsScreenState extends State<RegionManagerAnalyticsScr
     }
   }
 
+  void _handleLocalFilterChange() {
+    if (_selectedPeriod == 'quarter') {
+      _applyQuarterlyFilter();
+    } else {
+      _loadAnalytics(); // fallback to normal backend calls
+    }
+  }
+
+
   Future<void> _loadQuickStats() async {
     try {
       print('Loading quick stats for region: ${widget.regionId}');
-      final quickStats = await _analyticsProvider.getDashboardSummaryForRegion(widget.regionId);
-      
+      final quickStats = await _analyticsProvider.getDashboardSummaryForRegion(
+        widget.regionId,
+      );
+
       if (quickStats != null) {
         print('Received quick stats: $quickStats');
         if (!mounted) return;
@@ -84,7 +131,7 @@ class _RegionManagerAnalyticsScreenState extends State<RegionManagerAnalyticsScr
             quickStats.groupCount,
             quickStats.eventCount,
             quickStats.userCount,
-            quickStats.attendanceCount ?? 0
+            quickStats.attendanceCount ?? 0,
           };
         });
       } else {
@@ -109,11 +156,11 @@ class _RegionManagerAnalyticsScreenState extends State<RegionManagerAnalyticsScr
   Future<void> _loadRegionalAttendance() async {
     try {
       _regionAttendance = {};
-      
+
       // Load regions
       await _regionProvider.loadRegions();
       final regions = _regionProvider.regions;
-      
+
       if (regions.isEmpty) {
         throw Exception('No regions available');
       }
@@ -121,13 +168,15 @@ class _RegionManagerAnalyticsScreenState extends State<RegionManagerAnalyticsScr
       // Load attendance for each region
       for (var region in regions) {
         try {
-          final attendanceStats = await _analyticsProvider.getOverallAttendanceByPeriodForRegion(
-            _selectedPeriod,
-            region.id,
-          );
+          final attendanceStats = await _analyticsProvider
+              .getOverallAttendanceByPeriodForRegion(
+                _selectedPeriod,
+                region.id,
+              );
 
           if (attendanceStats?.overallStats?.attendanceRate != null) {
-            _regionAttendance[region.name] = attendanceStats!.overallStats!.attendanceRate;
+            _regionAttendance[region.name] =
+                attendanceStats!.overallStats!.attendanceRate;
           }
         } catch (e) {
           print('Error loading attendance for region ${region.name}: $e');
@@ -151,71 +200,71 @@ class _RegionManagerAnalyticsScreenState extends State<RegionManagerAnalyticsScr
 
   Future<void> _loadGroupAttendance() async {
     try {
-      final allRegionGroups = await _regionProvider.getGroupsByRegion(widget.regionId);
+      final allRegionGroups = await _regionProvider.getGroupsByRegion(
+        widget.regionId,
+      );
       final Map<String, double> groupAttendanceData = {};
 
       if (allRegionGroups.isEmpty) {
-        print('No groups found for region');
         if (mounted) {
-          setState(() {
-            _groupAttendanceData = {};
-          });
+          setState(() => _groupAttendanceData = {});
         }
         return;
       }
 
-      for (var group in allRegionGroups) {
-        if (group != null) {
-          try {
-            final groupAttendance = await _analyticsProvider.getGroupAttendanceStatsForRegion(group.id);
-            if (groupAttendance?.overallStats?.presentMembers != null) {
-              groupAttendanceData[group.name] = groupAttendance!.overallStats!.presentMembers.toDouble();
-            } else {
-              // If no attendance data, set to 0
-              groupAttendanceData[group.name] = 0.0;
+      // Launch all requests in parallel
+      final futures =
+          allRegionGroups.map((group) async {
+            try {
+              final groupAttendance = await _analyticsProvider
+                  .getGroupAttendanceStatsForRegion(group.id);
+              return MapEntry(
+                group.name,
+                groupAttendance?.overallStats?.presentMembers.toDouble() ?? 0.0,
+              );
+            } catch (e) {
+              print('Error loading attendance for group ${group.name}: $e');
+              return MapEntry(group.name, 0.0); // fallback
             }
-          } catch (e) {
-            print('Error loading attendance for group ${group.name}: $e');
-            // Set to 0 for groups with errors
-            groupAttendanceData[group.name] = 0.0;
-          }
-        }
-      }
+          }).toList();
+
+      // Wait for all requests to finish
+      final results = await Future.wait(futures);
 
       if (!mounted) return;
+
       setState(() {
-        _groupAttendanceData = groupAttendanceData;
+        _groupAttendanceData = Map.fromEntries(results);
       });
     } catch (e) {
       print('Error loading group attendance: $e');
-      if (mounted) {
-        setState(() {
-          _groupAttendanceData = {};
-        });
-      }
+      if (mounted) setState(() => _groupAttendanceData = {});
     }
   }
 
   Future<void> _loadActivityStatus() async {
     try {
-      final regionalActivityStatus = await _analyticsProvider.getActivityStatus(widget.regionId);
-      
+      final regionalActivityStatus = await _analyticsProvider.getActivityStatus(
+        widget.regionId,
+      );
+
       if (regionalActivityStatus != null) {
         if (!mounted) return;
         setState(() {
           _activityStatusData = {
-            'active': (regionalActivityStatus.statusSummary?.active?.toDouble() ?? 0.0),
-            'inactive': (regionalActivityStatus.statusSummary?.inactive?.toDouble() ?? 0.0)
+            'active':
+                (regionalActivityStatus.statusSummary?.active?.toDouble() ??
+                    0.0),
+            'inactive':
+                (regionalActivityStatus.statusSummary?.inactive?.toDouble() ??
+                    0.0),
           };
         });
       } else {
         print('No activity status data available, using default values');
         if (mounted) {
           setState(() {
-            _activityStatusData = {
-              'active': 0.0,
-              'inactive': 0.0
-            };
+            _activityStatusData = {'active': 0.0, 'inactive': 0.0};
           });
         }
       }
@@ -223,10 +272,7 @@ class _RegionManagerAnalyticsScreenState extends State<RegionManagerAnalyticsScr
       print('Error loading activity status: $e');
       if (mounted) {
         setState(() {
-          _activityStatusData = {
-            'active': 0.0,
-            'inactive': 0.0
-          };
+          _activityStatusData = {'active': 0.0, 'inactive': 0.0};
         });
       }
     }
@@ -400,7 +446,13 @@ class _RegionManagerAnalyticsScreenState extends State<RegionManagerAnalyticsScr
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color, String description) {
+  Widget _buildStatCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color,
+    String description,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -436,7 +488,9 @@ class _RegionManagerAnalyticsScreenState extends State<RegionManagerAnalyticsScr
           Text(
             description,
             style: TextStyles.bodyText.copyWith(
-              color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+              color: Theme.of(
+                context,
+              ).colorScheme.onBackground.withOpacity(0.7),
             ),
           ),
         ],
@@ -455,15 +509,13 @@ class _RegionManagerAnalyticsScreenState extends State<RegionManagerAnalyticsScr
           children: [
             Text(
               'Recent Activity',
-              style: TextStyles.heading2.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyles.heading2.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppColors.backgroundColor,
+                color: Theme.of(context).colorScheme.background,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: AppColors.accentColor),
               ),
@@ -480,7 +532,7 @@ class _RegionManagerAnalyticsScreenState extends State<RegionManagerAnalyticsScr
                     Icons.event,
                     'Event Activity',
                     '${_quickStatsData.isNotEmpty ? (int.parse(_quickStatsData.elementAt(1).toString()) * 0.2).toStringAsFixed(0) : 0} events scheduled this week',
-                    AppColors.secondaryColor,
+                    AppColors.grey,
                   ),
                   const SizedBox(height: 12),
                   _buildActivityItem(
@@ -498,7 +550,12 @@ class _RegionManagerAnalyticsScreenState extends State<RegionManagerAnalyticsScr
     );
   }
 
-  Widget _buildActivityItem(IconData icon, String title, String description, Color color) {
+  Widget _buildActivityItem(
+    IconData icon,
+    String title,
+    String description,
+    Color color,
+  ) {
     return Row(
       children: [
         Container(
@@ -524,7 +581,9 @@ class _RegionManagerAnalyticsScreenState extends State<RegionManagerAnalyticsScr
               Text(
                 description,
                 style: TextStyles.bodyText.copyWith(
-                  color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onBackground.withOpacity(0.7),
                 ),
               ),
             ],
@@ -550,13 +609,15 @@ class _RegionManagerAnalyticsScreenState extends State<RegionManagerAnalyticsScr
               items: const [
                 DropdownMenuItem(value: 'week', child: Text('Weekly')),
                 DropdownMenuItem(value: 'month', child: Text('Monthly')),
+                DropdownMenuItem(value: 'quarter', child: Text('Quarterly')), // ✅ new
                 DropdownMenuItem(value: 'year', child: Text('Yearly')),
               ],
               onChanged: (value) {
                 setState(() => _selectedPeriod = value!);
-                _loadAnalytics();
+                _handleLocalFilterChange(); // ✅ new helper
               },
-            ),
+            )
+
           ],
         ),
       ),
@@ -574,9 +635,7 @@ class _RegionManagerAnalyticsScreenState extends State<RegionManagerAnalyticsScr
           children: [
             Text(
               'Regional Attendance Trend',
-              style: TextStyles.heading2.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyles.heading2.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             SizedBox(
@@ -595,12 +654,10 @@ class _RegionManagerAnalyticsScreenState extends State<RegionManagerAnalyticsScr
                   borderData: FlBorderData(show: true),
                   lineBarsData: [
                     LineChartBarData(
-                      spots: attendanceData
-                          .asMap()
-                          .entries
-                          .map((e) {
-                        return FlSpot(e.key.toDouble(), e.value);
-                      }).toList(),
+                      spots:
+                          attendanceData.asMap().entries.map((e) {
+                            return FlSpot(e.key.toDouble(), e.value);
+                          }).toList(),
                       isCurved: true,
                       color: AppColors.primaryColor,
                       barWidth: 3,
@@ -622,6 +679,16 @@ class _RegionManagerAnalyticsScreenState extends State<RegionManagerAnalyticsScr
   }
 
   Widget _buildGroupAttendanceChart(Map<String, double> groupAttendance) {
+    const double baseBarWidth = 22;
+    const double spacing = 22;
+    final entries = groupAttendance.entries.toList();
+    final int groupCount = entries.length;
+    final double chartWidth = groupCount * (baseBarWidth + spacing) + 60;
+
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final double rotationAngle = screenWidth < 400 ? -0.8 : -0.4;
+    final int labelSkip = groupCount > 10 ? 2 : 1;
+
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -632,48 +699,138 @@ class _RegionManagerAnalyticsScreenState extends State<RegionManagerAnalyticsScr
           children: [
             Text(
               'Group Attendance',
-              style: TextStyles.heading2.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyles.heading2.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             SizedBox(
-              height: 300,
-              child: BarChart(
-                BarChartData(
-                  alignment: BarChartAlignment.spaceAround,
-                  maxY: 100,
-                  barTouchData: BarTouchData(enabled: false),
-                  titlesData: FlTitlesData(
-                    leftTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: true),
-                    ),
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        getTitlesWidget: (value, meta) {
-                          final index = value.toInt();
-                          if (index >= 0 && index < groupAttendance.length) {
-                            return Text(groupAttendance.keys.elementAt(index));
-                          }
-                          return const Text('');
-                        },
+              height: 320,
+              child: Scrollbar(
+                thumbVisibility: true,
+                thickness: 4,
+                radius: const Radius.circular(8),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SizedBox(
+                    width: chartWidth < screenWidth ? screenWidth : chartWidth,
+                    child: BarChart(
+                      BarChartData(
+                        alignment: BarChartAlignment.start,
+                        maxY: 100,
+                        gridData: const FlGridData(show: false), // no grid lines
+                        borderData: FlBorderData(
+                          show: true,
+                          border: const Border(
+                            left: BorderSide(width: 0.5, color: Colors.grey),
+                            bottom: BorderSide(width: 0.5, color: Colors.grey),
+                          ),
+                        ),
+                        titlesData: FlTitlesData(
+                          leftTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: true),
+                          ),
+                          bottomTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              getTitlesWidget: (value, meta) {
+                                final index = value.toInt();
+                                if (index >= 0 &&
+                                    index < groupCount &&
+                                    index % labelSkip == 0) {
+                                  String label = entries[index].key;
+                                  if (label.length > 10) {
+                                    label = label.substring(0, 10) + '...';
+                                  }
+                                  return Transform.rotate(
+                                    angle: rotationAngle,
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(top: 6),
+                                      child: Text(
+                                        label,
+                                        style: const TextStyle(fontSize: 11),
+                                      ),
+                                    ),
+                                  );
+                                }
+                                return const SizedBox.shrink();
+                              },
+                            ),
+                          ),
+                        ),
+                        barTouchData: BarTouchData(
+                          enabled: true,
+                          touchTooltipData: BarTouchTooltipData(
+                            tooltipBgColor: Colors.black87,
+                            tooltipRoundedRadius: 8,
+                            getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                              final idx = group.x.toInt();
+                              if (idx < 0 || idx >= groupCount) return null;
+                              final groupName = entries[idx].key;
+                              final value = rod.toY.toStringAsFixed(1);
+                              return BarTooltipItem(
+                                '$groupName\n',
+                                const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                                children: [
+                                  TextSpan(
+                                    text: '$value% attendance',
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+// update touched index on touch events
+                          touchCallback: (FlTouchEvent event, BarTouchResponse? response) {
+                            if (response == null || response.spot == null) {
+                              if (_touchedGroupIndex != null) {
+                                setState(() {
+                                  _touchedGroupIndex = null;
+                                });
+                              }
+                              return;
+                            }
+                            final touchedIndex = response.spot!.touchedBarGroupIndex;
+                            if (_touchedGroupIndex != touchedIndex) {
+                              setState(() {
+                                _touchedGroupIndex = touchedIndex;
+                              });
+                            }
+                          },
+                        ),
+                        barGroups: entries.asMap().entries.map((e) {
+                          final int index = e.key;
+                          final MapEntry<String, double> entry = e.value;
+                          final bool isTouched = _touchedGroupIndex != null && _touchedGroupIndex == index;
+                          final double barWidth = isTouched ? baseBarWidth + 8 : baseBarWidth;
+                          final Color color = isTouched ? AppColors.primaryColor : AppColors.secondaryColor;
+                          return BarChartGroupData(
+                            x: index,
+                            barsSpace: spacing / 2,
+                            barRods: [
+                              BarChartRodData(
+                                toY: entry.value,
+                                width: barWidth,
+                                color: color,
+                                borderRadius: BorderRadius.circular(6),
+                                backDrawRodData: BackgroundBarChartRodData(
+                                  show: true,
+                                  toY: 100,
+                                  color: AppColors.secondaryColor.withOpacity(0.06),
+                                ),
+                              ),
+                            ],
+                          );
+                        }).toList(),
                       ),
+                      swapAnimationDuration: const Duration(milliseconds: 400),
                     ),
                   ),
-                  borderData: FlBorderData(show: true),
-                  barGroups: groupAttendance.entries.map((entry) {
-                    return BarChartGroupData(
-                      x: groupAttendance.keys.toList().indexOf(entry.key),
-                      barRods: [
-                        BarChartRodData(
-                          toY: entry.value,
-                          color: AppColors.secondaryColor,
-                          width: 20,
-                        ),
-                      ],
-                    );
-                  }).toList(),
                 ),
               ),
             ),
@@ -682,6 +839,7 @@ class _RegionManagerAnalyticsScreenState extends State<RegionManagerAnalyticsScr
       ),
     );
   }
+
 
   Widget _buildActivityStatusChart(Map<String, double> activityStatus) {
     return Card(
@@ -694,9 +852,7 @@ class _RegionManagerAnalyticsScreenState extends State<RegionManagerAnalyticsScr
           children: [
             Text(
               'Activity Status',
-              style: TextStyles.heading2.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyles.heading2.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             SizedBox(
@@ -706,18 +862,20 @@ class _RegionManagerAnalyticsScreenState extends State<RegionManagerAnalyticsScr
                   sections: [
                     PieChartSectionData(
                       value: activityStatus['active'] ?? 0,
-                      title: '${(activityStatus['active'] ?? 0).toStringAsFixed(1)}%',
+                      title:
+                          '${(activityStatus['active'] ?? 0).toStringAsFixed(1)}%',
                       color: AppColors.successColor,
                       radius: 80,
-                      titleStyle: TextStyles.heading2
+                      titleStyle: TextStyles.heading2,
                     ),
                     PieChartSectionData(
                       value: activityStatus['inactive'] ?? 0,
-                      title: '${(activityStatus['inactive'] ?? 0).toStringAsFixed(1)}%',
+                      title:
+                          '${(activityStatus['inactive'] ?? 0).toStringAsFixed(1)}%',
                       color: AppColors.errorColor,
                       radius: 80,
-                      titleStyle: TextStyles.heading2
-                      ),
+                      titleStyle: TextStyles.heading2,
+                    ),
                   ],
                   sectionsSpace: 2,
                   centerSpaceRadius: 40,

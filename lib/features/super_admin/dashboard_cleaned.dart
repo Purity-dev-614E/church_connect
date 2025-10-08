@@ -27,6 +27,8 @@ import '../../data/providers/auth_provider.dart';
 import '../../data/providers/analytics_providers/super_admin_analytics_provider.dart';
 import 'package:flutter/foundation.dart';
 
+import 'event_management_screen.dart';
+
 class SuperAdminDashboard extends StatefulWidget {
   const SuperAdminDashboard({super.key});
 
@@ -41,12 +43,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   final PageController _pageController = PageController();
 
   // Data from providers
-  late EventServices _eventServices;
   late SuperAdminAnalyticsProvider _analyticsProvider;
-  late UserProvider _userProvider;
-  late EventProvider _eventProvider;
-  List<UserModel> _recentUsers = [];
-  final List<GroupModel> _recentGroups = [];
   Map<String, dynamic> _dashboardSummary = {};
 
   bool _isLoading = true;
@@ -65,9 +62,6 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   void initState() {
     super.initState();
     // Get the event services
-    _eventServices = EventServices();
-
-    // Initialize with default data to prevent loading indicator from getting stuck
     _dashboardSummary = {
       'totalUsers': 0,
       'totalGroups': 0,
@@ -75,7 +69,6 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
       'recentEvents': [],
     };
 
-    // Set initial loading state to false to show default data first
     _isLoading = false;
 
     // Then load actual data
@@ -100,7 +93,6 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
       setState(() {
         _isLoading = true;
         _errorMessage = null;
-        // Reset data request flags to allow new requests
         _usersDataRequested = false;
         _groupsDataRequested = false;
         _eventsDataRequested = false;
@@ -110,7 +102,6 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
       return;
     }
 
-    // Add a timeout to ensure we don't get stuck in loading state
     Future.delayed(const Duration(seconds: 15), () {
       if (mounted && _isLoading) {
         setState(() {
@@ -214,6 +205,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           _buildDashboardTab(),
           _buildUserManagementTab(),
           _buildGroupAdministrationTab(),
+          // _buildEventsTab(),
           _buildRegionManagerTab(),
           _buildAnalyticsTab(),
           _buildSettingsTab(),
@@ -228,6 +220,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           ),
           BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Users'),
           BottomNavigationBarItem(icon: Icon(Icons.groups), label: 'Groups'),
+          // BottomNavigationBarItem(icon: Icon(Icons.event),label: "events"),
           BottomNavigationBarItem(
             icon: Icon(Icons.map),
             label: 'Regions',
@@ -313,12 +306,11 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
               const SizedBox(height: 24),
               _buildStatisticsGrid(),
               const SizedBox(height: 24),
-              _buildSectionHeader('Quick Analytics', Icons.analytics, () {
-                _onItemTapped(3); // Navigate to Analytics tab
-              }),
+              // _buildSectionHeader('Quick Analytics', Icons.analytics, () {
+              //   _onItemTapped(3); // Navigate to Analytics tab
+              // }),
               const SizedBox(height: 16),
               // _buildQuickAnalyticsChart(),
-              const SizedBox(height: 32),
             ],
           ),
         ),
@@ -364,6 +356,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   // ANALYTICS TAB
   Widget _buildAnalyticsTab() {
     return const SuperAdminAnalyticsScreen();
+  }
+
+  Widget _buildEventsTab () {
+    return const EventManagementScreen();
   }
 
   // SETTINGS TAB
@@ -634,75 +630,29 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     );
   }
 
-
-  Widget _buildQuickActionButton({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.2)),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: color, size: 28),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildStatisticsGrid() {
-    // Get data from providers directly if dashboard summary is empty
     String totalUsers = '0';
     String totalGroups = '0';
     String totalEvents = '0';
     String recentEventsCount = '0';
 
     try {
-      // Try to get values from dashboard summary first using the new backend format
       totalUsers = _dashboardSummary['totalUsers']?.toString() ?? '0';
       totalGroups = _dashboardSummary['totalGroups']?.toString() ?? '0';
       totalEvents = _dashboardSummary['totalEvents']?.toString() ?? '0';
 
-      // Get recent events count
       final recentEvents = _dashboardSummary['recentEvents'] as List<dynamic>?;
       recentEventsCount = recentEvents?.length.toString() ?? '0';
 
-      // If values are '0', try to get them from providers
+      /// USERS
       if (totalUsers == '0' && !_usersDataRequested) {
-        // Get total users from UserProvider
-        final userProvider = Provider.of<UserProvider>(context, listen: false);
+        _usersDataRequested = true; // prevent repeats
 
-        // Mark as requested to prevent multiple calls
-        _usersDataRequested = true;
-
-        // Show notification after build is complete
         Future.microtask(() {
-          if (mounted) {
-            _showInfo('Loading user data. Please wait...');
-          }
+          if (mounted) _showInfo('Loading user data. Please wait...');
         });
 
-        // Fetch actual data in the background
+        final userProvider = Provider.of<UserProvider>(context, listen: false);
         userProvider.getAllUsers().then((users) {
           if (users.isNotEmpty && mounted) {
             setState(() {
@@ -712,24 +662,15 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         });
       }
 
+      /// GROUPS
       if (totalGroups == '0' && !_groupsDataRequested) {
-        // Get total groups from GroupProvider
-        final groupProvider = Provider.of<GroupProvider>(
-          context,
-          listen: false,
-        );
-
-        // Mark as requested to prevent multiple calls
         _groupsDataRequested = true;
 
-        // Show notification after build is complete
         Future.microtask(() {
-          if (mounted) {
-            _showInfo('Loading group data. Please wait...');
-          }
+          if (mounted) _showInfo('Loading group data. Please wait...');
         });
 
-        // Fetch actual data in the background
+        final groupProvider = Provider.of<GroupProvider>(context, listen: false);
         if (groupProvider.groups.isNotEmpty) {
           totalGroups = groupProvider.groups.length.toString();
         } else {
@@ -743,45 +684,30 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         }
       }
 
+      /// EVENTS
       if (totalEvents == '0' && !_eventsDataRequested) {
-        // Get events from EventProvider
-        final eventProvider = Provider.of<EventProvider>(
-          context,
-          listen: false,
-        );
-
-        // Mark as requested to prevent multiple calls
         _eventsDataRequested = true;
 
-        // Show notification after build is complete
         Future.microtask(() {
-          if (mounted) {
-            _showInfo('Loading event data. Please wait...');
-          }
+          if (mounted) _showInfo('Loading event data. Please wait...');
         });
 
-        // Fetch actual data in the background
+        final eventProvider = Provider.of<EventProvider>(context, listen: false);
         if (eventProvider.upcomingEvents.isNotEmpty) {
           totalEvents = eventProvider.upcomingEvents.length.toString();
         }
       }
 
-      if (recentEventsCount == '0') {
-        // No action needed, just use the default value
-      }
-
-      // Fetch actual data in the background
+      // RECENT EVENTS count is already handled by dashboardSummary
       if (recentEvents != null && recentEvents.isNotEmpty) {
         recentEventsCount = recentEvents.length.toString();
       }
 
-      // Print values for debugging
       print(
         'Statistics values: Users=$totalUsers, Groups=$totalGroups, Events=$totalEvents, RecentEvents=$recentEventsCount',
       );
     } catch (e) {
       print('Error building statistics grid: $e');
-      // Set default values if there's an error
       totalUsers = 'Something went Wrong';
       totalGroups = 'Something went Wrong';
       totalEvents = 'Something went Wrong';
@@ -800,18 +726,36 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           totalUsers,
           Icons.people,
           AppColors.primaryColor,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const UserManagementTab()),
+            );
+          },
         ),
         _buildStatCard(
           'Total Groups',
           totalGroups,
           Icons.groups,
           AppColors.secondaryColor,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const GroupAdministrationTab()),
+            );
+          },
         ),
         _buildStatCard(
           'Total Events',
           totalEvents,
           Icons.event,
           AppColors.accentColor,
+          // onTap: () {
+          //   Navigator.push(
+          //       context,
+          //       MaterialPageRoute(builder: (_) => const EventManagementScreen()),
+          //   );
+          // }
         ),
         _buildStatCard(
           'Recent Events',
@@ -827,64 +771,43 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
       String title,
       String value,
       IconData icon,
-      Color color,
-      ) {
+      Color color, {
+        VoidCallback? onTap,
+      }) {
     return Card(
       elevation: 3,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 32, color: color),
-            const SizedBox(height: 12),
-            Text(
-              value,
-              style: TextStyles.heading1.copyWith(
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.onBackground,
+      // ensure ripple is clipped to the rounded card
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 32, color: color),
+              const SizedBox(height: 12),
+              Text(
+                value,
+                style: TextStyles.heading1.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.onBackground,
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              style: TextStyles.bodyText.copyWith(
-                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+              const SizedBox(height: 8),
+              Text(
+                title,
+                style: TextStyles.bodyText.copyWith(
+                  color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+                ),
+                textAlign: TextAlign.center,
               ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    );
-  }
-
-  Widget _buildSectionHeader(
-      String title,
-      IconData icon,
-      VoidCallback onViewAll,
-      ) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Row(
-          children: [
-            Icon(icon, color: AppColors.primaryColor, size: 24),
-            const SizedBox(width: 8),
-            Text(
-              title,
-              style: TextStyles.heading2.copyWith(fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        TextButton.icon(
-          onPressed: onViewAll,
-          icon: const Icon(Icons.arrow_forward, size: 16),
-          label: const Text('View All'),
-          style: TextButton.styleFrom(foregroundColor: AppColors.primaryColor),
-        ),
-      ],
     );
   }
 

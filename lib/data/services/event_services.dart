@@ -153,7 +153,7 @@ class EventServices {
     required String groupId,
   }) async {
     try {
-      await _checkGroupPermission(groupId);
+      // await _checkGroupPermission(groupId);
 
       final response = await _httpClient.put(
         ApiEndpoints.updateEvent(eventId),
@@ -181,7 +181,6 @@ class EventServices {
   /// Returns true if deletion was successful
   Future<bool> deleteEvent(String eventId, String groupId) async {
     try {
-      await _checkGroupPermission(groupId);
 
       final response = await _httpClient.delete(ApiEndpoints.deleteEvent(eventId));
 
@@ -269,7 +268,6 @@ class EventServices {
       List<String> attendedMemberIds) async {
     try {
       final event = await getEventById(eventId);
-      await _checkGroupPermission(event.groupId);
 
       final response = await _httpClient.post(
         ApiEndpoints.createEventAttendance(eventId),
