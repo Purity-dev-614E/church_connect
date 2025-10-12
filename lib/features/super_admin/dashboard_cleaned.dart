@@ -28,6 +28,7 @@ import '../../data/providers/analytics_providers/super_admin_analytics_provider.
 import 'package:flutter/foundation.dart';
 
 import 'event_management_screen.dart';
+import 'recent_events_screen.dart';
 
 class SuperAdminDashboard extends StatefulWidget {
   const SuperAdminDashboard({super.key});
@@ -715,9 +716,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     }
 
     return GridView.count(
-      crossAxisCount: 2,
-      crossAxisSpacing: 16,
-      mainAxisSpacing: 16,
+      crossAxisCount: 3,
+      crossAxisSpacing: 11,
+      mainAxisSpacing: 11,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       children: [
@@ -750,19 +751,30 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           totalEvents,
           Icons.event,
           AppColors.accentColor,
-          // onTap: () {
-          //   Navigator.push(
-          //       context,
-          //       MaterialPageRoute(builder: (_) => const EventManagementScreen()),
-          //   );
-          // }
+          onTap: () {
+            Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const EventManagementScreen()),
+            );
+          }
         ),
-        _buildStatCard(
-          'Recent Events',
-          recentEventsCount,
-          Icons.history,
-          AppColors.buttonColor,
-        ),
+        // _buildStatCard(
+        //   'Recent Events',
+        //   recentEventsCount,
+        //   Icons.history,
+        //   AppColors.buttonColor,
+        //   onTap: () {
+        //     final recentEvents = _dashboardSummary['recentEvents'] as List<dynamic>? ?? [];
+        //     Navigator.push(
+        //       context,
+        //       MaterialPageRoute(
+        //         builder: (context) => RecentEventsScreen(
+        //           recentEvents: recentEvents,
+        //         ),
+        //       ),
+        //     );
+        //   },
+        // ),
       ],
     );
   }

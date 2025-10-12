@@ -33,17 +33,50 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
   final TextEditingController _searchController = TextEditingController();
   List<UserModel> _searchResults = [];
   bool _isSearching = false;
+  List<UserModel> _unmarkedMembers = [];
+  
+  // Local state for real-time updates
+  EventModel? _event;
+  List<Map<String, dynamic>> _attendees = [];
+  List<Map<String, dynamic>> _nonAttendees = [];
+  List<UserModel> _groupMembers = [];
+  bool _isLoading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _eventDataFuture = _fetchEventData();
+    _loadEventData();
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadEventData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final data = await _fetchEventData();
+      setState(() {
+        _event = data['event'] as EventModel;
+        _attendees = (data['attendees'] as List<dynamic>).map((e) => e as Map<String, dynamic>).toList();
+        _nonAttendees = (data['nonAttendees'] as List<dynamic>).map((e) => e as Map<String, dynamic>).toList();
+        _groupMembers = (data['groupMembers'] as List<dynamic>).map((e) => e as UserModel).toList();
+        _unmarkedMembers = (data['unmarkedMembers'] as List<dynamic>).map((e) => e as UserModel).toList();
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
   }
 
   Future<Map<String, dynamic>> _fetchEventData() async {
@@ -73,27 +106,27 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
 
       final attendees = <Map<String, dynamic>>[];
       final nonAttendees = <Map<String, dynamic>>[];
+      final unmarkedMembers = <UserModel>[];
 
       // Process each group member
       for (final user in groupMembers) {
         final record = attendanceMap[user.id];
-        final attendanceData = {
-          'user': user,
-          'attendance': record ??
-              AttendanceModel(
-                eventId: widget.eventId,
-                userId: user.id,
-                isPresent: false,
-                apology: null,
-                aob: null,
-                topic: null,
-              ),
-        };
+        
+        if (record != null) {
+          // Member has been marked
+          final attendanceData = {
+            'user': user,
+            'attendance': record,
+          };
 
-        if (record != null && record.isPresent) {
-          attendees.add(attendanceData);
+          if (record.isPresent) {
+            attendees.add(attendanceData);
+          } else {
+            nonAttendees.add(attendanceData);
+          }
         } else {
-          nonAttendees.add(attendanceData);
+          // Member hasn't been marked yet
+          unmarkedMembers.add(user);
         }
       }
 
@@ -102,6 +135,7 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
         'attendees': attendees,
         'nonAttendees': nonAttendees,
         'groupMembers': groupMembers,
+        'unmarkedMembers': unmarkedMembers,
       };
     } catch (e) {
       print('Error in _fetchEventData: $e');
@@ -117,6 +151,7 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
         'attendees': <Map<String, dynamic>>[],
         'nonAttendees': <Map<String, dynamic>>[],
         'groupMembers': <UserModel>[],
+        'unmarkedMembers': <UserModel>[],
         'error': e.toString(),
       };
     }
@@ -125,15 +160,13 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
 
 
   void _showAttendanceDetailsDialog(UserModel user, bool markAsPresent, {AttendanceModel? attendance}) {
-   final aobController = TextEditingController(text: attendance?.aob);
-   final topicController = TextEditingController(text: attendance?.topic);
    final apologyController = TextEditingController(text: attendance?.apology);
 
    showDialog(
      context: context,
      builder: (context) => AlertDialog(
        title: Text(
-         markAsPresent ? 'Mark Attendance' : 'Record Absence',
+         markAsPresent ? 'Mark as Present' : 'Record Absence',
          style: TextStyles.heading2,
        ),
        content: SingleChildScrollView(
@@ -154,44 +187,51 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
              ),
              const SizedBox(height: 16),
              if (markAsPresent) ...[
-               TextField(
-                 controller: aobController,
-                 decoration: InputDecoration(
-                   labelText: 'AOB',
-                   border: OutlineInputBorder(
-                     borderRadius: BorderRadius.circular(12),
-                   ),
+               Container(
+                 padding: const EdgeInsets.all(16),
+                 decoration: BoxDecoration(
+                   color: Colors.green.withOpacity(0.1),
+                   borderRadius: BorderRadius.circular(12),
+                   border: Border.all(color: Colors.green.withOpacity(0.3)),
                  ),
-                 maxLines: 2,
-               ),
-               const SizedBox(height: 16),
-               TextField(
-                 controller: topicController,
-                 decoration: InputDecoration(
-                   labelText: 'Topic',
-                   border: OutlineInputBorder(
-                     borderRadius: BorderRadius.circular(12),
-                   ),
+                 child: Row(
+                   children: [
+                     const Icon(Icons.check_circle, color: Colors.green),
+                     const SizedBox(width: 12),
+                     Expanded(
+                       child: Text(
+                         'Marking ${user.fullName} as present',
+                         style: TextStyles.bodyText.copyWith(
+                           fontWeight: FontWeight.w600,
+                           color: Colors.green[700],
+                         ),
+                       ),
+                     ),
+                   ],
                  ),
-                 maxLines: 2,
                ),
-             ] else
+             ] else ...[
                TextField(
                  controller: apologyController,
                  decoration: InputDecoration(
-                   labelText: 'Apology',
+                   labelText: 'Apology (optional)',
+                   hintText: 'Enter reason for absence...',
                    border: OutlineInputBorder(
                      borderRadius: BorderRadius.circular(12),
                    ),
                  ),
                  maxLines: 3,
                ),
+             ],
            ],
          ),
        ),
        actions: [
          TextButton(
-           onPressed: () => Navigator.pop(context),
+           onPressed: () {
+             apologyController.dispose();
+             Navigator.pop(context);
+           },
            child: Text(
              'Cancel',
              style: TextStyles.bodyText.copyWith(
@@ -201,17 +241,17 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
          ),
          ElevatedButton(
            onPressed: () {
+             final apologyText = markAsPresent ? null : (apologyController.text.isNotEmpty ? apologyController.text : null);
+             apologyController.dispose();
              Navigator.pop(context);
              _markAttendance(
                user.id,
                markAsPresent,
-               aob: aobController.text.isNotEmpty ? aobController.text : null,
-               topic: topicController.text.isNotEmpty ? topicController.text : null,
-               apology: apologyController.text.isNotEmpty ? apologyController.text : null,
+               apology: apologyText,
              );
            },
            style: ElevatedButton.styleFrom(
-             backgroundColor: AppColors.primaryColor,
+             backgroundColor: markAsPresent ? Colors.green : Colors.red,
              shape: RoundedRectangleBorder(
                borderRadius: BorderRadius.circular(8),
              ),
@@ -224,13 +264,6 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
        ],
      ),
    );
-
-   // Clean up controllers
-   WidgetsBinding.instance.addPostFrameCallback((_) {
-     aobController.dispose();
-     topicController.dispose();
-     apologyController.dispose();
-   });
  }
 
   void _showError(String message) {
@@ -257,27 +290,115 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
     );
   }
 
-  Future<void> _markAttendance(String userId, bool present, {String? aob, String? topic, String? apology}) async {
+  Future<void> _markAttendance(String userId, bool present, {String? apology}) async {
     try {
       final attendanceProvider = Provider.of<AttendanceProvider>(context, listen: false);
       await attendanceProvider.markAttendance(
         eventId: widget.eventId,
         userId: userId,
         present: present,
-        aob: aob,
-        topic: topic,
+        aob: null, // Admin doesn't need to provide AOB
+        topic: null, // Admin doesn't need to provide topic
         apology: apology,
       );
       
-      // Refresh the data
-      setState(() {
-        _eventDataFuture = _fetchEventData();
-      });
+      // Update local state immediately
+      _updateLocalState(userId, present, apology);
       
       _showSuccess(present ? 'Marked as present' : 'Marked as absent');
     } catch (e) {
       _showError('Error marking attendance: $e');
     }
+  }
+
+  void _updateLocalState(String userId, bool present, String? apology) {
+    // Find the user in unmarked members
+    final userIndex = _unmarkedMembers.indexWhere((user) => user.id == userId);
+    if (userIndex == -1) return;
+
+    final user = _unmarkedMembers[userIndex];
+    
+    // Create attendance record
+    final attendance = AttendanceModel(
+      eventId: widget.eventId,
+      userId: userId,
+      isPresent: present,
+      apology: apology,
+      aob: null,
+      topic: null,
+    );
+
+    // Remove from unmarked members
+    setState(() {
+      _unmarkedMembers.removeAt(userIndex);
+      
+      // Add to appropriate list
+      if (present) {
+        _attendees.add({
+          'user': user,
+          'attendance': attendance,
+        });
+      } else {
+        _nonAttendees.add({
+          'user': user,
+          'attendance': attendance,
+        });
+      }
+    });
+  }
+
+  Widget _buildUnmarkedMembersList(List<UserModel> unmarkedMembers) {
+    return Card(
+      elevation: 2,
+      margin: const EdgeInsets.only(top: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: unmarkedMembers.map((user) {
+          return ListTile(
+            leading: CircleAvatar(
+              backgroundColor: AppColors.primaryColor,
+              child: Text(
+                user.fullName.substring(0, 1),
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+            title: Text(
+              user.fullName,
+              style: TextStyles.bodyText.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            subtitle: Text(
+              user.email,
+              style: TextStyles.bodyText.copyWith(
+                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+              ),
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.check_circle, color: Colors.green),
+                  onPressed: () {
+                    _showAttendanceDetailsDialog(user, true);
+                  },
+                  tooltip: 'Mark as present',
+                ),
+                IconButton(
+                  icon: const Icon(Icons.cancel, color: Colors.red),
+                  onPressed: () {
+                    _showAttendanceDetailsDialog(user, false);
+                  },
+                  tooltip: 'Mark as absent',
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
   }
 
 
@@ -288,59 +409,34 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
         title: Text(widget.eventTitle),
         backgroundColor: AppColors.primaryColor,
       ),
-      body: FutureBuilder<Map<String, dynamic>>(
-        future: _eventDataFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          } else if (!snapshot.hasData) {
-            return const Center(child: Text('No data available'));
-          }
-
-          final eventDetails = snapshot.data!['event'] as EventModel;
-
-          final attendeesJson = snapshot.data!['attendees'] as List<dynamic>;
-          final attendees = attendeesJson.map((e) => e as Map<String, dynamic>).toList();
-
-          final nonAttendeesJson = snapshot.data!['nonAttendees'] as List<dynamic>;
-          final nonAttendees = nonAttendeesJson.map((e) => e as Map<String, dynamic>).toList();
-
-          final groupMembersJson = snapshot.data!['groupMembers'] as List<dynamic>;
-          final groupMembers = groupMembersJson.map((e) => e as UserModel).toList();
-
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildEventDetailsCard(eventDetails),
-                const SizedBox(height: 24),
-                _buildAttendanceStats(attendees.length, nonAttendees.length),
-                const SizedBox(height: 24),
-                _buildSectionHeader('Attendees (${attendees.length})', Icons.check_circle),
-                _buildUserList(attendees, isAttendee: true),
-                const SizedBox(height: 24),
-                _buildSectionHeader('Non-Attendees (${nonAttendees.length})', Icons.cancel),
-                _buildUserList(nonAttendees, isAttendee: false),
-              ],
-            ),
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final eventData = await _eventDataFuture;
-          final groupMembers = eventData['groupMembers'] as List<UserModel>;
-          _showMarkAttendanceDialog(context, groupMembers);
-        },
-        backgroundColor: AppColors.primaryColor,
-        icon: const Icon(Icons.person_add),
-        label: const Text('Mark Attendance'),
-      ),
-
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(child: Text('Error: $_error'))
+              : _event == null
+                  ? const Center(child: Text('No data available'))
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildEventDetailsCard(_event!),
+                          const SizedBox(height: 24),
+                          if (_unmarkedMembers.isNotEmpty) ...[
+                            _buildSectionHeader('Mark Attendance', Icons.person_add),
+                            _buildUnmarkedMembersList(_unmarkedMembers),
+                            const SizedBox(height: 24),
+                          ],
+                          _buildAttendanceStats(_attendees.length, _nonAttendees.length),
+                          const SizedBox(height: 24),
+                          _buildSectionHeader('Attendees (${_attendees.length})', Icons.check_circle),
+                          _buildUserList(_attendees, isAttendee: true),
+                          const SizedBox(height: 24),
+                          _buildSectionHeader('Non-Attendees (${_nonAttendees.length})', Icons.cancel),
+                          _buildUserList(_nonAttendees, isAttendee: false),
+                        ],
+                      ),
+                    ),
     );
   }
 
@@ -602,9 +698,27 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: isAttendee
                       ? [
-                          _buildDetailItem('AOB', attendance.aob ?? 'No AOB provided'),
-                          const SizedBox(height: 8),
-                          _buildDetailItem('Topic', attendance.topic ?? 'No topic provided'),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.green.withOpacity(0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.check_circle, color: Colors.green, size: 20),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Present',
+                                  style: TextStyles.bodyText.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.green[700],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ]
                       : [
                           _buildDetailItem('Apology', attendance.apology ?? 'No apology provided'),
@@ -640,116 +754,6 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
     );
   }
 
-  void _showMarkAttendanceDialog(BuildContext context, List<UserModel> groupMembers) {
-    final Map<String, bool> isAbsentTapped = {}; // tracks which members have tapped "absent"
-    final Map<String, TextEditingController> apologyControllers = {}; // stores apology text
-
-    // Initialize controllers
-    for (var user in groupMembers) {
-      isAbsentTapped[user.id] = false;
-      apologyControllers[user.id] = TextEditingController();
-    }
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: Text('Mark Attendance', style: TextStyles.heading2),
-          content: Container(
-            constraints: const BoxConstraints(maxHeight: 400),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: groupMembers.map((user) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: AppColors.primaryColor,
-                          child: Text(
-                            user.fullName.substring(0, 1),
-                            style: const TextStyle(color: Colors.white),
-                          ),
-                        ),
-                        title: Text(user.fullName),
-                        subtitle: Text(user.email),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.check_circle, color: Colors.green),
-                              onPressed: () {
-                                Navigator.pop(context);
-                                _markAttendance(user.id, true); // mark present
-                              },
-                              tooltip: 'Mark as present',
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.cancel, color: Colors.red),
-                              onPressed: () {
-                                setState(() {
-                                  isAbsentTapped[user.id] = true; // show apology field
-                                });
-                              },
-                              tooltip: 'Mark as absent',
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (isAbsentTapped[user.id] == true)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                          child: Column(
-                            children: [
-                              TextField(
-                                controller: apologyControllers[user.id],
-                                decoration: const InputDecoration(
-                                  labelText: 'Apology (optional)',
-                                  border: OutlineInputBorder(),
-                                ),
-                                maxLines: 2,
-                              ),
-                              const SizedBox(height: 8),
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: ElevatedButton(
-                                  onPressed: () {
-                                    Navigator.pop(context); // close dialog
-                                    _markAttendance(
-                                      user.id,
-                                      false,
-                                      apology: apologyControllers[user.id]!.text, // send apology
-                                    );
-                                  },
-                                  child: const Text('Save Absent'),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      const Divider(),
-                    ],
-                  );
-                }).toList(),
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                'Cancel',
-                style: TextStyles.bodyText.copyWith(
-                  color: Theme.of(context).colorScheme.onBackground,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
 
 }

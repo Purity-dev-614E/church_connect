@@ -91,8 +91,8 @@ class _UserManagementTabState extends State<UserManagementTab> {
                 user.role.toLowerCase() == 'user') ||
             (_selectedRole == 'Group Leaders' &&
                 user.role.toLowerCase() == 'admin') ||
-            (_selectedRole == 'Admins' &&
-                user.role.toLowerCase() == 'super admin');
+            (_selectedRole == 'Regional Leaders' &&
+                user.role.toLowerCase() == 'regional manager');
 
         return matchesQuery && matchesRole;
       }).toList();
@@ -128,7 +128,7 @@ class _UserManagementTabState extends State<UserManagementTab> {
     }
 
     return Material(
-      color: Colors.transparent,
+      color: Theme.of(context).colorScheme.background,
       child: Column(
         children: [
           Padding(
