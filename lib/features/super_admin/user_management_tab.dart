@@ -186,9 +186,8 @@ class _UserManagementTabState extends State<UserManagementTab> {
                   items: const [
                     DropdownMenuItem(value: 'All', child: Text('All')),
                     DropdownMenuItem(value: 'Members', child: Text('Members')),
-                    DropdownMenuItem(
-                        value: 'Group Leaders', child: Text('Group Leaders')),
-                    DropdownMenuItem(value: 'Admins', child: Text('Admins')),
+                    DropdownMenuItem(value: 'Group Leaders', child: Text('Group Leaders')),
+                    DropdownMenuItem(value: "Regional Leaders", child: Text("Regional Leaders")),
                   ],
                   onChanged: (newValue) {
                     if (newValue != null) {

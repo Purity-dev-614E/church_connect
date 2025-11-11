@@ -14,6 +14,7 @@ import 'package:group_management_church_app/features/region_manager/region_group
 import 'package:group_management_church_app/features/region_manager/screens/analytics_screen.dart';
 import 'package:group_management_church_app/widgets/custom_app_bar.dart';
 import 'package:provider/provider.dart';
+import 'package:group_management_church_app/features/super_admin/dashboard_cleaned.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
 import 'package:path_provider/path_provider.dart';
@@ -32,10 +33,12 @@ import 'package:group_management_church_app/data/services/auth_services.dart';
 
 class RegionDashboard extends StatefulWidget {
   final String regionId;
+  final bool actingAsSuperAdmin;
   
   const RegionDashboard({
     super.key,
     required this.regionId,
+    this.actingAsSuperAdmin = false,
   });
 
   @override
@@ -273,9 +276,22 @@ class _RegionDashboardState extends State<RegionDashboard> {
     return Scaffold(
       appBar: CustomAppBar(
         title: _region?.name ?? 'Region Dashboard',
-        showBackButton: false,
+        showBackButton: widget.actingAsSuperAdmin, // allow back when coming from Super Admin
         showProfileAvatar: true,
         onProfileTap: _navigateToProfile,
+        actions: [
+          if (widget.actingAsSuperAdmin)
+            IconButton(
+              icon: const Icon(Icons.admin_panel_settings, color: Colors.white),
+              tooltip: 'Back to Super Admin',
+              onPressed: () {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const SuperAdminDashboard()),
+                  (route) => false,
+                );
+              },
+            ),
+        ],
       ),
       body: PageView(
         controller: _pageController,
@@ -399,7 +415,9 @@ class _RegionDashboardState extends State<RegionDashboard> {
   Widget _buildWelcomeCard() {
     // Get user name from UserProvider if available
     final userProvider = Provider.of<UserProvider>(context, listen: false);
-    final userName = userProvider.currentUser?.fullName ?? 'Region Manager';
+    final userName = widget.actingAsSuperAdmin
+        ? 'Super Admin'
+        : (userProvider.currentUser?.fullName ?? 'Region Manager');
 
     return Card(
       elevation: 4,
@@ -443,12 +461,20 @@ class _RegionDashboardState extends State<RegionDashboard> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Text(
-                        'Manage ${_region?.name ?? 'your region'} from this dashboard',
-                        style: TextStyles.bodyText.copyWith(
-                          color: Colors.white.withOpacity(0.9),
+                      if (widget.actingAsSuperAdmin)
+                        Text(
+                          'You are viewing ${_region?.name ?? 'this region'} as Super Admin',
+                          style: TextStyles.bodyText.copyWith(
+                            color: Colors.white.withOpacity(0.9),
+                          ),
+                        )
+                      else
+                        Text(
+                          'Manage ${_region?.name ?? 'your region'} from this dashboard',
+                          style: TextStyles.bodyText.copyWith(
+                            color: Colors.white.withOpacity(0.9),
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),

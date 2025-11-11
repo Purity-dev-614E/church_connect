@@ -593,7 +593,7 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
                   textAlign: TextAlign.center,
                 ),
               )
-                  : BarChart(
+              : BarChart(
                 BarChartData(
                   alignment: BarChartAlignment.spaceAround,
                   maxY: _regionAttendance.values.isEmpty
@@ -602,6 +602,10 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
                         (a, b) => a > b ? a : b,
                   ) *
                       1.2,
+                  gridData: const FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                  ),
                   barTouchData: BarTouchData(enabled: false),
                   titlesData: FlTitlesData(
                     leftTitles: const AxisTitles(
@@ -784,9 +788,12 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
                   textAlign: TextAlign.center,
                 ),
               )
-                  : LineChart(
+              : LineChart(
                 LineChartData(
-                  gridData: const FlGridData(show: true),
+                  gridData: const FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                  ),
                   titlesData: FlTitlesData(
                     leftTitles: const AxisTitles(
                       sideTitles: SideTitles(showTitles: true),

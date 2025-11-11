@@ -7,6 +7,7 @@ import 'package:group_management_church_app/data/providers/auth_provider.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
 import 'package:provider/provider.dart';
 import 'package:group_management_church_app/features/region_manager/region_details_screen.dart';
+import 'package:group_management_church_app/features/region_manager/region_dashboard.dart';
 
 import '../../data/models/user_model.dart';
 
@@ -113,7 +114,7 @@ class _RegionManagementTabState extends State<RegionManagementTab> {
                                     child: ListTile(
                                       title: Text(
                                         region.name,
-                                        style: TextStyles.bodyText,
+                                        style: TextStyles.bodyText.copyWith(fontWeight: FontWeight.bold,color: Colors.red),
                                       ),
                                       subtitle:
                                       FutureBuilder<String?>(
@@ -145,8 +146,9 @@ class _RegionManagementTabState extends State<RegionManagementTab> {
                                         Navigator.push(
                                           context,
                                           MaterialPageRoute(
-                                            builder: (context) => RegionDetailsScreen(
-                                              regionalID: region.id,
+                                            builder: (context) => RegionDashboard(
+                                              regionId: region.id,
+                                              actingAsSuperAdmin: true,
                                             ),
                                           ),
                                         );

@@ -46,6 +46,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   // Data from providers
   late SuperAdminAnalyticsProvider _analyticsProvider;
   Map<String, dynamic> _dashboardSummary = {};
+  // Attendance chart state
+  double _overallAttendance = 0.0;
+  List<FlSpot> _attendanceTrend = [];
 
   bool _isLoading = true;
   String? _errorMessage;
@@ -144,6 +147,23 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
       print('Fetching dashboard summary...');
       // Now try to get the dashboard summary with the refreshed token
       await _analyticsProvider.getDashboardSummary();
+      // Also load overall attendance trend for the last month (same logic as analytics screen)
+      final overall = await _analyticsProvider.getOverallAttendanceByPeriod('month');
+      if (overall.overallStats.attendanceRate != null) {
+        final rate = overall.overallStats.attendanceRate;
+        _overallAttendance = rate;
+        _attendanceTrend = [
+          FlSpot(0, _overallAttendance * 0.9),
+          FlSpot(1, _overallAttendance * 0.95),
+          FlSpot(2, _overallAttendance * 0.97),
+          FlSpot(3, _overallAttendance),
+          FlSpot(4, _overallAttendance * 1.02),
+          FlSpot(5, _overallAttendance * 1.05),
+        ];
+      } else {
+        _overallAttendance = 0.0;
+        _attendanceTrend = [];
+      }
 
       if (mounted) {
         setState(() {
@@ -206,7 +226,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           _buildDashboardTab(),
           _buildUserManagementTab(),
           _buildGroupAdministrationTab(),
-          // _buildEventsTab(),
+          _buildEventsTab(),
           _buildRegionManagerTab(),
           _buildAnalyticsTab(),
           _buildSettingsTab(),
@@ -221,7 +241,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           ),
           BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Users'),
           BottomNavigationBarItem(icon: Icon(Icons.groups), label: 'Groups'),
-          // BottomNavigationBarItem(icon: Icon(Icons.event),label: "events"),
+          BottomNavigationBarItem(icon: Icon(Icons.event),label: "Events"),
           BottomNavigationBarItem(
             icon: Icon(Icons.map),
             label: 'Regions',
@@ -307,6 +327,8 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
               const SizedBox(height: 24),
               _buildStatisticsGrid(),
               const SizedBox(height: 24),
+              _buildOverallAttendanceCard(),
+              const SizedBox(height: 24),
               // _buildSectionHeader('Quick Analytics', Icons.analytics, () {
               //   _onItemTapped(3); // Navigate to Analytics tab
               // }),
@@ -337,6 +359,101 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     }
 
     return content;
+  }
+
+  Widget _buildOverallAttendanceCard() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Overall Attendance Trend',
+                  style: TextStyles.heading2.copyWith(
+                      fontWeight: FontWeight.bold
+                  ),
+                ),
+                _overallAttendance > 0
+                    ? Text(
+                  'Current: ${_overallAttendance.toStringAsFixed(1)}%',
+                  style: TextStyles.heading1.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue,
+                  ),
+                )
+                    : const SizedBox(),
+              ],
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 300,
+              width: double.infinity,
+              child: _attendanceTrend.isEmpty
+                  ? const Center(
+                child: Text(
+                  'No attendance trend data available at this time',
+                  textAlign: TextAlign.center,
+                ),
+              )
+                  : LineChart(
+                LineChartData(
+                  gridData: const FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                  ),
+                  titlesData: FlTitlesData(
+                    leftTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: true),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        getTitlesWidget: (value, meta) {
+                          const labels = [
+                            'Jan',
+                            'Feb',
+                            'Mar',
+                            'Apr',
+                            'May',
+                            'Jun',
+                          ];
+                          final index = value.toInt();
+                          if (index >= 0 && index < labels.length) {
+                            return Text(labels[index]);
+                          }
+                          return const Text('');
+                        },
+                      ),
+                    ),
+                  ),
+                  borderData: FlBorderData(show: true),
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: _attendanceTrend,
+                      isCurved: true,
+                      color: Colors.blue,
+                      barWidth: 3,
+                      isStrokeCapRound: true,
+                      dotData: const FlDotData(show: true),
+                      belowBarData: BarAreaData(
+                        show: true,
+                        color: Colors.blue.withOpacity(0.2),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   // USER MANAGEMENT TAB

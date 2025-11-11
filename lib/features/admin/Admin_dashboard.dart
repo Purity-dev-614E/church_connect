@@ -2104,7 +2104,7 @@ class _AdminDashboardState extends State<AdminDashboard>
               style: TextStyles.bodyText.copyWith(fontWeight: FontWeight.w600),
             ),
             subtitle: Text(
-              member.email,
+              '+254${member.contact.substring(3)}',
               style: TextStyles.bodyText.copyWith(
                 color: Theme.of(
                   context,
