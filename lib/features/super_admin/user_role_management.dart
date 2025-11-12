@@ -12,6 +12,19 @@ import 'package:group_management_church_app/widgets/custom_app_bar.dart';
 import 'package:group_management_church_app/widgets/custom_button.dart';
 import 'package:provider/provider.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
+import 'package:group_management_church_app/core/utils/role_utils.dart';
+
+class _RoleOption {
+  final String label;
+  final String value;
+  final String? alias;
+
+  const _RoleOption({
+    required this.label,
+    required this.value,
+    this.alias,
+  });
+}
 
 class UserRoleManagementScreen extends StatefulWidget {
   const UserRoleManagementScreen({super.key});
@@ -28,7 +41,14 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
   List<UserModel> _filteredUsers = [];
   
   // Available roles
-  final List<String> _availableRoles = ['user', 'admin', 'regional manager', 'super admin'];
+  final List<_RoleOption> _availableRoles = const [
+    _RoleOption(label: 'User', value: 'user'),
+    _RoleOption(label: 'Admin', value: 'admin'),
+    // _RoleOption(label: 'Regional Manager', value: 'regional manager'),
+    _RoleOption(label: 'Regional Coordinator', value: 'regional manager', alias: 'Regional Coordinator'),
+    _RoleOption(label: 'Regional Focal Person', value: 'regional manager', alias: 'Regional Focal Person'),
+    _RoleOption(label: 'Super Admin', value: 'super admin'),
+  ];
   
   // Regions list
   List<RegionModel> _regions = [];
@@ -113,18 +133,63 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
         _filteredUsers = _users.where((user) {
           return user.fullName.toLowerCase().contains(query.toLowerCase()) ||
                  user.email.toLowerCase().contains(query.toLowerCase()) ||
-                 user.role.toLowerCase().contains(query.toLowerCase());
+                 user.role.toLowerCase().contains(query.toLowerCase()) ||
+                 (user.regionalTitle?.toLowerCase().contains(query.toLowerCase()) ?? false);
         }).toList();
       }
     });
   }
 
-  Future<void> _updateUserRole(UserModel user, String newRole, {String? regionId, String? groupId}) async {
+  String _formatRoleLabel(UserModel user) {
+    final canonicalRole = RoleUtils.mapToDbRole(user.role);
+    if (canonicalRole == 'regional manager') {
+      final alias = user.regionalTitle?.trim();
+      if (alias != null && alias.isNotEmpty) {
+        return alias;
+      }
+      return 'Regional Manager';
+    }
+    return _titleCase(canonicalRole);
+  }
+
+  bool _optionMatchesUserRole(UserModel user, _RoleOption option) {
+    final userRole = RoleUtils.mapToDbRole(user.role);
+    final optionRole = RoleUtils.mapToDbRole(option.value);
+
+    if (!RoleUtils.isRegionalLeadership(optionRole)) {
+      return userRole == optionRole;
+    }
+
+    final alias = user.regionalTitle?.trim() ?? '';
+    if (option.alias != null) {
+      return userRole == 'regional manager' &&
+          alias.toLowerCase() == option.alias!.toLowerCase();
+    }
+
+    return userRole == 'regional manager' && alias.isEmpty;
+  }
+
+  String _titleCase(String value) {
+    return value
+        .replaceAll('_', ' ')
+        .split(RegExp(r'\s+'))
+        .where((segment) => segment.isNotEmpty)
+        .map((segment) => segment[0].toUpperCase() + segment.substring(1))
+        .join(' ');
+  }
+
+  Future<void> _updateUserRole(UserModel user, _RoleOption option, {String? regionId, String? groupId}) async {
+    final mappedRole = RoleUtils.mapToDbRole(option.value);
+    final isRegionalRole = RoleUtils.isRegionalLeadership(mappedRole);
+    final displayLabel = option.label;
+
     log('Attempting to update role for user:');
     log('User ID: ${user.id}');
     log('User Name: ${user.fullName}');
     log('Current Role: ${user.role}');
-    log('New Role: $newRole');
+    log('New Role (value): ${option.value}');
+    log('Mapped Role (canonical): $mappedRole');
+    log('Selected alias: ${option.alias}');
     log('Region ID (for Regional Manager): $regionId');
     log('Group ID (for Admin): $groupId or from user: ${user.regionId}');
 
@@ -146,20 +211,21 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
         contact: user.contact,
         nextOfKin: user.nextOfKin,
         nextOfKinContact: user.nextOfKinContact,
-        role: newRole,
+        role: mappedRole,
         gender: user.gender,
 
         // Groups are tied to Admins
-        regionId: newRole == 'admin'
+        regionId: mappedRole == 'admin'
             ? groupId ?? user.regionId
             : user.regionId,
 
         regionName: user.regionName,
 
-        // Regions are tied to Regional Managers
-        regionalID: newRole == 'regional manager'
+        // Regions are tied to Regional leadership roles
+        regionalID: isRegionalRole
             ? regionId ?? user.regionalID
             : user.regionalID,
+        regionalTitle: isRegionalRole ? option.alias : null,
       );
 
       log('Created updated user model:');
@@ -174,14 +240,14 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
         throw Exception('Failed to update user role');
       }
 
-      // Assign regional manager to region
-      if (newRole == 'regional manager' && updatedUser.regionalID.isNotEmpty) {
+      // Assign regional leaders to region
+      if (isRegionalRole && updatedUser.regionalID.isNotEmpty) {
         final regionSuccess = await userProvider.assignUserToRegion(user.id, updatedUser.regionalID);
         if (!regionSuccess) throw Exception('Failed to assign user to region');
       }
 
       // Assign admin to group
-      if (newRole == 'admin' && updatedUser.regionId.isNotEmpty) {
+      if (mappedRole == 'admin' && updatedUser.regionId.isNotEmpty) {
         final adminSuccess = await GroupProvider().assignAdminToGroup(updatedUser.regionId, user.id);
         if (!adminSuccess) throw Exception('Failed to assign admin to group');
       }
@@ -191,16 +257,16 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
 
       // Success message
       if (mounted) {
-        if (newRole == 'regional manager' && updatedUser.regionalID.isNotEmpty) {
+        if (isRegionalRole && updatedUser.regionalID.isNotEmpty) {
           final region = _regions.firstWhere(
                 (r) => r.id == updatedUser.regionalID,
             orElse: () => RegionModel(id: updatedUser.regionalID, name: 'Unknown Region'),
           );
-          _showSuccess('${user.fullName}\'s role updated to Regional Manager for ${region.name}');
-        } else if (newRole == 'admin' && updatedUser.regionId.isNotEmpty) {
-          _showSuccess('${user.fullName}\'s role updated to Admin for Group ${updatedUser.regionId}');
+          _showSuccess('${user.fullName}\'s role updated to $displayLabel for ${region.name}');
+        } else if (mappedRole == 'admin' && updatedUser.regionId.isNotEmpty) {
+          _showSuccess('${user.fullName}\'s role updated to ${displayLabel} for Group ${updatedUser.regionId}');
         } else {
-          _showSuccess('${user.fullName}\'s role updated to $newRole');
+          _showSuccess('${user.fullName}\'s role updated to $displayLabel');
         }
       }
     } catch (e) {
@@ -342,9 +408,11 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
   }
   
   Widget _buildUserCard(UserModel user) {
+    final canonicalRole = RoleUtils.mapToDbRole(user.role);
+
     // Determine role color
     Color roleColor;
-    switch (user.role.toLowerCase()) {
+    switch (canonicalRole) {
       case 'super_admin':
         roleColor = Colors.red;
         break;
@@ -402,14 +470,20 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        user.email,
+                        user.contact,
                         style: TextStyles.bodyText.copyWith(
                           color: Colors.grey[600],
                         ),
                       ),
-                      if (user.role == 'regional manager' && user.regionalID != null)
+                      Text(
+                        "group: ${user.regionName}",
+                        style: TextStyles.bodyText.copyWith(
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      if (canonicalRole == 'regional manager' && user.regionalID.isNotEmpty)
                         Text(
-                          'Region: ${user.regionName}',
+                          'Region: ${user.overalRegionName}',
                           style: TextStyles.bodyText.copyWith(
                             color: Colors.purple[700],
                             fontWeight: FontWeight.bold,
@@ -421,11 +495,11 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
                 
                 // Current role chip
                 Chip(
-                  avatar: user.role == 'regional manager'
+                  avatar: canonicalRole == 'regional manager'
                       ? const Icon(Icons.location_city, color: Colors.white, size: 16)
                       : null,
                   label: Text(
-                    user.role == 'regional manager' ? 'Regional Manager' : user.role,
+                    _formatRoleLabel(user),
                     style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
@@ -453,13 +527,13 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
-                      children: _availableRoles.map((role) {
-                        final isCurrentRole = role.toLowerCase() == user.role.toLowerCase();
+                      children: _availableRoles.map((roleOption) {
+                        final isCurrentRole = _optionMatchesUserRole(user, roleOption);
                         return Padding(
                           padding: const EdgeInsets.only(right: 8.0),
                           child: ActionChip(
-                            key: ValueKey('${user.id}-$role'),
-                            label: Text(role),
+                            key: ValueKey('${user.id}-${roleOption.label}'),
+                            label: Text(roleOption.label),
                             backgroundColor: isCurrentRole
                                 ? AppColors.primaryColor
                                 : Colors.grey[200],
@@ -469,7 +543,7 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
                             ),
                             onPressed: isCurrentRole
                                 ? null
-                                : () => _showRoleChangeConfirmation(user, role),
+                                : () => _showRoleChangeConfirmation(user, roleOption),
                           ),
                         );
                       }).toList(),
@@ -484,50 +558,49 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
     );
   }
   
-  void _showRoleChangeConfirmation(UserModel user, String newRole) {
-    // If the new role is regional manager, show region selection dialog
-    if (newRole == 'regional manager') {
-      _showRegionSelectionDialog(user, newRole);
-    } else {
-      // For other roles, show standard confirmation dialog
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Confirm Role Change'),
-          content: Text(
-            'Are you sure you want to change ${user.fullName}\'s role from ${user.role} to $newRole?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _updateUserRole(user, newRole);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryColor,
-              ),
-              child: const Text('Confirm'),
-            ),
-          ],
-        ),
-      );
+  void _showRoleChangeConfirmation(UserModel user, _RoleOption option) {
+    final mappedRole = RoleUtils.mapToDbRole(option.value);
+
+    if (RoleUtils.isRegionalLeadership(mappedRole)) {
+      _showRegionSelectionDialog(user, option);
+      return;
     }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm Role Change'),
+        content: Text(
+          'Are you sure you want to change ${user.fullName}\'s role from ${_formatRoleLabel(user)} to ${option.label}?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _updateUserRole(user, option);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryColor,
+            ),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
   }
 
-  void _showRegionSelectionDialog(UserModel user, String newRole) {
+  void _showRegionSelectionDialog(UserModel user, _RoleOption option) {
     // Default selected region (either user's current region or first in list)
-    String? selectedRegionId = user.regionalID;
+    String? selectedRegionId = user.regionalID.isNotEmpty ? user.regionalID : null;
 
-    // ✅ Fallback to first region if user's region is null
     if (selectedRegionId == null && _regions.isNotEmpty) {
       selectedRegionId = _regions.first.id;
     }
 
-    // ✅ Ensure selectedRegionId exists in the _regions list
     if (selectedRegionId != null &&
         !_regions.any((r) => r.id == selectedRegionId)) {
       selectedRegionId = _regions.isNotEmpty ? _regions.first.id : null;
@@ -537,13 +610,13 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: const Text('Assign Regional Manager'),
+          title: Text('Assign ${option.label}'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'You are about to change ${user.fullName}\'s role from ${user.role} to Regional Manager.',
+                'You are about to change ${user.fullName}\'s role from ${_formatRoleLabel(user)} to ${option.label}.',
                 style: TextStyles.bodyText,
               ),
               const SizedBox(height: 16),
@@ -594,7 +667,7 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
                   ? null
                   : () {
                 Navigator.pop(context);
-                _updateUserRole(user, newRole, regionId: selectedRegionId);
+                _updateUserRole(user, option, regionId: selectedRegionId);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryColor,

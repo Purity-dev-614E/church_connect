@@ -6,6 +6,7 @@ import '../services/region_services.dart';
 import '../services/user_services.dart';
 import '../services/group_services.dart';
 import '../services/analytics_services/regional_manager_analytics_service.dart';
+import '../services/regional_alias_service.dart';
 
 class RegionProvider extends ChangeNotifier {
   final RegionServices _regionServices = RegionServices();
@@ -14,6 +15,7 @@ class RegionProvider extends ChangeNotifier {
   final RegionAnalyticsService _analyticsServices = RegionAnalyticsService(
     baseUrl: 'https://safari-backend-fgl3.onrender.com/api',
   );
+  final RegionalAliasService _aliasService = RegionalAliasService();
   
   List<RegionModel> _regions = [];
   List<RegionModel> get regions => _regions;
@@ -208,10 +210,18 @@ class RegionProvider extends ChangeNotifier {
     
     try {
       final users = await _userServices.getUsersByRegion(regionId);
-      _regionUsers = users;
+      final aliasMap = await _aliasService.getAllAliases();
+      final mergedUsers = aliasMap.isEmpty
+          ? users
+          : users
+              .map((user) => aliasMap.containsKey(user.id)
+                  ? user.copyWith(regionalTitle: aliasMap[user.id])
+                  : user)
+              .toList();
+      _regionUsers = mergedUsers;
       _isLoading = false;
       notifyListeners();
-      return users;
+      return mergedUsers;
     } catch (e) {
       _errorMessage = 'Failed to load region users: $e';
       _isLoading = false;

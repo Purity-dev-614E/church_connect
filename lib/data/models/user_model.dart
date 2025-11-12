@@ -16,6 +16,7 @@ class UserModel{
   final String? if_Not;
   final String regionalID;
   final String? overalRegionName;
+  final String? regionalTitle;
 
   UserModel({
     required this.id,
@@ -35,6 +36,7 @@ class UserModel{
     this.citam_Assembly,
     this.if_Not,
     this.overalRegionName,
+    this.regionalTitle,
   });
 
   UserModel copyWith({
@@ -52,6 +54,7 @@ class UserModel{
     String? createdAt,
     String? profileImageUrl,
     String? OveralRegionName,
+    String? regionalTitle,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -68,6 +71,7 @@ class UserModel{
       createdAt: createdAt ?? this.createdAt,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
       overalRegionName: OveralRegionName ?? this.overalRegionName,
+      regionalTitle: regionalTitle ?? this.regionalTitle,
     );
   }
 
@@ -88,19 +92,13 @@ class UserModel{
       userId = safeToString(json['_id']);
     }
 
-    // Normalize role to lowercase for consistent comparison
+    // Normalize role strings and map aliases to canonical DB roles
     String role = safeToString(json['role'] ?? 'user').toLowerCase();
-
-    // Map role values to expected format
     if (role == 'super_admin' || role == 'superadmin' || role == 'super admin') {
       role = 'super_admin';
-    } else if (role == 'admin') {
-      role = 'admin';
-    } else if (role == 'regional_manager' || role == 'regionalmanager' || role == 'regional manager') {
+    } else if (role == 'regional_manager' || role == 'regionalmanager' || role == 'regional manager'
+        || role == 'regional coordinator' || role == 'regional coordinator' || role == 'regional focal person') {
       role = 'regional manager';
-    } else {
-      // Default to 'user' for any other role
-      role = 'user';
     }
 
     return UserModel(
@@ -121,12 +119,13 @@ class UserModel{
       citam_Assembly: safeToString(json['citam_assembly'] ?? json['citamAssembly']),
       if_Not: safeToString(json['if_not_member'] ?? json['ifNot']),
       overalRegionName: safeToString(json['region_name'] ?? json['overalRegionName']),
+      regionalTitle: null,
     );
   }
 
   Map<String, dynamic> toJson(){
     return {
-      'uid': id,
+      'auth_id': id,
       'full_name': fullName,
       'phone_number': contact,
       'next_of_kin_name': nextOfKin,
@@ -138,7 +137,7 @@ class UserModel{
       'region_id': regionalID,
       'location': regionName,
       'profile_picture': profileImageUrl,
-      'created_at': createdAt,
+      // 'created_at': createdAt,
       'age': age,
       'citam_assembly': citam_Assembly,
       'if_not_member': if_Not,

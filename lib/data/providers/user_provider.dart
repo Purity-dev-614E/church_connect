@@ -1,6 +1,8 @@
 import 'dart:developer';
 
 import 'package:flutter/material.dart';
+import '../../core/utils/role_utils.dart';
+import '../services/regional_alias_service.dart';
 import '../../data/services/user_services.dart';
 import '../../data/services/auth_services.dart';
 import '../../data/models/user_model.dart';
@@ -8,12 +10,15 @@ import '../../data/models/user_model.dart';
 class UserProvider with ChangeNotifier {
   final UserServices _userService = UserServices();
   final AuthServices _authService = AuthServices();
+  final RegionalAliasService _aliasService = RegionalAliasService();
   UserModel? _currentUser;
   UserModel? get currentUser => _currentUser;
 
   Future<void> loadUser(String userId) async {
     try {
-      _currentUser = await _userService.fetchCurrentUser(userId);
+      final fetchedUser = await _userService.fetchCurrentUser(userId);
+      final alias = await _aliasService.getAlias(userId);
+      _currentUser = fetchedUser.copyWith(regionalTitle: alias);
       notifyListeners();
       log('User Found: ${_currentUser!.fullName} (ID: ${_currentUser!.id})');
     } catch (e) {
@@ -38,7 +43,14 @@ class UserProvider with ChangeNotifier {
       final success = await _authService.updateProfile(updatedUser);
       
       if (success) {
-        _currentUser = updatedUser;
+        if (RoleUtils.isRegionalLeadership(updatedUser.role)) {
+          await _aliasService.setAlias(updatedUser.id, updatedUser.regionalTitle);
+        } else {
+          await _aliasService.clearAlias(updatedUser.id);
+        }
+
+        final alias = await _aliasService.getAlias(updatedUser.id);
+        _currentUser = updatedUser.copyWith(regionalTitle: alias);
         notifyListeners();
         return true;
       } else {
@@ -53,8 +65,8 @@ class UserProvider with ChangeNotifier {
   
   Future<List<UserModel>> getAllUsers() async {
     try {
-      List<UserModel> users = await _userService.fetchAllUsers();
-      return users;
+      final users = await _userService.fetchAllUsers();
+      return await _attachAliases(users);
     } catch (error) {
       print('Error fetching users: $error');
       return [];
@@ -64,7 +76,8 @@ class UserProvider with ChangeNotifier {
   // Search users by name or email
   Future<List<UserModel>> searchUsers(String query) async {
     try {
-      return await _userService.searchUsers(query);
+      final results = await _userService.searchUsers(query);
+      return await _attachAliases(results);
     } catch (error) {
       print('Error searching users: $error');
       return [];
@@ -81,11 +94,13 @@ class UserProvider with ChangeNotifier {
       
       print('UserProvider: Getting user by ID: $userId');
       final user = await _userService.fetchCurrentUser(userId);
+      final alias = await _aliasService.getAlias(userId);
+      final mergedUser = user.copyWith(regionalTitle: alias);
       
       // Log the result for debugging
       print('UserProvider: Successfully retrieved user: ${user.fullName} (ID: ${user.id})');
           
-      return user;
+      return mergedUser;
     } catch (error) {
       print('Error fetching user by ID: $error');
       return null;
@@ -96,7 +111,9 @@ class UserProvider with ChangeNotifier {
   
   Future<List<UserModel>> getUsersByRegion(String regionId) async {
     try {
-      return await _userService.getUsersByRegion(regionId);
+      final users = await _userService.getUsersByRegion(regionId);
+      final merged = await _attachAliases(users);
+      return merged;
     } catch (error) {
       print('Error fetching users by region: $error');
       return [];
@@ -147,5 +164,15 @@ class UserProvider with ChangeNotifier {
     }
   }
 
+  Future<List<UserModel>> _attachAliases(List<UserModel> users) async {
+    if (users.isEmpty) return users;
+    final aliasMap = await _aliasService.getAllAliases();
+    if (aliasMap.isEmpty) return users;
 
+    return users
+        .map((user) => aliasMap.containsKey(user.id)
+            ? user.copyWith(regionalTitle: aliasMap[user.id])
+            : user)
+        .toList();
+  }
 }

@@ -62,14 +62,23 @@ class _RegionManagementTabState extends State<RegionManagementTab> {
       // Fetch all users in the region
       final users = await RegionProvider().getUsersByRegion(regionId);
 
-      // Find the user with the role of "region manager"
+      // Find the first user with any regional leadership role
       final regionHead = users.firstWhere(
-        (user) => user.role == 'region manager',
-         orElse: () => users.first,
+        (user) {
+          final r = user.role.toLowerCase();
+          return r == 'regional manager' ||
+              r == 'regional coordinator' ||
+              r == 'regional focal person';
+        },
+        orElse: () => users.first,
       );
 
       // Return the name of the region head, or null if not found
-      return '${regionHead.fullName}\nPhone Number: +${regionHead.contact}';
+      final alias = regionHead.regionalTitle?.trim();
+      final title = (alias != null && alias.isNotEmpty)
+          ? alias
+          : 'Regional Manager';
+      return '${regionHead.fullName} ($title)\nPhone Number: +${regionHead.contact}';
     } catch (e) {
       // Handle any errors
       return null;

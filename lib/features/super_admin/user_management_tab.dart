@@ -8,6 +8,7 @@ import 'package:group_management_church_app/features/member/member_attendance_sc
 import 'package:group_management_church_app/features/super_admin/user_role_management.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
 import 'package:provider/provider.dart';
+import 'package:group_management_church_app/core/utils/role_utils.dart';
 
 class UserManagementTab extends StatefulWidget {
   const UserManagementTab({super.key});
@@ -82,17 +83,19 @@ class _UserManagementTabState extends State<UserManagementTab> {
 
     setState(() {
       _filteredUsers = _users.where((user) {
+        final canonicalRole = RoleUtils.mapToDbRole(user.role);
         final matchesQuery = query.isEmpty ||
             user.fullName.toLowerCase().contains(query) ||
-            user.email.toLowerCase().contains(query);
+            user.email.toLowerCase().contains(query) ||
+            (user.regionalTitle?.toLowerCase().contains(query) ?? false);
 
         final matchesRole = _selectedRole == 'All' ||
             (_selectedRole == 'Members' &&
-                user.role.toLowerCase() == 'user') ||
+                canonicalRole == 'user') ||
             (_selectedRole == 'Group Leaders' &&
-                user.role.toLowerCase() == 'admin') ||
+                canonicalRole == 'admin') ||
             (_selectedRole == 'Regional Leaders' &&
-                user.role.toLowerCase() == 'regional manager');
+                RoleUtils.isRegionalLeadership(canonicalRole));
 
         return matchesQuery && matchesRole;
       }).toList();
@@ -254,7 +257,9 @@ class _UserManagementTabState extends State<UserManagementTab> {
     String roleDisplay = 'Unknown';
     Color roleColor = Colors.grey;
 
-    switch (user.role.toLowerCase()) {
+    final canonicalRole = RoleUtils.mapToDbRole(user.role);
+
+    switch (canonicalRole) {
       case 'super_admin':
         roleDisplay = 'Super Admin';
         roleColor = AppColors.primaryColor;
@@ -264,11 +269,18 @@ class _UserManagementTabState extends State<UserManagementTab> {
         roleColor = AppColors.secondaryColor;
         break;
       case 'regional manager':
-        roleDisplay = 'RFP';
+        final alias = user.regionalTitle?.trim();
+        roleDisplay = (alias != null && alias.isNotEmpty)
+            ? alias
+            : 'Regional Manager';
         roleColor = AppColors.accentColor;
         break;
       case 'user':
         roleDisplay = 'Member';
+        roleColor = AppColors.accentColor;
+        break;
+      default:
+        roleDisplay = _titleCase(canonicalRole);
         roleColor = AppColors.accentColor;
         break;
     }
@@ -338,5 +350,14 @@ class _UserManagementTabState extends State<UserManagementTab> {
         },
       ),
     );
+  }
+
+  String _titleCase(String value) {
+    return value
+        .replaceAll('_', ' ')
+        .split(RegExp(r'\s+'))
+        .where((segment) => segment.isNotEmpty)
+        .map((segment) => segment[0].toUpperCase() + segment.substring(1))
+        .join(' ');
   }
 }

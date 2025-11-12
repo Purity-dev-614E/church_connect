@@ -19,6 +19,7 @@ import 'dart:developer';
 import '../../features/admin/Admin_dashboard.dart';
 import '../../features/super_admin/dashboard_cleaned.dart';
 import '../constants/text_styles.dart';
+import '../utils/role_utils.dart';
 
 class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
@@ -245,6 +246,8 @@ class _RoleBasedNavigator extends StatelessWidget {
         return const SuperAdminDashboard();
 
       case 'regional manager':
+      case 'regional coordinator':
+      case 'regional focal person':
         log('Navigating to RegionDashboard');
 
         // Correct check for Regional Managers
