@@ -228,6 +228,7 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
       case 'regional manager':
         roleDisplay = 'Regional Manager';
         roleColor = AppColors.buttonColor;
+        break;
       case 'admin':
         roleDisplay = 'Group Leader';
         roleColor = AppColors.secondaryColor;
@@ -294,7 +295,16 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
           children: [
             IconButton(
               icon: const Icon(Icons.edit, color: AppColors.secondaryColor),
-              onPressed: () => _showEditUserDialog(user),
+              onPressed: () {
+                final role = user.role.toLowerCase();
+                // Only Super Admin should assign or manage Regional Managers.
+                // Prevent Region Managers from changing roles for Super Admins or Regional leaders.
+                if (role == 'super_admin' || role == 'regional manager') {
+                  _showInfo('You cannot change this user\'s role. Please contact a Super Admin.');
+                  return;
+                }
+                _showEditUserDialog(user);
+              },
             ),
             IconButton(
               icon: const Icon(Icons.delete, color: Colors.red),
@@ -307,7 +317,11 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
   }
   
   void _showEditUserDialog(UserModel user) {
-    String selectedRole = user.role;
+    // Only allow editing between 'user' and 'admin' from the Region Manager screen.
+    String selectedRole = user.role.toLowerCase();
+    if (selectedRole != 'admin' && selectedRole != 'user') {
+      selectedRole = 'user';
+    }
     
     showDialog(
       context: context,
@@ -361,6 +375,8 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
                 ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
+              // Region managers should NOT be able to assign Regional Manager roles.
+              // Only Super Admin can promote someone to a regional leadership role.
               items: const [
                 DropdownMenuItem(
                   value: 'user',
@@ -370,10 +386,6 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
                   value: 'admin',
                   child: Text('Group Leader'),
                 ),
-                DropdownMenuItem(
-                  value: 'regional manager',
-                  child: Text('Regional Manager'),
-                )
               ],
               onChanged: (value) {
                 if (value != null) {
@@ -471,6 +483,8 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
     switch (role.toLowerCase()) {
       case 'super_admin':
         return AppColors.primaryColor;
+      case 'regional manager':
+        return AppColors.buttonColor;
       case 'admin':
         return AppColors.secondaryColor;
       case 'user':
@@ -484,6 +498,8 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
     switch (role.toLowerCase()) {
       case 'super_admin':
         return 'Super Admin';
+      case 'regional manager':
+        return 'Regional Manager';
       case 'admin':
         return 'Group Leader';
       case 'user':

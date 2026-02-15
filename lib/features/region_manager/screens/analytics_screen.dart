@@ -2,11 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:group_management_church_app/core/constants/colors.dart';
 import 'package:group_management_church_app/core/constants/text_styles.dart';
+import 'package:group_management_church_app/core/constants/app_endpoints.dart';
 import 'package:group_management_church_app/data/models/group_model.dart';
 import 'package:group_management_church_app/data/providers/analytics_providers/regional_manager_analytics_provider.dart';
-import 'package:group_management_church_app/data/providers/analytics_providers/super_admin_analytics_provider.dart';
 import 'package:group_management_church_app/data/providers/region_provider.dart';
+import 'package:group_management_church_app/data/services/attendance_overview.dart'
+    as attendance_services;
 import 'package:provider/provider.dart';
+
+import '../../../data/providers/attendance_overview.dart'
+    as attendance_overview;
+import '../../../widgets/attendanceChart.dart';
 
 class RegionManagerAnalyticsScreen extends StatefulWidget {
   final String regionId;
@@ -29,8 +35,9 @@ class _RegionManagerAnalyticsScreenState
   List<double> _regionalAttendanceData = [];
   Map<String, double> _groupAttendanceData = {};
   Map<String, double> _activityStatusData = {};
-  Map<String, double> _regionAttendance = {};
   int? _touchedGroupIndex;
+
+
 
 
   @override
@@ -43,38 +50,6 @@ class _RegionManagerAnalyticsScreenState
     _regionProvider = Provider.of<RegionProvider>(context, listen: false);
     Future.microtask(() => _loadAnalytics());
   }
-
-  void _applyQuarterlyFilter() {
-    setState(() {
-      // Example logic: Average recent attendance data
-      if (_regionalAttendanceData.isNotEmpty) {
-        // Average of every 3 entries
-        final List<double> quarterlyData = [];
-        for (int i = 0; i < _regionalAttendanceData.length; i += 3) {
-          final chunk = _regionalAttendanceData.skip(i).take(3);
-          final avg = chunk.isNotEmpty
-              ? chunk.reduce((a, b) => a + b) / chunk.length
-              : 0.0;
-          quarterlyData.add(avg);
-        }
-        _regionalAttendanceData = quarterlyData;
-      }
-
-      // Optionally aggregate group attendance
-      if (_groupAttendanceData.isNotEmpty) {
-        final aggregated = _groupAttendanceData.map((k, v) =>
-            MapEntry(k, (v * 0.9) + 5)); // some smoothing example
-        _groupAttendanceData = aggregated;
-      }
-
-      // You can also adjust quick stats slightly
-      _quickStatsData = _quickStatsData.map((e) {
-        if (e is num) return (e * 0.25).round(); // quarter-year scale
-        return e;
-      }).toSet();
-    });
-  }
-
 
   Future<void> _loadAnalytics() async {
     if (!mounted) return;
@@ -106,15 +81,6 @@ class _RegionManagerAnalyticsScreenState
       }
     }
   }
-
-  void _handleLocalFilterChange() {
-    if (_selectedPeriod == 'quarter') {
-      _applyQuarterlyFilter();
-    } else {
-      _loadAnalytics(); // fallback to normal backend calls
-    }
-  }
-
 
   Future<void> _loadQuickStats() async {
     try {
@@ -153,48 +119,67 @@ class _RegionManagerAnalyticsScreenState
     }
   }
 
+  List<double> _averageTimelineSegments(List<double> values, int segments) {
+    if (values.isEmpty || segments <= 0) return [];
+    if (values.length <= segments) return values;
+
+    final List<double> aggregated = [];
+    final chunkSize = (values.length / segments).ceil();
+
+    for (int i = 0; i < values.length; i += chunkSize) {
+      var end = i + chunkSize;
+      if (end > values.length) {
+        end = values.length;
+      }
+      final chunk = values.sublist(i, end);
+      final avg = chunk.reduce((a, b) => a + b) / chunk.length;
+      aggregated.add(avg);
+      if (aggregated.length == segments) break;
+    }
+
+    return aggregated;
+  }
+
   Future<void> _loadRegionalAttendance() async {
     try {
-      _regionAttendance = {};
+      final bool isQuarterView = _selectedPeriod == 'quarter';
+      final periodForApi = isQuarterView ? 'month' : _selectedPeriod;
 
-      // Load regions
-      await _regionProvider.loadRegions();
-      final regions = _regionProvider.regions;
+      final attendanceStats = await _analyticsProvider
+          .getAttendanceByPeriodForRegion(periodForApi, widget.regionId);
 
-      if (regions.isEmpty) {
-        throw Exception('No regions available');
+      final dailyStats = List.of(attendanceStats.dailyStats)
+        ..sort((a, b) {
+          final aDate = DateTime.tryParse(a.date);
+          final bDate = DateTime.tryParse(b.date);
+          if (aDate == null || bDate == null) return 0;
+          return aDate.compareTo(bDate);
+        });
+
+      List<double> timeline =
+          dailyStats.map((stat) => stat.attendanceRate).toList();
+
+      if (timeline.isEmpty) {
+        final eventStats = List.of(attendanceStats.eventStats)
+          ..sort((a, b) => a.eventDate.compareTo(b.eventDate));
+        timeline = eventStats.map((stat) => stat.attendanceRate).toList();
       }
 
-      // Load attendance for each region
-      for (var region in regions) {
-        try {
-          final attendanceStats = await _analyticsProvider
-              .getOverallAttendanceByPeriodForRegion(
-                _selectedPeriod,
-                region.id,
-              );
-
-          if (attendanceStats?.overallStats?.attendanceRate != null) {
-            _regionAttendance[region.name] =
-                attendanceStats!.overallStats!.attendanceRate;
-          }
-        } catch (e) {
-          print('Error loading attendance for region ${region.name}: $e');
-          // Provide fallback data for regions with missing attendance
-          _regionAttendance[region.name] = 0.0;
-        }
+      if (isQuarterView && timeline.isNotEmpty) {
+        timeline = _averageTimelineSegments(timeline, 3);
       }
 
-      // If all regions failed, provide some sample data
-      if (_regionAttendance.isEmpty) {
-        for (var region in regions) {
-          _regionAttendance[region.name] = 0.0;
-        }
-      }
+      if (!mounted) return;
+      setState(() {
+        _regionalAttendanceData = timeline;
+      });
     } catch (e) {
-      print('Error in _loadRegionalAttendance: $e');
-      // Don't throw exception, just set empty data
-      _regionAttendance = {};
+      print('Error loading periodic attendance: $e');
+      if (mounted) {
+        setState(() {
+          _regionalAttendanceData = [];
+        });
+      }
     }
   }
 
@@ -343,19 +328,38 @@ class _RegionManagerAnalyticsScreenState
                   ),
                 ),
                 // Detailed Analytics Tab
-                SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildPeriodSelector(),
-                      const SizedBox(height: 16),
-                      _buildRegionalAttendanceChart(_regionalAttendanceData),
-                      const SizedBox(height: 16),
-                      _buildGroupAttendanceChart(_groupAttendanceData),
-                      const SizedBox(height: 16),
-                      _buildActivityStatusChart(_activityStatusData),
-                    ],
+                ChangeNotifierProvider<attendance_overview.AttendanceProvider>(
+                  create: (_) {
+                    final service = attendance_services.AttendanceService(
+                      ApiEndpoints.baseUrl,
+                    );
+                    final provider =
+                        attendance_overview.AttendanceProvider(service);
+                    // Load initial data for this region scope
+                    provider.loadData(
+                      scope: 'region',
+                      regionId: widget.regionId,
+                    );
+                    return provider;
+                  },
+                  child: Builder(
+                    builder: (innerContext) => SingleChildScrollView(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          buildScopedAttendanceChart(
+                            context: innerContext,
+                            scope: 'region',
+                            regionId: widget.regionId,
+                          ),
+                          const SizedBox(height: 16),
+                          _buildGroupAttendanceChart(_groupAttendanceData),
+                          const SizedBox(height: 16),
+                          _buildActivityStatusChart(_activityStatusData),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -521,12 +525,12 @@ class _RegionManagerAnalyticsScreenState
               ),
               child: Column(
                 children: [
-                  _buildActivityItem(
-                    Icons.people,
-                    'Member Growth',
-                    '${_quickStatsData.isNotEmpty ? (int.parse(_quickStatsData.elementAt(2).toString()) * 0.1).toStringAsFixed(0) : 0} new members this week',
-                    AppColors.primaryColor,
-                  ),
+                  // _buildActivityItem(
+                  //   Icons.people,
+                  //   'Member Growth',
+                  //   '${_quickStatsData.isNotEmpty ? (int.parse(_quickStatsData.elementAt(2).toString()) * 0.1).toStringAsFixed(0) : 0} new members this week',
+                  //   AppColors.primaryColor,
+                  // ),
                   const SizedBox(height: 12),
                   _buildActivityItem(
                     Icons.event,
@@ -593,6 +597,37 @@ class _RegionManagerAnalyticsScreenState
     );
   }
 
+  Widget buildScopedAttendanceChart({
+    required BuildContext context,
+    required String scope,
+    String? regionId,
+    String? groupId,
+  }) {
+    final attendanceProvider =
+        context.watch<attendance_overview.AttendanceProvider>();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Attendance Chart with scope-specific data
+        AttendanceChart(
+          periods: ['week', 'month', 'quarter', 'year'],
+          selectedPeriod: attendanceProvider.period,
+          labels: attendanceProvider.chartLabels,
+          values: attendanceProvider.chartRates,
+          isLoading: attendanceProvider.loading,
+          onPeriodChange: (p) => attendanceProvider.changePeriod(
+            p!,
+            scope: scope,
+            regionId: regionId,
+            groupId: groupId,
+          ),
+        ),
+      ],
+    );
+  }
+
+
   Widget _buildPeriodSelector() {
     return Card(
       child: Padding(
@@ -613,8 +648,9 @@ class _RegionManagerAnalyticsScreenState
                 DropdownMenuItem(value: 'year', child: Text('Yearly')),
               ],
               onChanged: (value) {
-                setState(() => _selectedPeriod = value!);
-                _handleLocalFilterChange(); // ✅ new helper
+                if (value == null) return;
+                setState(() => _selectedPeriod = value);
+                _loadAnalytics();
               },
             )
 

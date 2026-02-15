@@ -237,17 +237,8 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
         ],
       ),
 
-      // Floating Add Button (just plus)
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final created = await _showCreateGroupDialog(context);
-          if (created) {
-            await _loadGroups();
-          }
-        },
-        backgroundColor: AppColors.primaryColor,
-        child: const Icon(Icons.add),
-      ),
+      // Floating Add Button removed: all groups are pre-created and
+      // creation logic is currently being refactored.
     );
   }
 
@@ -302,26 +293,11 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Create your first group to get started',
+            'All groups are managed centrally. If you expected groups here, please contact the system admin.',
             style: TextStyles.bodyText.copyWith(
-            color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
-          ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-
-          SizedBox(
-            width: double.infinity,
-            child: FloatingActionButton(
-              onPressed: () async {
-                final created = await _showCreateGroupDialog(context);
-                if (created) {
-                  await _loadGroups();
-                }
-              },
-              backgroundColor: AppColors.primaryColor,
-              child: const Icon(Icons.add),
+              color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
             ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),

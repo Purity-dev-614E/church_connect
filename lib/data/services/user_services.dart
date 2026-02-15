@@ -45,44 +45,33 @@ class UserServices {
         } else {
           throw Exception('Authentication failed. Please login again.');
         }
+      } else if (response.statusCode == 404) {
+        // User not yet created in the profiles database.
+        // Return a minimal, clearly "incomplete" user so that the app
+        // can route them to profile setup, but DO NOT pretend they have
+        // groups or a finalized role.
+        print('User not found (404), returning minimal placeholder for ID: $id');
+        return UserModel(
+          id: id,
+          fullName: '', // Empty so profile-setup checks still trigger
+          email: '',
+          contact: '',
+          nextOfKin: '',
+          nextOfKinContact: '',
+          role: 'user',
+          gender: '',
+          regionId: '',
+          regionalID: '',
+        );
       } else {
         print('Failed to load user. Status: ${response.statusCode}, Body: ${response.body}');
-        
-        // If the user doesn't exist in the database yet, create a minimal user model
-        // This handles the case where a user has authenticated but hasn't set up their profile
-        if (response.statusCode == 404) {
-          print('User not found, creating minimal user model with ID: $id');
-          return UserModel(
-            id: id,
-            fullName: 'User $id',  // Add a default name to make it more user-friendly
-            email: '',
-            contact: '',
-            nextOfKin: '',
-            nextOfKinContact: '',
-            role: 'user',
-            gender: '',
-            regionId: '',
-            regionalID: '',
-          );
-        }
-        
         throw Exception('Failed to load user: ${response.statusCode}');
       }
     } catch (e) {
       print('Exception in fetchCurrentUser: $e');
-      // Return a minimal user model instead of throwing
-      return UserModel(
-        id: id.isNotEmpty ? id : 'unknown',
-        fullName: 'User ${id.isNotEmpty ? id : "Unknown"}',  // Add a default name
-        email: '',
-        contact: '',
-        nextOfKin: '',
-        nextOfKinContact: '',
-        role: 'user',
-        gender: '',
-        regionId: '',
-        regionalID: '',
-      );
+      // Bubble the error up so callers can show a proper error state
+      // instead of silently treating the user as a plain "user" with no group.
+      rethrow;
     }
   }
   

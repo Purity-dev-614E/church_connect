@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:group_management_church_app/core/constants/colors.dart';
 import 'package:group_management_church_app/core/constants/text_styles.dart';
-import 'package:group_management_church_app/data/services/auth_services.dart';
+import 'package:group_management_church_app/core/constants/supabase_config.dart';
+import 'package:group_management_church_app/data/services/supabase_service.dart';
 import 'package:group_management_church_app/features/auth/login.dart';
 import 'package:group_management_church_app/widgets/custom_button.dart';
 import 'package:group_management_church_app/widgets/input_field.dart';
-import 'package:provider/provider.dart';
-import 'package:group_management_church_app/data/providers/auth_provider.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
   const ResetPasswordScreen({super.key});
@@ -105,24 +105,29 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with SingleTi
       });
 
       try {
-        // Get the AuthProvider instance
-        final authProvider = Provider.of<AuthProvider>(context, listen: false);
-
-        // Call resetPassword method from provider
-        final result = await authProvider.resetPassword(_emailController.text.trim());
+        final email = _emailController.text.trim();
+        
+    
+        await SupabaseService.client.auth.resetPasswordForEmail(
+          email,
+          redirectTo: SupabaseConfig.resetRedirectUrl,
+        );
 
         if (mounted) {
-          if (result.success) {
-            setState(() {
-              _resetLinkSent = true;
-            });
-          } else {
-            _showError(result.message);
-          }
+          setState(() {
+            _resetLinkSent = true;
+          });
+          _showSuccess('Password reset link sent successfully!');
         }
       } catch (e) {
         if (mounted) {
-          _showError('An unexpected error occurred. Please try again.');
+          String errorMessage = 'An unexpected error occurred. Please try again.';
+          if (e.toString().contains('Invalid email')) {
+            errorMessage = 'Invalid email address. Please check and try again.';
+          } else if (e.toString().contains('rate limit')) {
+            errorMessage = 'Too many requests. Please try again later.';
+          }
+          _showError(errorMessage);
         }
       } finally {
         if (mounted) {
@@ -329,12 +334,32 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with SingleTi
         ),
         const SizedBox(height: 32),
 
-        // Back to login button
+        // Navigate to new password screen button
         CustomButton(
-          label: 'Back to Login',
-          onPressed: _navigateToLogin,
+          label: 'Update Password',
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const NewPasswordScreen(),
+              ),
+            );
+          },
           color: AppColors.primaryColor,
-          isPulsing: false,
+          isPulsing: true,
+        ),
+        const SizedBox(height: 16),
+
+        // Back to login button
+        TextButton(
+          onPressed: _navigateToLogin,
+          child: Text(
+            'Back to Login',
+            style: TextStyles.bodyText.copyWith(
+              color: AppColors.primaryColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
         const SizedBox(height: 16),
       ],
@@ -697,8 +722,16 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
 }
 
 // New password screen after verification
+// This screen can be navigated to after clicking the reset link in email
 class NewPasswordScreen extends StatefulWidget {
-  const NewPasswordScreen({super.key});
+  final String? accessToken; // Optional: token from reset link
+  final String? refreshToken; // Optional: refresh token from reset link
+  
+  const NewPasswordScreen({
+    super.key,
+    this.accessToken,
+    this.refreshToken,
+  });
 
   @override
   State<NewPasswordScreen> createState() => _NewPasswordScreenState();
@@ -775,29 +808,68 @@ class _NewPasswordScreenState extends State<NewPasswordScreen> {
     return null;
   }
 
-  void _resetPassword() {
+  Future<void> _resetPassword() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
       });
 
-      // Simulate API call
-      Future.delayed(const Duration(seconds: 2), () {
+      try {
+        final newPassword = _passwordController.text.trim();
+        
+
+        if (widget.accessToken != null && widget.refreshToken != null) {
+
+          await SupabaseService.client.auth.setSession(widget.accessToken!);
+        } else {
+          final session = SupabaseService.client.auth.currentSession;
+          if (session == null) {
+            throw Exception('No active session. Please use the reset link from your email.');
+          }
+        }
+
+
+        final response = await SupabaseService.client.auth.updateUser(
+          UserAttributes(password: newPassword),
+        );
+
+        if (mounted) {
+          if (response.user != null) {
+            _showSuccess('Password reset successfully!');
+            
+            // Sign out to ensure clean state
+            await SupabaseService.client.auth.signOut();
+            
+            // Navigate to login
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => const LoginScreen()),
+              (route) => false,
+            );
+          } else {
+            _showError('Failed to update password. Please try again.');
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          String errorMessage = 'Failed to reset password. Please try again.';
+          final errorString = e.toString().toLowerCase();
+          if (errorString.contains('session') || errorString.contains('token')) {
+            errorMessage = 'Invalid or expired reset link. Please request a new one from the reset password screen.';
+          } else if (errorString.contains('password')) {
+            errorMessage = 'Password does not meet requirements. Please try again.';
+          } else if (errorString.contains('active session')) {
+            errorMessage = 'No active session. Please use the reset link from your email or request a new one.';
+          }
+          _showError(errorMessage);
+        }
+      } finally {
         if (mounted) {
           setState(() {
             _isLoading = false;
           });
-
-          // Show success and navigate to login
-          _showSuccess('Password reset successfully!');
-
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (context) => const LoginScreen()),
-            (route) => false,
-          );
         }
-      });
+      }
     }
   }
 
@@ -861,7 +933,7 @@ class _NewPasswordScreenState extends State<NewPasswordScreen> {
 
               // Reset button
               CustomButton(
-                label: 'Reset Password',
+                label: 'Update Password',
                 onPressed: _resetPassword,
                 isLoading: _isLoading,
                 color: AppColors.primaryColor,

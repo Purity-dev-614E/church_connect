@@ -62,23 +62,34 @@ class _RegionManagementTabState extends State<RegionManagementTab> {
       // Fetch all users in the region
       final users = await RegionProvider().getUsersByRegion(regionId);
 
-      // Find the first user with any regional leadership role
-      final regionHead = users.firstWhere(
-        (user) {
-          final r = user.role.toLowerCase();
-          return r == 'regional manager' ||
-              r == 'regional coordinator' ||
-              r == 'regional focal person';
-        },
-        orElse: () => users.first,
-      );
+      if (users.isEmpty) {
+        return null;
+      }
 
-      // Return the name of the region head, or null if not found
+      // Only consider users who actually have a regional leadership role.
+      // Do NOT fall back to the first user (who might just be an admin/member),
+      // otherwise they appear as "regional manager" even when they are not.
+      final leaders = users.where((user) {
+        final r = user.role.toLowerCase();
+        return r == 'regional manager' ||
+            r == 'regional coordinator' ||
+            r == 'regional focal person';
+      }).toList();
+
+      if (leaders.isEmpty) {
+        // No regional leader assigned for this region.
+        return null;
+      }
+
+      final regionHead = leaders.first;
+
+      // Return the name of the region head with their display title (alias if present).
+      // If there is no alias, we no longer show "Regional Manager" in brackets – just the name.
       final alias = regionHead.regionalTitle?.trim();
-      final title = (alias != null && alias.isNotEmpty)
-          ? alias
-          : 'Regional Manager';
-      return '${regionHead.fullName} ($title)\nPhone Number: +${regionHead.contact}';
+      final titleSuffix = (alias != null && alias.isNotEmpty)
+          ? ' ($alias)'
+          : '';
+      return '${regionHead.fullName}$titleSuffix\nPhone Number: +${regionHead.contact}';
     } catch (e) {
       // Handle any errors
       return null;

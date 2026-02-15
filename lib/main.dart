@@ -19,6 +19,8 @@ import 'package:group_management_church_app/features/auth/login.dart';
 import 'package:group_management_church_app/features/auth/reset_password.dart';
 import 'package:group_management_church_app/features/auth/signup.dart';
 import 'package:group_management_church_app/features/splash_screen.dart';
+import 'package:group_management_church_app/core/constants/app_flags.dart';
+import 'package:group_management_church_app/features/maintenance/maintenance_screen.dart';
 
 import 'features/auth/SignupFlowWrapper.dart';
 
@@ -103,11 +105,21 @@ class MyApp extends StatelessWidget {
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,
         themeMode: ThemeMode.system,
-        home: const SplashScreen(),
+        home: AppFlags.maintenanceMode ? const MaintenanceScreen() : const SplashScreen(),
         routes: {
           '/login': (context) => const LoginScreen(),
           '/signup': (context) => const SignUpFlowWrapper(),
           '/reset-password': (context) => const ResetPasswordScreen(),
+          '/new-password': (context) {
+            // Extract tokens from URL if coming from email link
+            final uri = Uri.base;
+            final accessToken = uri.queryParameters['access_token'];
+            final refreshToken = uri.queryParameters['refresh_token'];
+            return NewPasswordScreen(
+              accessToken: accessToken,
+              refreshToken: refreshToken,
+            );
+          },
         },
         navigatorObservers: [
           _AuthErrorObserver(),
@@ -128,11 +140,15 @@ class MyApp extends StatelessWidget {
 
           DeviceConfig.init(context);
 
+          final content = AppFlags.maintenanceMode
+              ? const MaintenanceScreen()
+              : child!;
+
           return MediaQuery(
             data: mediaQuery.copyWith(
               size: Size(targetWidth, mediaQuery.size.height),
             ),
-            child: child!,
+            child: content,
           );
         },
       ),

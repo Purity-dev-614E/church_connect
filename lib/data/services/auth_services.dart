@@ -11,6 +11,11 @@ class AuthServices {
   // Use a single instance of FlutterSecureStorage
   final FlutterSecureStorage secureStorage = const FlutterSecureStorage();
 
+  // In-memory fallback (keeps session alive if browser storage is blocked)
+  String? _memoryAccessToken;
+  String? _memoryRefreshToken;
+  String? _memoryUserId;
+
   // Token keys
   static const String accessTokenKey = 'accessToken';
   static const String refreshTokenKey = 'refreshToken';
@@ -44,7 +49,7 @@ class AuthServices {
       );
 
       print('Login response status code: ${response.statusCode}');
-      print('Login response body: ${response.body}');
+      // print('Login response body: ${response.body}');
 
       // Parse response
       Map<String, dynamic> responseData;
@@ -68,23 +73,71 @@ class AuthServices {
           final user = responseData['user'];
           
           // Store tokens and user data
-          final accessToken = session['access_token'];
-          final refreshToken = session['refresh_token'];
-          final userId = user['id'];
+          // Be tolerant to different API shapes (snake_case vs camelCase, nested vs top-level)
+          String? accessToken;
+          String? refreshToken;
+          if (session is Map) {
+            accessToken = session['access_token']?.toString() ??
+                session['accessToken']?.toString();
+            refreshToken = session['refresh_token']?.toString() ??
+                session['refreshToken']?.toString();
+          }
+          accessToken ??= responseData['access_token']?.toString() ??
+              responseData['accessToken']?.toString();
+          refreshToken ??= responseData['refresh_token']?.toString() ??
+              responseData['refreshToken']?.toString();
+          final String? userId = (user is Map) ? user['id']?.toString() : null;
 
           print('Login successful. Storing tokens and user data...');
-          print('User ID: $userId');
-          print('User Data: $user');
+          // print('User ID: $userId');
+          // print('User Data: $user');
 
-          // Store tokens in secure storage
-          await secureStorage.write(key: accessTokenKey, value: accessToken);
-          await secureStorage.write(key: refreshTokenKey, value: refreshToken);
-          await secureStorage.write(key: userIdKey, value: userId);
+          // Validate critical fields before writing (prevents null-safety crashes in storage plugins)
+          if (accessToken == null || accessToken.isEmpty) {
+            return {
+              'success': false,
+              'message': 'Login failed: server response missing access token.'
+            };
+          }
+          if (userId == null || userId.isEmpty) {
+            return {
+              'success': false,
+              'message': 'Login failed: server response missing user id.'
+            };
+          }
+
+          // Always cache in memory (so API calls can still work in-session)
+          _memoryAccessToken = accessToken;
+          _memoryRefreshToken = refreshToken;
+          _memoryUserId = userId;
+
+          // Store tokens in secure storage (best effort; web implementations can fail)
+          try {
+            await secureStorage.write(key: accessTokenKey, value: accessToken);
+            if (refreshToken != null && refreshToken.isNotEmpty) {
+              await secureStorage.write(
+                  key: refreshTokenKey, value: refreshToken);
+            }
+            await secureStorage.write(key: userIdKey, value: userId);
+          } catch (e) {
+            print('Secure storage write failed (continuing): $e');
+          }
 
           // Store user data in SharedPreferences
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('user_data', json.encode(user));
-          await prefs.setString('user_id', userId);
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('user_data', json.encode(user));
+            await prefs.setString('user_id', userId);
+            // Also store tokens here for reliable web persistence / fallback reads
+            await prefs.setString('auth_token', accessToken);
+            if (refreshToken != null && refreshToken.isNotEmpty) {
+              await prefs.setString('refresh_token', refreshToken);
+            }
+          } catch (e) {
+            // Some browsers / contexts block storage (e.g. strict privacy modes).
+            // Don't fail login just because persistence is unavailable.
+            print('SharedPreferences write failed (continuing): $e');
+          }
 
           return {
             'success': true,
@@ -107,8 +160,9 @@ class AuthServices {
           'message': errorMessage
         };
       }
-    } catch (e) {
+    } catch (e, st) {
       print('Login error: $e');
+      print('Login stacktrace: $st');
       return {
         'success': false,
         'message': 'An error occurred during login: $e'
@@ -136,54 +190,93 @@ class AuthServices {
         })
       );
 
+      print("Refresh token response status code: ${response.statusCode}");
+
       if (response.statusCode == 200) {
+        // Parse response body (don't mix parsing and storage writes in same try)
+        Map<String, dynamic> data;
         try {
-          final data = json.decode(response.body);
-          
-          // Get the new tokens
-          String? newAccessToken;
-          String? newRefreshToken;
-          
-          if (data.containsKey('access_token')) {
-            newAccessToken = data['access_token'];
-          } else if (data.containsKey('session') && data['session'].containsKey('access_token')) {
-            newAccessToken = data['session']['access_token'];
-          }
-          
-          if (data.containsKey('refresh_token')) {
-            newRefreshToken = data['refresh_token'];
-          } else if (data.containsKey('session') && data['session'].containsKey('refresh_token')) {
-            newRefreshToken = data['session']['refresh_token'];
-          }
-          
-          if (newAccessToken == null) {
-            print("Invalid refresh token response format");
-            return false;
-          }
-          
-          // Store the new tokens in both FlutterSecureStorage and SharedPreferences
-          await secureStorage.write(key: accessTokenKey, value: newAccessToken);
-          if (newRefreshToken != null) {
-            await secureStorage.write(key: refreshTokenKey, value: newRefreshToken);
-          }
-          
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('auth_token', newAccessToken);
-          if (newRefreshToken != null) {
-            await prefs.setString('refresh_token', newRefreshToken);
-          }
-          
-          return true;
+          data = json.decode(response.body) as Map<String, dynamic>;
         } catch (e) {
           print("Error parsing refresh token response: $e");
+          print("Raw refresh token response body: ${response.body}");
           return false;
         }
+          
+        // Get the new tokens (tolerant to API shape)
+        String? newAccessToken;
+        String? newRefreshToken;
+          
+        if (data.containsKey('access_token')) {
+          newAccessToken = data['access_token']?.toString();
+        } else if (data.containsKey('accessToken')) {
+          newAccessToken = data['accessToken']?.toString();
+        } else if (data.containsKey('session') &&
+            data['session'] is Map &&
+            (data['session'] as Map).containsKey('access_token')) {
+          newAccessToken = (data['session'] as Map)['access_token']?.toString();
+        } else if (data.containsKey('session') &&
+            data['session'] is Map &&
+            (data['session'] as Map).containsKey('accessToken')) {
+          newAccessToken = (data['session'] as Map)['accessToken']?.toString();
+        }
+          
+        if (data.containsKey('refresh_token')) {
+          newRefreshToken = data['refresh_token']?.toString();
+        } else if (data.containsKey('refreshToken')) {
+          newRefreshToken = data['refreshToken']?.toString();
+        } else if (data.containsKey('session') &&
+            data['session'] is Map &&
+            (data['session'] as Map).containsKey('refresh_token')) {
+          newRefreshToken =
+              (data['session'] as Map)['refresh_token']?.toString();
+        } else if (data.containsKey('session') &&
+            data['session'] is Map &&
+            (data['session'] as Map).containsKey('refreshToken')) {
+          newRefreshToken =
+              (data['session'] as Map)['refreshToken']?.toString();
+        }
+          
+        if (newAccessToken == null || newAccessToken.isEmpty) {
+          print("Invalid refresh token response format");
+          return false;
+        }
+
+        // Update in-memory values first (keeps session alive even if persistence fails)
+        _memoryAccessToken = newAccessToken;
+        _memoryRefreshToken = (newRefreshToken != null && newRefreshToken.isNotEmpty)
+            ? newRefreshToken
+            : _memoryRefreshToken;
+          
+        // Store the new tokens (best effort; web storage can be blocked)
+        try {
+          await secureStorage.write(key: accessTokenKey, value: newAccessToken);
+          if (newRefreshToken != null && newRefreshToken.isNotEmpty) {
+            await secureStorage.write(
+                key: refreshTokenKey, value: newRefreshToken);
+          }
+        } catch (e) {
+          print("Secure storage write failed during refresh (continuing): $e");
+        }
+
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('auth_token', newAccessToken);
+          if (newRefreshToken != null && newRefreshToken.isNotEmpty) {
+            await prefs.setString('refresh_token', newRefreshToken);
+          }
+        } catch (e) {
+          print("SharedPreferences write failed during refresh (continuing): $e");
+        }
+        
+        return true;
       } else {
         print("Refresh token failed with status: ${response.statusCode}");
         return false;
       }
-    } catch (e) {
+    } catch (e, st) {
       print("Refresh token error: $e");
+      print("Refresh token stacktrace: $st");
       return false;
     }
   }
@@ -191,6 +284,11 @@ class AuthServices {
   // Get access token
   Future<String?> getAccessToken() async {
     try {
+      // Prefer in-memory token first
+      if (_memoryAccessToken != null && _memoryAccessToken!.isNotEmpty) {
+        return _memoryAccessToken;
+      }
+
       // Try to get from FlutterSecureStorage first
       String? token = await secureStorage.read(key: accessTokenKey);
       
@@ -210,6 +308,11 @@ class AuthServices {
   // Get refresh token
   Future<String?> getRefreshToken() async {
     try {
+      // Prefer in-memory token first
+      if (_memoryRefreshToken != null && _memoryRefreshToken!.isNotEmpty) {
+        return _memoryRefreshToken;
+      }
+
       // Try to get from FlutterSecureStorage first
       String? token = await secureStorage.read(key: refreshTokenKey);
       
@@ -229,6 +332,11 @@ class AuthServices {
   // Get user ID
   Future<String?> getUserId() async {
     try {
+      // Prefer in-memory value first
+      if (_memoryUserId != null && _memoryUserId!.isNotEmpty) {
+        return _memoryUserId;
+      }
+
       // Try to get from FlutterSecureStorage first
       String? userId = await secureStorage.read(key: userIdKey);
       
@@ -259,6 +367,11 @@ class AuthServices {
   // Logout method
   Future<void> logout() async {
     try {
+      // Clear in-memory values
+      _memoryAccessToken = null;
+      _memoryRefreshToken = null;
+      _memoryUserId = null;
+
       // Clear tokens from FlutterSecureStorage
       await secureStorage.delete(key: accessTokenKey);
       await secureStorage.delete(key: refreshTokenKey);

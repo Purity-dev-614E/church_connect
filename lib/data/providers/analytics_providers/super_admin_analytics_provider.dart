@@ -1,7 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:group_management_church_app/core/auth/auth_wrapper.dart';
 import 'package:group_management_church_app/core/constants/app_endpoints.dart';
-import 'package:group_management_church_app/data/services/auth_services.dart';
 
 // Only import the models we're actually using
 import '../../models/super_analytics_model.dart';
@@ -78,14 +76,9 @@ class SuperAdminAnalyticsProvider extends ChangeNotifier {
   List<dynamic> get recentGroups => _recentGroups;
 
   List<dynamic> get recentUsers => _recentUsers;
-  final AuthServices _authServices = AuthServices();
-
   SuperAdminAnalyticsProvider({
-    String baseUrl = ApiEndpoints.baseUrl,
-  })
-      : _analyticsService = SuperAdminAnalyticsService(
-    baseUrl: ApiEndpoints.baseUrl,
-  );
+    SuperAdminAnalyticsService? analyticsService,
+  }) : _analyticsService = analyticsService ?? SuperAdminAnalyticsService();
 
   // Helper methods
   void _setLoading(bool loading) {
@@ -147,43 +140,7 @@ class SuperAdminAnalyticsProvider extends ChangeNotifier {
     }
   }
 
-  Future<GroupGrowthAnalytics> getGroupGrowthAnalytics(String groupId) async {
-    _setLoading(true);
-    try {
-      final analytics = await _analyticsService.getGroupGrowthAnalytics(
-          groupId);
-      _groupGrowthAnalytics[groupId] = analytics;
-      _errorMessage = '';
-      _setLoading(false);
-      return analytics;
-    } catch (error) {
-      _handleError('fetching group growth analytics', error);
-      _setLoading(false);
-      return GroupGrowthAnalytics(
-        monthlyGrowth: {},
-        cumulativeGrowth: [],
-      );
-    }
-  }
 
-  Future<GroupComparison> compareGroups(List<String> groupIds) async {
-    _setLoading(true);
-    try {
-      final comparison = await _analyticsService.compareGroups(groupIds);
-      final key = groupIds.join('-');
-      _compareGroupsData[key] = comparison;
-      _errorMessage = '';
-      _setLoading(false);
-      return comparison;
-    } catch (error) {
-      _handleError('comparing groups', error);
-      _setLoading(false);
-      return GroupComparison(
-        memberCounts: [],
-        attendanceRates: [],
-      );
-    }
-  }
 
   // Attendance Analytics Methods
   Future<AttendanceByPeriod> getAttendanceByPeriod(String period) async {
@@ -229,18 +186,10 @@ class SuperAdminAnalyticsProvider extends ChangeNotifier {
     }
   }
 
-  // This method is missing in the service, so we'll implement a stub
   Future<Map<String, dynamic>> getUserAttendanceTrends(String userId) async {
     _setLoading(true);
     try {
-      // Since this method is missing in the service, we'll return a placeholder
-      // In a real implementation, you would add this method to the service
-      final data = {
-        'userId': userId,
-        'attendanceRate': 0.0,
-        'trends': [],
-        'message': 'This is a placeholder. Method not implemented in service.',
-      };
+      final data = await _analyticsService.getUserAttendanceTrends(userId);
       _userAttendanceTrends[userId] = data;
       _errorMessage = '';
       _setLoading(false);
@@ -299,33 +248,7 @@ class SuperAdminAnalyticsProvider extends ChangeNotifier {
     }
   }
 
-  // Member Analytics Methods
-  // This method is missing in the service, so we'll implement a stub
-  Future<Map<String, dynamic>> getMemberParticipationStats({
-    String? startDate,
-    String? endDate,
-  }) async {
-    _setLoading(true);
-    try {
-      // Since this method is missing in the service, we'll return a placeholder
-      // In a real implementation, you would add this method to the service
-      final data = {
-        'startDate': startDate,
-        'endDate': endDate,
-        'participationRate': 0.0,
-        'members': [],
-        'message': 'This is a placeholder. Method not implemented in service.',
-      };
-      _memberParticipationStats = data;
-      _errorMessage = '';
-      _setLoading(false);
-      return data;
-    } catch (error) {
-      _handleError('fetching member participation stats', error);
-      _setLoading(false);
-      return {};
-    }
-  }
+
 
   Future<MemberActivityStatus> getMemberActivityStatus() async {
     _setLoading(true);
@@ -405,6 +328,27 @@ class SuperAdminAnalyticsProvider extends ChangeNotifier {
     }
   }
 
+  Future<Map<String, dynamic>> getMemberParticipationStats({
+    String? startDate,
+    String? endDate,
+  }) async {
+    _setLoading(true);
+    try {
+      final data = await _analyticsService.getMemberParticipationStats(
+        startDate: startDate,
+        endDate: endDate,
+      );
+      _memberParticipationStats = data;
+      _errorMessage = '';
+      _setLoading(false);
+      return data;
+    } catch (error) {
+      _handleError('fetching member participation stats', error);
+      _setLoading(false);
+      return {};
+    }
+  }
+
   Future<GroupDashboardData> getGroupDashboardData(String groupId) async {
     _setLoading(true);
     try {
@@ -430,6 +374,44 @@ class SuperAdminAnalyticsProvider extends ChangeNotifier {
       );
     }
   }
+
+  Future<GroupGrowthAnalytics> getGroupGrowthAnalytics(String groupId) async {
+    _setLoading(true);
+    try {
+      final analytics = await _analyticsService.getGroupGrowthAnalytics(
+          groupId);
+      _groupGrowthAnalytics[groupId] = analytics;
+      _errorMessage = '';
+      _setLoading(false);
+      return analytics;
+    } catch (error) {
+      _handleError('fetching group growth analytics', error);
+      _setLoading(false);
+      return GroupGrowthAnalytics(
+        monthlyGrowth: {},
+        cumulativeGrowth: [],
+      );
+    }
+  }
+
+  Future<GroupComparison> compareGroups(List<String> groupIds) async {
+    _setLoading(true);
+    try {
+      final comparison = await _analyticsService.compareGroups(groupIds);
+      final key = groupIds.join('-');
+      _compareGroupsData[key] = comparison;
+      _errorMessage = '';
+      _setLoading(false);
+      return comparison;
+    } catch (error) {
+      _handleError('comparing groups', error);
+      _setLoading(false);
+      return GroupComparison(
+        memberCounts: [],
+        attendanceRates: [],
+      );
+    }
+  }
 }
-  
+
   // Combined Dashboard Data

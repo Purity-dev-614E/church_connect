@@ -650,7 +650,7 @@ String? _getRegionByGroup(String groupId) {
           hintText: 'Enter your phone number',
           prefixIcon: Icons.phone_outlined,
           keyboardType: TextInputType.phone,
-          validator: _validatePhoneNumber,
+          // validator: _validatePhoneNumber,
           inputFormatters: [
             FilteringTextInputFormatter.digitsOnly,
             LengthLimitingTextInputFormatter(15),

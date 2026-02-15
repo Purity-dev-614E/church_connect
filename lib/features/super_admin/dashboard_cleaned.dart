@@ -384,7 +384,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   'Current: ${_overallAttendance.toStringAsFixed(1)}%',
                   style: TextStyles.heading1.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: Colors.blue,
+                    color: Colors.red,
                   ),
                 )
                     : const SizedBox(),
@@ -437,13 +437,14 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                     LineChartBarData(
                       spots: _attendanceTrend,
                       isCurved: true,
-                      color: Colors.blue,
+                      color: Colors.red
+                      ,
                       barWidth: 3,
                       isStrokeCapRound: true,
                       dotData: const FlDotData(show: true),
                       belowBarData: BarAreaData(
                         show: true,
-                        color: Colors.blue.withOpacity(0.2),
+                        color: Colors.red.withOpacity(0.2),
                       ),
                     ),
                   ],

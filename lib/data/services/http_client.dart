@@ -9,6 +9,8 @@ class HttpClient {
   static HttpClient? _instance;
   bool _isRefreshing = false;
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+  String? _memoryAccessToken;
+  String? _memoryRefreshToken;
   
   // Token keys
   static const String accessTokenKey = 'accessToken';
@@ -23,33 +25,63 @@ class HttpClient {
   
   /// Get authentication token
   Future<String> _getToken() async {
+    if (_memoryAccessToken != null && _memoryAccessToken!.isNotEmpty) {
+      return _memoryAccessToken!;
+    }
+
     // Try to get from FlutterSecureStorage first
-    String? token = await _secureStorage.read(key: accessTokenKey);
+    String? token;
+    try {
+      token = await _secureStorage.read(key: accessTokenKey);
+    } catch (e) {
+      print('Secure storage read failed (continuing): $e');
+    }
     
     // If not found, try SharedPreferences
     if (token == null) {
-      final prefs = await SharedPreferences.getInstance();
-      token = prefs.getString('auth_token');
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        token = prefs.getString('auth_token');
+      } catch (e) {
+        print('SharedPreferences read failed (continuing): $e');
+      }
     }
     
     if (token == null || token.isEmpty) {
       throw Exception('Authentication token is null');
     }
     
+    _memoryAccessToken = token;
     return token;
   }
   
   /// Get refresh token
   Future<String?> _getRefreshToken() async {
+    if (_memoryRefreshToken != null && _memoryRefreshToken!.isNotEmpty) {
+      return _memoryRefreshToken;
+    }
+
     // Try to get from FlutterSecureStorage first
-    String? token = await _secureStorage.read(key: refreshTokenKey);
+    String? token;
+    try {
+      token = await _secureStorage.read(key: refreshTokenKey);
+    } catch (e) {
+      print('Secure storage read failed (continuing): $e');
+    }
     
     // If not found, try SharedPreferences
     if (token == null) {
-      final prefs = await SharedPreferences.getInstance();
-      token = prefs.getString('refresh_token');
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        token = prefs.getString('refresh_token');
+      } catch (e) {
+        print('SharedPreferences read failed (continuing): $e');
+      }
     }
     
+    if (token != null && token.isNotEmpty) {
+      _memoryRefreshToken = token;
+    }
     return token;
   }
   
@@ -74,53 +106,89 @@ class HttpClient {
       );
 
       if (response.statusCode == 200) {
+        Map<String, dynamic> data;
         try {
-          final data = json.decode(response.body);
-          
-          // Get the new tokens
-          String? newAccessToken;
-          String? newRefreshToken;
-          
-          if (data.containsKey('access_token')) {
-            newAccessToken = data['access_token'];
-          } else if (data.containsKey('session') && data['session'].containsKey('access_token')) {
-            newAccessToken = data['session']['access_token'];
-          }
-          
-          if (data.containsKey('refresh_token')) {
-            newRefreshToken = data['refresh_token'];
-          } else if (data.containsKey('session') && data['session'].containsKey('refresh_token')) {
-            newRefreshToken = data['session']['refresh_token'];
-          }
-          
-          if (newAccessToken == null) {
-            print("Invalid refresh token response format");
-            return false;
-          }
-          
-          // Store the new tokens
-          await _secureStorage.write(key: accessTokenKey, value: newAccessToken);
-          if (newRefreshToken != null) {
-            await _secureStorage.write(key: refreshTokenKey, value: newRefreshToken);
-          }
-          
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('auth_token', newAccessToken);
-          if (newRefreshToken != null) {
-            await prefs.setString('refresh_token', newRefreshToken);
-          }
-          
-          return true;
+          data = json.decode(response.body) as Map<String, dynamic>;
         } catch (e) {
           print("Error parsing refresh token response: $e");
+          print("Raw refresh token response body: ${response.body}");
           return false;
         }
+          
+        // Get the new tokens
+        String? newAccessToken;
+        String? newRefreshToken;
+          
+        if (data.containsKey('access_token')) {
+          newAccessToken = data['access_token']?.toString();
+        } else if (data.containsKey('accessToken')) {
+          newAccessToken = data['accessToken']?.toString();
+        } else if (data.containsKey('session') &&
+            data['session'] is Map &&
+            (data['session'] as Map).containsKey('access_token')) {
+          newAccessToken = (data['session'] as Map)['access_token']?.toString();
+        } else if (data.containsKey('session') &&
+            data['session'] is Map &&
+            (data['session'] as Map).containsKey('accessToken')) {
+          newAccessToken = (data['session'] as Map)['accessToken']?.toString();
+        }
+          
+        if (data.containsKey('refresh_token')) {
+          newRefreshToken = data['refresh_token']?.toString();
+        } else if (data.containsKey('refreshToken')) {
+          newRefreshToken = data['refreshToken']?.toString();
+        } else if (data.containsKey('session') &&
+            data['session'] is Map &&
+            (data['session'] as Map).containsKey('refresh_token')) {
+          newRefreshToken =
+              (data['session'] as Map)['refresh_token']?.toString();
+        } else if (data.containsKey('session') &&
+            data['session'] is Map &&
+            (data['session'] as Map).containsKey('refreshToken')) {
+          newRefreshToken =
+              (data['session'] as Map)['refreshToken']?.toString();
+        }
+          
+        if (newAccessToken == null || newAccessToken.isEmpty) {
+          print("Invalid refresh token response format");
+          return false;
+        }
+
+        // Cache in memory first
+        _memoryAccessToken = newAccessToken;
+        if (newRefreshToken != null && newRefreshToken.isNotEmpty) {
+          _memoryRefreshToken = newRefreshToken;
+        }
+          
+        // Store the new tokens (best effort)
+        try {
+          await _secureStorage.write(key: accessTokenKey, value: newAccessToken);
+          if (newRefreshToken != null && newRefreshToken.isNotEmpty) {
+            await _secureStorage.write(
+                key: refreshTokenKey, value: newRefreshToken);
+          }
+        } catch (e) {
+          print("Secure storage write failed during refresh (continuing): $e");
+        }
+
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('auth_token', newAccessToken);
+          if (newRefreshToken != null && newRefreshToken.isNotEmpty) {
+            await prefs.setString('refresh_token', newRefreshToken);
+          }
+        } catch (e) {
+          print("SharedPreferences write failed during refresh (continuing): $e");
+        }
+        
+        return true;
       } else {
         print("Refresh token failed with status: ${response.statusCode}");
         return false;
       }
-    } catch (e) {
+    } catch (e, st) {
       print("Refresh token error: $e");
+      print("Refresh token stacktrace: $st");
       return false;
     }
   }

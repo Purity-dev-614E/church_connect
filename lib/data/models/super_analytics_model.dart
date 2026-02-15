@@ -443,7 +443,7 @@ class EventParticipationStats {
           : DateTime.now(),
       groupId: json['groupId'] ?? '',
       groupName: json['groupName'] ?? '',
-      totalParticipants: json['totalParticipants'] ?? 0,
+      totalParticipants: json['totalPossible'] ?? 0,
       presentCount: json['presentCount'] ?? 0,
       attendanceRate: (json['attendanceRate'] ?? 0).toDouble(),
       participants: (json['participants'] as List?)

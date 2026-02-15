@@ -10,13 +10,19 @@ import 'package:group_management_church_app/data/providers/event_provider.dart';
 import 'package:group_management_church_app/data/providers/group_provider.dart';
 import 'package:group_management_church_app/data/services/analytics_services/admin_analytics_service.dart';
 import 'package:group_management_church_app/data/services/auth_services.dart';
+import 'package:group_management_church_app/data/services/attendance_overview.dart'
+    as attendance_services;
+import 'package:group_management_church_app/widgets/attendanceChart.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase/supabase.dart';
+import 'package:provider/provider.dart';
 
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../data/models/event_model.dart';
+import '../../../data/providers/attendance_overview.dart'
+    as attendance_overview;
 
 class AdminAnalyticsScreen extends StatefulWidget {
   final groupId;
@@ -42,7 +48,7 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
   bool _showLineChart = true;
 
   Map<String, List<double>> _eventAttendance = {};
-  Map<String, Map<String, int>> _eventComparison = {};
+  Map<String, dynamic> _eventComparison = {};
   Map<String, double> _activityStatus = {};
   final List<Map<String, dynamic>> _eventDetails = [];
 
@@ -85,35 +91,95 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
     }
   }
 
-  Future<Map<String, List<dynamic>>> _loadEventAttendance() async {
+  Future<void> _loadEventAttendance() async {
     try {
-      final allevents = await _eventProvider.fetchEventsByGroup(widget.groupId);
+      final allEvents = await _eventProvider.fetchEventsByGroup(widget.groupId);
+      if (!mounted) return;
 
-      if (allevents.isNotEmpty) {
-        List<dynamic> attended = [];
-        List<dynamic> absent = [];
-
-        for (var event in allevents) {
-          final attendance = await _eventProvider.fetchEventAttendance(event.id);
-          if (attendance != null) {
-            attended.addAll(attendance.where((record) => record.isPresent == true).toList());
-            absent.addAll(attendance.where((record) => record.isPresent == false).toList());
-          }
-        }
-
-        return {'attended': attended, 'absent': absent};
-      } else {
-        print('No events found for the group');
-        return {'attended': [], 'absent': []};
+      if (allEvents.isEmpty) {
+        setState(() {
+          _eventComparison = {};
+        });
+        return;
       }
+
+      final filteredEvents = allEvents
+          .where((event) => _eventMatchesSelectedPeriod(event.dateTime))
+          .toList();
+
+      if (filteredEvents.isEmpty) {
+        setState(() {
+          _eventComparison = {};
+        });
+        return;
+      }
+
+      final summaries = await Future.wait(filteredEvents.map((event) async {
+        final attendance = await _eventProvider.fetchEventAttendance(event.id);
+        final total = attendance.length;
+        final present = attendance.where((record) => record.isPresent).length;
+        final absent = total - present;
+        final rate = total == 0 ? 0.0 : (present / total) * 100;
+
+        final label = event.title.isNotEmpty
+            ? event.title
+            : 'Event ${DateFormat('MMM d').format(event.dateTime)}';
+
+        return {
+          'label': label,
+          'rate': double.parse(rate.toStringAsFixed(1)),
+          'present': present,
+          'absent': absent,
+          'total': total,
+        };
+      }));
+
+      if (!mounted) return;
+
+      final Map<String, double> eventRates = {
+        for (final summary in summaries)
+          summary['label'] as String: summary['rate'] as double,
+      };
+
+      final Map<String, Map<String, int>> attendanceCounts = {
+        for (final summary in summaries)
+          summary['label'] as String: {
+            'present': summary['present'] as int,
+            'absent': summary['absent'] as int,
+            'total': summary['total'] as int,
+          },
+      };
+
+      setState(() {
+        _eventComparison = {
+          'eventStats': eventRates,
+          'counts': attendanceCounts,
+        };
+      });
     } catch (e) {
       print('Error loading event attendance: $e');
-      if (mounted) {
-        setState(() {
-          _errorMessage = 'Failed to load event attendance: ${e.toString()}';
-        });
-      }
-      return {'attended': [], 'absent': []};
+      if (!mounted) return;
+      setState(() {
+        _eventComparison = {};
+        _errorMessage ??= 'Failed to load event attendance: ${e.toString()}';
+      });
+    }
+  }
+
+  bool _eventMatchesSelectedPeriod(DateTime eventDate) {
+    final now = DateTime.now();
+    if (eventDate.isAfter(now)) return false;
+
+    final differenceInDays = now.difference(eventDate).inDays;
+    switch (_selectedPeriod) {
+      case 'weekly':
+        return differenceInDays <= 7;
+      case 'monthly':
+        return differenceInDays <= 30;
+      case 'yearly':
+        return differenceInDays <= 365;
+      default:
+        return true;
     }
   }
 
@@ -275,16 +341,31 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
               },
             ),
             // Detailed Analytics Tab
-            SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildEventAttendanceChart(),
-                  const SizedBox(height: 16),
-                  _buildDemographicsPieChart(),
-                  const SizedBox(height: 16),
-                ],
+            ChangeNotifierProvider<attendance_overview.AttendanceProvider>(
+              create: (_) {
+                final service = attendance_services.AttendanceService(
+                  ApiEndpoints.baseUrl,
+                );
+                final provider =
+                    attendance_overview.AttendanceProvider(service);
+                provider.loadData(scope: 'group', groupId: widget.groupId);
+                return provider;
+              },
+              child: Builder(
+                builder: (context) => SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildGroupAttendanceOverview(context),
+                      const SizedBox(height: 16),
+                      _buildEventAttendanceChart(),
+                      const SizedBox(height: 16),
+                      _buildDemographicsPieChart(),
+                      const SizedBox(height: 16),
+                    ],
+                  ),
+                ),
               ),
             ),
           ],
@@ -331,49 +412,99 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
                  return const Center(child: CircularProgressIndicator());
                } else if (snapshot.hasError) {
                  return Center(child: Text('Error: ${snapshot.error}'));
-               } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-                 final eventStats = snapshot.data!['eventStats'] as Map<String, dynamic>;
-                 return SizedBox(
-                   height: 300,
-                   child: BarChart(
-                     BarChartData(
-                       alignment: BarChartAlignment.spaceAround,
-                       borderData: FlBorderData(show: true),
-                       barGroups: eventStats.entries.map((entry) {
-                         final index = eventStats.keys.toList().indexOf(entry.key);
-                         return BarChartGroupData(
-                           x: index,
-                           barRods: [
-                             BarChartRodData(
-                               toY: (entry.value as num).toDouble(),
-                               color: Colors.blue,
-                               width: 16,
-                             ),
-                           ],
-                         );
-                       }).toList(),
-                       titlesData: FlTitlesData(
-                         leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true)),
-                          bottomTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                          showTitles: true,
-                          getTitlesWidget: (value, meta) {
-                            final index = value.toInt();
-                            if (index >= 0 && index < eventStats.keys.length) {
-                              return Text(eventStats.keys.elementAt(index));
-                            }
-                            return const Text('');
-                          },
-                        ),
-                      ),
+               }
 
-                     ),
-                   ),
-                  )
-                 );
-               } else {
+               final data = snapshot.data ?? {};
+               final eventStats =
+                   (data['eventStats'] as Map<String, double>?) ?? {};
+               final counts =
+                   (data['counts'] as Map<String, Map<String, int>>?) ?? {};
+
+               if (eventStats.isEmpty) {
                  return const Center(child: Text('No attendance data available.'));
                }
+
+               final eventLabels = eventStats.keys.toList();
+
+               return SizedBox(
+                 height: 320,
+                 child: BarChart(
+                   BarChartData(
+                     alignment: BarChartAlignment.spaceAround,
+                     maxY: 100,
+                     barTouchData: BarTouchData(
+                       enabled: true,
+                       touchTooltipData: BarTouchTooltipData(
+                         tooltipBgColor: Colors.black87,
+                         getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                           final label = eventLabels[group.x.toInt()];
+                           final count = counts[label];
+                           final present = count?['present'] ?? 0;
+                           final total = count?['total'] ?? 0;
+                           return BarTooltipItem(
+                             '$label\n${rod.toY.toStringAsFixed(1)}% attendance\n$present of $total present',
+                             const TextStyle(
+                               color: Colors.white,
+                               fontWeight: FontWeight.w600,
+                             ),
+                           );
+                         },
+                       ),
+                     ),
+                     gridData: const FlGridData(
+                       show: true,
+                       drawVerticalLine: false,
+                     ),
+                     borderData: FlBorderData(
+                       show: true,
+                       border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                     ),
+                     titlesData: FlTitlesData(
+                       leftTitles: const AxisTitles(
+                         sideTitles: SideTitles(showTitles: true),
+                       ),
+                       bottomTitles: AxisTitles(
+                         sideTitles: SideTitles(
+                           showTitles: true,
+                           getTitlesWidget: (value, meta) {
+                             final index = value.toInt();
+                             if (index >= 0 && index < eventLabels.length) {
+                               return Padding(
+                                 padding: const EdgeInsets.only(top: 8.0),
+                                 child: Transform.rotate(
+                                   angle: -0.6,
+                                   child: Text(
+                                     eventLabels[index],
+                                     style: Theme.of(context)
+                                         .textTheme
+                                         .bodySmall
+                                         ?.copyWith(fontSize: 10),
+                                   ),
+                                 ),
+                               );
+                             }
+                             return const SizedBox.shrink();
+                           },
+                         ),
+                       ),
+                     ),
+                     barGroups: eventStats.entries.map((entry) {
+                       final index = eventLabels.indexOf(entry.key);
+                       return BarChartGroupData(
+                         x: index,
+                         barRods: [
+                           BarChartRodData(
+                             toY: entry.value,
+                             color: AppColors.primaryColor,
+                             width: 18,
+                             borderRadius: BorderRadius.circular(6),
+                           ),
+                         ],
+                       );
+                     }).toList(),
+                   ),
+                 ),
+               );
              },
            ),
          ],
@@ -432,6 +563,44 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
      },
    );
  }
+
+  Widget _buildGroupAttendanceOverview(BuildContext context) {
+    final attendanceProvider =
+        context.watch<attendance_overview.AttendanceProvider>();
+
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Attendance Overview',
+              style: TextStyles.heading2.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            AttendanceChart(
+              periods: const ['week', 'month', 'quarter', 'year'],
+              selectedPeriod: attendanceProvider.period,
+              labels: attendanceProvider.chartLabels,
+              values: attendanceProvider.chartRates,
+              isLoading: attendanceProvider.loading,
+              onPeriodChange: (value) {
+                if (value == null) return;
+                attendanceProvider.changePeriod(
+                  value,
+                  scope: 'group',
+                  groupId: widget.groupId,
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
  // Widget _buildActivityStatusCard() {
  //   return FutureBuilder<Map<String, double>>(

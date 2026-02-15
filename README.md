@@ -2,6 +2,8 @@
 
 A comprehensive Flutter application designed to streamline church group management, event coordination, and member communication.
 
+### Live app : safariconnect.org
+
 ![Church Connect App](assets/images/citam_logo.jpg)
 
 ## Overview
@@ -42,7 +44,7 @@ Church Connect is a multi-platform application that helps church administrators 
 ## Technology Stack
 
 - **Frontend**: Flutter (Dart)
-- **Backend**: Supabase
+- **Backend**: Express.js (Node.js)
 - **Authentication**: Supabase Auth
 - **Database**: PostgreSQL (via Supabase)
 - **Storage**: Supabase Storage

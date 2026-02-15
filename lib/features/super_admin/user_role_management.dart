@@ -184,7 +184,7 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
     final displayLabel = option.label;
 
     log('Attempting to update role for user:');
-    log('User ID: ${user.id}');
+    // log('User ID: ${user.id}');
     log('User Name: ${user.fullName}');
     log('Current Role: ${user.role}');
     log('New Role (value): ${option.value}');

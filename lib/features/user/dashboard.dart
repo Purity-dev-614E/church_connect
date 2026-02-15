@@ -97,13 +97,23 @@ class _UserDashboardState extends State<UserDashboard> {
       final userGroups = await groupProvider.getUserGroups(userId);
 
       if (userGroups.isEmpty) {
-        print('No groups found for user, redirecting to no group screen');
-        if (mounted) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => const NoGroupScreen()),
-          );
+        // Only regular members (role == "user") should ever see the NoGroupScreen.
+        final userProvider = Provider.of<UserProvider>(context, listen: false);
+        final role = userProvider.currentUser?.role.toLowerCase() ?? 'user';
+
+        if (role == 'user') {
+          print('No groups found for regular user, redirecting to no group screen');
+          if (mounted) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (context) => const NoGroupScreen()),
+            );
+          }
+          return;
         }
-        return;
+
+        // For Super Admins, Admins, and Regional roles, skip the NoGroupScreen
+        // and continue loading the dashboard (they may legitimately have no group).
+        print('No groups found, but role is "$role"; skipping NoGroupScreen.');
       }
 
       // Use the first group if no specific group is provided

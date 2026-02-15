@@ -2,10 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:group_management_church_app/data/providers/analytics_providers/regional_manager_analytics_provider.dart';
 import 'package:group_management_church_app/data/providers/analytics_providers/super_admin_analytics_provider.dart';
+import 'package:group_management_church_app/data/providers/attendance_overview.dart'
+    as attendance_overview;
 import 'package:group_management_church_app/data/providers/region_provider.dart';
+import 'package:group_management_church_app/data/services/attendance_overview.dart'
+    as attendance_services;
+import '../../../core/constants/app_endpoints.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../main.dart';
+import 'package:group_management_church_app/widgets/attendanceChart.dart';
+import 'package:provider/provider.dart';
 
 class SuperAdminAnalyticsScreen extends StatefulWidget {
   const SuperAdminAnalyticsScreen({super.key});
@@ -21,6 +28,8 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
   final RegionalManagerAnalyticsProvider _regionalProvider =
       RegionalManagerAnalyticsProvider();
   final RegionProvider _regionProvider = RegionProvider();
+  final attendance_services.AttendanceService _attendanceService =
+      attendance_services.AttendanceService(ApiEndpoints.baseUrl);
 
   String _selectedPeriod = 'week';
   bool _isLoading = false;
@@ -111,45 +120,44 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
 
   Future<void> _loadRegionalAttendance() async {
     try {
-      _regionAttendance = {};
-      
-      // Load regions
       await _regionProvider.loadRegions();
       final regions = _regionProvider.regions;
-      
+
       if (regions.isEmpty) {
-        throw Exception('No regions available');
+        setState(() {
+          _regionAttendance = {};
+        });
+        return;
       }
 
-      // Load attendance for each region
-      for (var region in regions) {
-        try {
-          // Updated API route for regional attendance
-          final attendanceStats = await _regionalProvider.getOverallAttendanceByPeriodForRegion(
-            _selectedPeriod,
-            region.id,
-          );
-
-          if (attendanceStats?.overallStats?.attendanceRate != null) {
-            _regionAttendance[region.name] = attendanceStats!.overallStats!.attendanceRate;
+      final entries = await Future.wait(
+        regions.map((region) async {
+          try {
+            final overview = await _attendanceService.getOverview(
+              _selectedPeriod,
+              scope: 'region',
+              regionId: region.id,
+            );
+            return MapEntry(region.name, overview.summary.attendanceRate);
+          } catch (e) {
+            debugPrint('Error loading attendance for region ${region.name}: $e');
+            return MapEntry(region.name, 0.0);
           }
-        } catch (e) {
-          print('Error loading attendance for region ${region.name}: $e');
-          // Provide fallback data for regions with missing attendance
-          _regionAttendance[region.name] = 0.0;
-        }
-      }
+        }),
+      );
 
-      // If all regions failed, provide some sample data
-      if (_regionAttendance.isEmpty) {
-        for (var region in regions) {
-          _regionAttendance[region.name] = 0.0;
-        }
-      }
+      if (!mounted) return;
+      setState(() {
+        _regionAttendance = {
+          for (final entry in entries) entry.key: entry.value,
+        };
+      });
     } catch (e) {
-      print('Error in _loadRegionalAttendance: $e');
-      // Don't throw exception, just set empty data
-      _regionAttendance = {};
+      debugPrint('Error in _loadRegionalAttendance: $e');
+      if (!mounted) return;
+      setState(() {
+        _regionAttendance = {};
+      });
     }
   }
 
@@ -300,19 +308,34 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
               ),
 
               // Detailed Analytics Tab
-              FadeTransition(
-                opacity: _fadeAnimation,
-                child: ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    _buildPeriodSelector(),
-                    const SizedBox(height: 16),
-                    _buildOverallAttendanceChart(),
-                    const SizedBox(height: 16),
-                    _buildActivityStatusChart(),
-                    const SizedBox(height: 16),
-                    _buildRegionalAttendanceChart(),
-                  ],
+              ChangeNotifierProvider<attendance_overview.AttendanceProvider>(
+                create: (_) {
+                  final service = attendance_services.AttendanceService(
+                    ApiEndpoints.baseUrl,
+                  );
+                  final provider =
+                      attendance_overview.AttendanceProvider(service);
+                  provider.loadData(scope: 'overall');
+                  return provider;
+                },
+                child: FadeTransition(
+                  opacity: _fadeAnimation,
+                  child: Builder(
+                    builder: (context) => ListView(
+                      padding: const EdgeInsets.all(16),
+                      children: [
+                        // _buildPeriodSelector(),
+                        // const SizedBox(height: 16),
+                        _buildGlobalAttendanceOverview(context),
+                        const SizedBox(height: 16),
+                        // _buildOverallAttendanceChart(),
+                        // const SizedBox(height: 16),
+                        _buildActivityStatusChart(),
+                        const SizedBox(height: 16),
+                        _buildRegionalAttendanceChart(),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -498,6 +521,43 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
     );
   }
 
+  Widget _buildGlobalAttendanceOverview(BuildContext context) {
+    final attendanceProvider =
+        context.watch<attendance_overview.AttendanceProvider>();
+
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Overall Attendance Overview',
+              style: TextStyles.heading2.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            AttendanceChart(
+              periods: const ['week', 'month', 'quarter', 'year'],
+              selectedPeriod: attendanceProvider.period,
+              labels: attendanceProvider.chartLabels,
+              values: attendanceProvider.chartRates,
+              isLoading: attendanceProvider.loading,
+              onPeriodChange: (value) {
+                if (value == null) return;
+                attendanceProvider.changePeriod(
+                  value,
+                  scope: 'overall',
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildActivitySummary() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -641,7 +701,7 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
                       barRods: [
                         BarChartRodData(
                           toY: entry.value,
-                          color: Colors.blue,
+                          color: Colors.red,
                           width: 20,
                         ),
                       ],

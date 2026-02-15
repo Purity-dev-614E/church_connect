@@ -83,14 +83,14 @@ class AdminAnalyticsProvider extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
 
   AdminAnalyticsProvider({
+    AdminAnalyticsService? analyticsService,
     String baseUrl = ApiEndpoints.baseUrl,
     String token = AuthServices.accessTokenKey,
-  })
-
-      : _analyticsService = AdminAnalyticsService(
-          baseUrl: baseUrl,
-          token: token,
-        );
+  }) : _analyticsService = analyticsService ??
+            AdminAnalyticsService(
+              baseUrl: baseUrl,
+              token: token,
+            );
 
   // Helper methods
   void _setLoading(bool loading) {

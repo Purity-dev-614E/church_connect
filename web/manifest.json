@@ -1,11 +1,11 @@
 {
-    "name": "Church Connect",
-    "short_name": "Church Connect",
+    "name": "Safari Connect",
+    "short_name": "Safari Connect",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "Church Connect is a platform for connecting church members",
+    "description": "Safari Connect is a platform for connecting the CITAM community",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

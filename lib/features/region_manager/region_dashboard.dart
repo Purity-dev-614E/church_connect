@@ -277,21 +277,22 @@ class _RegionDashboardState extends State<RegionDashboard> {
       appBar: CustomAppBar(
         title: _region?.name ?? 'Region Dashboard',
         showBackButton: widget.actingAsSuperAdmin, // allow back when coming from Super Admin
-        showProfileAvatar: true,
+        showProfileAvatar: !widget.actingAsSuperAdmin,
         onProfileTap: _navigateToProfile,
-        actions: [
-          if (widget.actingAsSuperAdmin)
-            IconButton(
-              icon: const Icon(Icons.admin_panel_settings, color: Colors.white),
-              tooltip: 'Back to Super Admin',
-              onPressed: () {
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (_) => const SuperAdminDashboard()),
-                  (route) => false,
-                );
-              },
-            ),
-        ],
+        actions: widget.actingAsSuperAdmin
+            ? [
+                IconButton(
+                  icon: const Icon(Icons.admin_panel_settings, color: Colors.white),
+                  tooltip: 'Back to Super Admin',
+                  onPressed: () {
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => const SuperAdminDashboard()),
+                      (route) => false,
+                    );
+                  },
+                ),
+              ]
+            : null,
       ),
       body: PageView(
         controller: _pageController,
@@ -485,11 +486,6 @@ class _RegionDashboardState extends State<RegionDashboard> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildQuickActionButton(
-                  'Add Group',
-                  Icons.group_add,
-                  () => _onItemTapped(2),
-                ),
-                _buildQuickActionButton(
                   'Settings',
                   Icons.settings,
                   () => _onItemTapped(4),
@@ -543,7 +539,7 @@ class _RegionDashboardState extends State<RegionDashboard> {
     String formattedAttendance = '${(attendanceRate / 100).toStringAsFixed(1)}%';
 
     return GridView.count(
-      crossAxisCount: 2,
+      crossAxisCount: 3,
       crossAxisSpacing: 16,
       mainAxisSpacing: 16,
       shrinkWrap: true,
@@ -552,7 +548,7 @@ class _RegionDashboardState extends State<RegionDashboard> {
         _buildStatCard('Total Users', totalUsers, Icons.people, AppColors.primaryColor),
         _buildStatCard('Total Groups', totalGroups, Icons.groups, AppColors.secondaryColor),
         _buildStatCard('Active Events', activeEvents, Icons.event, AppColors.accentColor),
-        _buildStatCard('Attendance', formattedAttendance, Icons.trending_up, Colors.green),
+        // _buildStatCard('Attendance', formattedAttendance, Icons.trending_up, Colors.green),
       ],
     );
   }

@@ -1,6 +1,4 @@
 import 'package:flutter/foundation.dart';
-import 'package:group_management_church_app/data/services/http_client.dart';
-import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 
 import '../../models/regional_analytics_model.dart';
@@ -121,10 +119,13 @@ class RegionalManagerAnalyticsProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   
-  RegionalManagerAnalyticsProvider({http.Client? client}) 
-      : _analyticsService = RegionAnalyticsService(
-        baseUrl: 'https://safari-backend-fgl3.onrender.com/api'
-          );
+  RegionalManagerAnalyticsProvider({
+    RegionAnalyticsService? analyticsService,
+    String baseUrl = '/api',
+  }) : _analyticsService = analyticsService ??
+            RegionAnalyticsService(
+              baseUrl: baseUrl,
+            );
   
   // Helper methods
   void _setLoading(bool loading) {

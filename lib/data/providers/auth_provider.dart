@@ -108,9 +108,46 @@ class AuthProvider extends ChangeNotifier {
       
       if (success) {
         // Set the current user from the login response
+        // The Supabase user object structure is different from our UserModel
+        // So we create a minimal user model with just the ID and email
         if (result['user'] != null) {
-          _currentUser = UserModel.fromJson(result['user']);
-          print('Current user set: ${_currentUser?.fullName}');
+          try {
+            final userData = result['user'] as Map<String, dynamic>;
+            // Create a minimal user model from Supabase user object
+            _currentUser = UserModel(
+              id: userData['id']?.toString() ?? '',
+              fullName: userData['user_metadata']?['full_name']?.toString() ?? 
+                       userData['email']?.toString().split('@')[0] ?? 
+                       'User ${userData['id']?.toString() ?? ''}',
+              email: userData['email']?.toString() ?? '',
+              contact: userData['phone']?.toString() ?? '',
+              nextOfKin: '',
+              nextOfKinContact: '',
+              role: userData['user_metadata']?['role']?.toString() ?? 
+                   userData['role']?.toString() ?? 
+                   'user',
+              gender: '',
+              regionId: '',
+              regionalID: '',
+            );
+            print('Current user set: ${_currentUser?.fullName}');
+          } catch (e) {
+            print('Error creating user model from login response: $e');
+            // Create a minimal user model with just the ID
+            final userData = result['user'] as Map<String, dynamic>;
+            _currentUser = UserModel(
+              id: userData['id']?.toString() ?? '',
+              fullName: 'User ${userData['id']?.toString() ?? 'Unknown'}',
+              email: userData['email']?.toString() ?? '',
+              contact: '',
+              nextOfKin: '',
+              nextOfKinContact: '',
+              role: 'user',
+              gender: '',
+              regionId: '',
+              regionalID: '',
+            );
+          }
         }
         
         _status = AuthStatus.authenticated;
@@ -274,7 +311,14 @@ class AuthProvider extends ChangeNotifier {
       final success = await _authService.refreshToken();
       
       if (!success) {
-        // If token refresh fails, set status to unauthenticated
+        // If refresh fails but we still have an access token, don't force logout.
+        // Some web contexts block storage writes, making refresh "appear" to fail.
+        final existingToken = await _authService.getAccessToken();
+        if (existingToken != null && existingToken.isNotEmpty) {
+          print('Token refresh failed, but access token exists; continuing without refresh.');
+          return true;
+        }
+
         _status = AuthStatus.unauthenticated;
         _errorMessage = 'Your session has expired. Please login again.';
         notifyListeners();
@@ -282,6 +326,12 @@ class AuthProvider extends ChangeNotifier {
       
       return success;
     } catch (e) {
+      final existingToken = await _authService.getAccessToken();
+      if (existingToken != null && existingToken.isNotEmpty) {
+        print('Token refresh threw, but access token exists; continuing without refresh.');
+        return true;
+      }
+
       _status = AuthStatus.unauthenticated;
       _errorMessage = 'Authentication failed. Please login again.';
       notifyListeners();
@@ -319,7 +369,7 @@ class AuthProvider extends ChangeNotifier {
           : 'data:image/jpeg;base64,$base64Image';
 
       // Make API request to upload profile image
-      final url = Uri.parse('${ApiEndpoints.baseUrl}/users/$userId/uploadimage');
+      final url = Uri.parse(ApiEndpoints.uploadUserImage(userId));
       
       // Log request details (excluding the full base64 string for brevity)
       print('Upload request details:');
@@ -349,10 +399,13 @@ class AuthProvider extends ChangeNotifier {
         try {
           final responseData = json.decode(response.body);
           if (responseData['url'] != null) {
-            // Construct the full image URL by combining the base URL with the relative path
-            // Remove /api from the base URL when constructing the uploads URL
-            final baseUrl = ApiEndpoints.baseUrl.replaceAll('/api', '');
-            final fullImageUrl = '$baseUrl${responseData['url']}';
+            // Construct the full image URL by combining the server base URL with the relative path
+            // The response URL is typically relative, so we prepend the server base URL
+            final serverBaseUrl = 'https://safari-backend-fgl3.onrender.com';
+            final imagePath = responseData['url'].toString().startsWith('/') 
+                ? responseData['url'] 
+                : '/${responseData['url']}';
+            final fullImageUrl = '$serverBaseUrl$imagePath';
             print('Full image URL: $fullImageUrl');
 
             // Update the current user's profile image URL with the full URL

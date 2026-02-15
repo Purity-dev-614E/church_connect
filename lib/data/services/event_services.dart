@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:group_management_church_app/core/constants/app_endpoints.dart';
 import 'package:group_management_church_app/data/models/attendance_model.dart';
 import 'package:group_management_church_app/data/models/event_model.dart';
@@ -10,9 +11,17 @@ import 'package:group_management_church_app/data/services/http_client.dart';
 
 /// Service class for managing group-specific events and attendance
 class EventServices {
-  final AuthServices _authServices = AuthServices();
-  final UserServices _userServices = UserServices();
-  final HttpClient _httpClient = HttpClient();
+  final AuthServices _authServices;
+  final UserServices _userServices;
+  final HttpClient _httpClient;
+
+  EventServices({
+    AuthServices? authServices,
+    UserServices? userServices,
+    HttpClient? httpClient,
+  })  : _authServices = authServices ?? AuthServices(),
+        _userServices = userServices ?? UserServices(),
+        _httpClient = httpClient ?? HttpClient();
 
   // SECTION: Authentication and Authorization
 
@@ -356,17 +365,14 @@ Future<List<AttendanceModel>> getEventAttendance(String eventId) async {
       bool present,
       {String? topic, String? aob, String? apology}) async {
     try {
-      final body = {
-        'user_id': userId,
-        'present': present,
-      };
-
-      if (present) {
-        if (topic != null) body['topic'] = topic;
-        if (aob != null) body['aob'] = aob;
-      } else {
-        if (apology != null) body['apology'] = apology;
-      }
+      final body = buildAttendancePayload(
+        eventId: eventId,
+        userId: userId,
+        present: present,
+        topic: topic,
+        aob: aob,
+        apology: apology,
+      );
 
       final response = await _httpClient.post(
         ApiEndpoints.createEventAttendance(eventId),
@@ -382,6 +388,31 @@ Future<List<AttendanceModel>> getEventAttendance(String eventId) async {
     } catch (e) {
       throw Exception('Failed to mark attendance: $e');
     }
+  }
+
+  @visibleForTesting
+  Map<String, dynamic> buildAttendancePayload({
+    required String eventId,
+    required String userId,
+    required bool present,
+    String? topic,
+    String? aob,
+    String? apology,
+  }) {
+    final payload = {
+      'event_id': eventId,
+      'user_id': userId,
+      'present': present,
+    };
+
+    if (present) {
+      if (topic != null) payload['topic'] = topic;
+      if (aob != null) payload['aob'] = aob;
+    } else {
+      if (apology != null) payload['apology'] = apology;
+    }
+
+    return payload;
   }
 
   /// Get attendance records for a specific user

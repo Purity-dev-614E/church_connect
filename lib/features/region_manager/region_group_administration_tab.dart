@@ -149,16 +149,8 @@ class _RegionGroupAdministrationTabState
                       ? _buildEmptyView()
                       : _buildGroupList(),
             ),
-
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          _showCreateGroupDialog(context);
-        },
-        backgroundColor: AppColors.primaryColor,
-        child: const Icon(Icons.add, size: 28, color: Colors.white),
       ),
     );
   }
@@ -211,7 +203,7 @@ class _RegionGroupAdministrationTabState
           ),
           const SizedBox(height: 8),
           Text(
-            'Create your first group to get started',
+            'No groups found for this region. Groups are currently created and assigned by the super admin.',
             style: TextStyles.bodyText.copyWith(
               color: Theme.of(
                 context,
@@ -219,7 +211,6 @@ class _RegionGroupAdministrationTabState
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 24),
         ],
       ),
     );

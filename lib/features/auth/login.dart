@@ -479,7 +479,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
           // Copyright text
           Text(
-            '© 2025 Safari Connect. All rights reserved.',
+            '© 2026 Safari Connect. All rights reserved.',
             style: TextStyle(
               fontSize: 11, // Smaller font
               color: Theme.of(context).colorScheme.onBackground,
