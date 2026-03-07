@@ -211,8 +211,8 @@ class EventCard extends StatelessWidget {
           padding: const EdgeInsets.all(20.0),
           child: FutureBuilder(
             future: Future.wait([
-              groupProvider.getGroupById(event.groupId),
-              regionProvider.getRegionById(event.regionId),
+              groupProvider.getGroupById(event.groupId!),
+              regionProvider.getRegionById(event.regionId!),
             ]).timeout(
               const Duration(seconds: 10),
               onTimeout: () => [null, null],

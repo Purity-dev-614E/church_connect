@@ -7,12 +7,14 @@ import 'package:group_management_church_app/data/models/group_model.dart';
 import 'package:group_management_church_app/data/providers/event_provider.dart';
 import 'package:group_management_church_app/data/providers/group_provider.dart';
 import 'package:group_management_church_app/data/services/group_services.dart';
+import 'package:group_management_church_app/data/services/group_activity_service.dart';
 import 'package:group_management_church_app/data/services/user_services.dart';
+import 'package:group_management_church_app/data/services/group_creation_service.dart';
+import 'package:group_management_church_app/widgets/create_group_dialog.dart';
 import 'package:provider/provider.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
 import '../admin/Admin_dashboard.dart';
 import '../region_manager/group_details_screen.dart';
-
 
 class GroupAdministrationTab extends StatefulWidget {
   const GroupAdministrationTab({super.key});
@@ -31,7 +33,8 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
   final List<String> _filterOptions = ['All Groups', 'Active', 'Inactive'];
   final ScrollController _scrollController = ScrollController();
   bool _isHeaderVisible = true;
-  
+  Map<String, bool> _groupInactive = {};
+
   @override
   void initState() {
     super.initState();
@@ -39,13 +42,15 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
     _loadGroups();
 
     _scrollController.addListener(() {
-      if (_scrollController.position.userScrollDirection == ScrollDirection.reverse) {
+      if (_scrollController.position.userScrollDirection ==
+          ScrollDirection.reverse) {
         if (_isHeaderVisible) {
           setState(() {
             _isHeaderVisible = false;
           });
         }
-      } else if (_scrollController.position.userScrollDirection == ScrollDirection.forward) {
+      } else if (_scrollController.position.userScrollDirection ==
+          ScrollDirection.forward) {
         if (!_isHeaderVisible) {
           setState(() {
             _isHeaderVisible = true;
@@ -69,11 +74,16 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
       if (mounted) {
         setState(() {
           _groups = groupProvider.groups;
-          _filteredGroups = _groups;
           _errorMessage = null;
-          _isLoading = false;
         });
-        _filterGroups();
+        await _loadGroupActivityStatus();
+        if (mounted) {
+          setState(() {
+            _filteredGroups = _groups;
+            _isLoading = false;
+          });
+          _filterGroups();
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -85,18 +95,42 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
     }
   }
 
+  Future<void> _loadGroupActivityStatus() async {
+    final service = GroupActivityService();
+    final results = await Future.wait(
+      _groups.map(
+        (g) => service
+            .isGroupInactive(g.id)
+            .then((v) => MapEntry(g.id, v))
+            .catchError((_) => MapEntry(g.id, false)),
+      ),
+    );
+    if (mounted) {
+      setState(() {
+        for (final e in results) {
+          _groupInactive[e.key] = e.value;
+        }
+      });
+    }
+  }
+
   void _filterGroups() {
     setState(() {
-      _filteredGroups = _groups.where((group) {
-        final matchesSearch = group.name.toLowerCase().contains(_searchQuery.toLowerCase());
-        final matchesFilter = _selectedFilter == 'All Groups' ||
-                             (_selectedFilter == 'Active' && true) || // Assuming all groups are active for now
-                             (_selectedFilter == 'Inactive' && false);
-        return matchesSearch && matchesFilter;
-      }).toList();
+      _filteredGroups =
+          _groups.where((group) {
+            final matchesSearch = group.name.toLowerCase().contains(
+              _searchQuery.toLowerCase(),
+            );
+            final isInactive = _groupInactive[group.id] ?? false;
+            final matchesFilter =
+                _selectedFilter == 'All Groups' ||
+                (_selectedFilter == 'Active' && !isInactive) ||
+                (_selectedFilter == 'Inactive' && isInactive);
+            return matchesSearch && matchesFilter;
+          }).toList();
     });
   }
-  
+
   void _showError(String message) {
     CustomNotification.show(
       context: context,
@@ -121,28 +155,21 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
     );
   }
 
-  /// Helper function to get attendance data
-  Future<Map<String, dynamic>> _getGroupAttendance(String groupId) async {
-    final data = await GroupServices().fetchGroupAttendancePercentage(groupId)
-    ;
-    // Handle empty or null responses
-    if (data.isEmpty || data['percentage'] == null) {
+  /// Helper function to get group activity status.
+  /// A group is inactive if no event has been registered within 1.5 months of the last event.
+  Future<Map<String, dynamic>> _getGroupActivityStatus(String groupId) async {
+    try {
+      final status = await GroupActivityService().getGroupActivityStatus(
+        groupId,
+      );
       return {
-        'status': 'No Data',
-        'percentage': 0.0,
+        'status': status['status'] ?? 'No Data',
+        'isInactive': status['isInactive'] ?? true,
       };
+    } catch (_) {
+      return {'status': 'No Data', 'isInactive': true};
     }
-
-    final percentage = double.tryParse(data['percentage'].toString()) ?? 0.0;
-    final isActive = percentage > 75.0;
-
-    return {
-      'status': isActive ? 'Active' : 'Inactive',
-      'percentage': percentage,
-    };
   }
-
-
 
   @override
   @override
@@ -158,17 +185,23 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Group Management',
+                  Text(
+                    'Group Management',
                     style: TextStyles.heading1.copyWith(
-                      color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
-                  ),),
-                  const SizedBox(height: 16),
-                  Text('Manage all church groups from this dashboard.',
-                    style: TextStyles.heading2.copyWith(
-                      color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onBackground.withOpacity(0.7),
                     ),
                   ),
-
+                  const SizedBox(height: 16),
+                  Text(
+                    'Manage all church groups from this dashboard.',
+                    style: TextStyles.heading2.copyWith(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onBackground.withOpacity(0.7),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -204,12 +237,15 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
                         });
                         _filterGroups();
                       },
-                      items: _filterOptions
-                          .map((filter) => DropdownMenuItem(
-                        value: filter,
-                        child: Text(filter),
-                      ))
-                          .toList(),
+                      items:
+                          _filterOptions
+                              .map(
+                                (filter) => DropdownMenuItem(
+                                  value: filter,
+                                  child: Text(filter),
+                                ),
+                              )
+                              .toList(),
                       isExpanded: true,
                     ),
                   ],
@@ -221,27 +257,32 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
           // Groups list
           _isLoading
               ? const SliverFillRemaining(
-            child: Center(child: CircularProgressIndicator()),
-          )
+                child: Center(child: CircularProgressIndicator()),
+              )
               : _errorMessage != null
               ? SliverFillRemaining(child: _buildErrorView())
               : _filteredGroups.isEmpty
               ? SliverFillRemaining(child: _buildEmptyView())
               : SliverList(
-            delegate: SliverChildBuilderDelegate(
+                delegate: SliverChildBuilderDelegate(
                   (context, index) =>
-                  _buildGroupListItem(_filteredGroups[index]),
-              childCount: _filteredGroups.length,
-            ),
-          ),
+                      _buildGroupListItem(_filteredGroups[index]),
+                  childCount: _filteredGroups.length,
+                ),
+              ),
         ],
       ),
 
-      // Floating Add Button removed: all groups are pre-created and
-      // creation logic is currently being refactored.
+      // Floating Action Button for creating groups
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showCreateGroupDialog,
+        backgroundColor: AppColors.primaryColor,
+        foregroundColor: Colors.white,
+        child: const Icon(Icons.add),
+        tooltip: 'Create Group',
+      ),
     );
   }
-
 
   Widget _buildErrorView() {
     return Center(
@@ -273,7 +314,7 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
       ),
     );
   }
-  
+
   Widget _buildEmptyView() {
     return Center(
       child: Column(
@@ -287,15 +328,15 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
           const SizedBox(height: 16),
           Text(
             'No Groups Found',
-            style: TextStyles.heading2.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyles.heading2.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
             'All groups are managed centrally. If you expected groups here, please contact the system admin.',
             style: TextStyles.bodyText.copyWith(
-              color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+              color: Theme.of(
+                context,
+              ).colorScheme.onBackground.withOpacity(0.7),
             ),
             textAlign: TextAlign.center,
           ),
@@ -307,25 +348,23 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
   Widget _buildGroupList() {
     return RefreshIndicator(
       onRefresh: _loadGroups,
-     child: ListView.builder(
-       itemCount: _filteredGroups.length,
-       itemBuilder: (context, index) {
-         if (_filteredGroups.isEmpty) {
-           return const Center(child: Text('No groups available'));
-         }
-         final group = _filteredGroups[index];
-         return _buildGroupListItem(group);
-       },
-     )
+      child: ListView.builder(
+        itemCount: _filteredGroups.length,
+        itemBuilder: (context, index) {
+          if (_filteredGroups.isEmpty) {
+            return const Center(child: Text('No groups available'));
+          }
+          final group = _filteredGroups[index];
+          return _buildGroupListItem(group);
+        },
+      ),
     );
   }
 
   Widget _buildGroupListItem(GroupModel group) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -336,7 +375,11 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
                 CircleAvatar(
                   backgroundColor: AppColors.secondaryColor,
                   radius: 24,
-                  child: const Icon(Icons.groups, color: Colors.white, size: 28),
+                  child: const Icon(
+                    Icons.groups,
+                    color: Colors.white,
+                    size: 28,
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -353,17 +396,17 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
                       FutureBuilder<String>(
                         future: _fetchAdminName(group.group_admin!),
                         builder: (context, snapshot) {
-                          final adminName = snapshot.data ??
+                          final adminName =
+                              snapshot.data ??
                               (group.group_admin!.isNotEmpty
                                   ? "Loading..."
                                   : "No admin assigned");
                           return Text(
                             'Admin: $adminName',
                             style: TextStyles.bodyText.copyWith(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onBackground
-                                  .withOpacity(0.7),
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onBackground.withOpacity(0.7),
                             ),
                           );
                         },
@@ -387,7 +430,7 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
                 //   ),
                 // ),
                 FutureBuilder<Map<String, dynamic>>(
-                  future: _getGroupAttendance(group.id),
+                  future: _getGroupActivityStatus(group.id),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const SizedBox(
@@ -399,26 +442,41 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
 
                     if (!snapshot.hasData) {
                       return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.grey,
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Text('No Data', style: TextStyle(color: Colors.white)),
+                        child: const Text(
+                          'No Data',
+                          style: TextStyle(color: Colors.white),
+                        ),
                       );
                     }
 
                     final status = snapshot.data!['status'] as String;
 
                     return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
-                        color: status == "Active" ? Colors.green : Colors.redAccent,
+                        color:
+                            status == "Active"
+                                ? Colors.green
+                                : Colors.redAccent,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
                         status,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     );
                   },
@@ -434,10 +492,11 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => GroupDetailsScreen(
-                                groupId: group.id,
-                                groupName: group.name,
-                              ),
+                              builder:
+                                  (context) => GroupDetailsScreen(
+                                    groupId: group.id,
+                                    groupName: group.name,
+                                  ),
                             ),
                           );
                         } else if (value == 'edit') {
@@ -447,36 +506,39 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
                             }
                           });
                         } else if (value == 'delete') {
-                          _showDeleteGroupDialog(context, group).then((deleted) {
+                          _showDeleteGroupDialog(context, group).then((
+                            deleted,
+                          ) {
                             if (deleted) {
                               _loadGroups();
                             }
                           });
                         }
                       },
-                      itemBuilder: (context) => [
-                        const PopupMenuItem(
-                          value: 'view',
-                          child: ListTile(
-                            leading: Icon(Icons.visibility),
-                            title: Text('View'),
-                          ),
-                        ),
-                        const PopupMenuItem(
-                          value: 'edit',
-                          child: ListTile(
-                            leading: Icon(Icons.edit),
-                            title: Text('Edit'),
-                          ),
-                        ),
-                        const PopupMenuItem(
-                          value: 'delete',
-                          child: ListTile(
-                            leading: Icon(Icons.delete, color: Colors.red),
-                            title: Text('Delete'),
-                          ),
-                        ),
-                      ],
+                      itemBuilder:
+                          (context) => [
+                            const PopupMenuItem(
+                              value: 'view',
+                              child: ListTile(
+                                leading: Icon(Icons.visibility),
+                                title: Text('View'),
+                              ),
+                            ),
+                            const PopupMenuItem(
+                              value: 'edit',
+                              child: ListTile(
+                                leading: Icon(Icons.edit),
+                                title: Text('Edit'),
+                              ),
+                            ),
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: ListTile(
+                                leading: Icon(Icons.delete, color: Colors.red),
+                                title: Text('Delete'),
+                              ),
+                            ),
+                          ],
                     ),
                   ],
                 ),
@@ -500,11 +562,12 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => AdminDashboard(
-                              groupId: group.id,
-                              groupName: group.name,
-                              initialTabIndex: 1,
-                            ),
+                            builder:
+                                (context) => AdminDashboard(
+                                  groupId: group.id,
+                                  groupName: group.name,
+                                  initialTabIndex: 1,
+                                ),
                           ),
                         );
                       },
@@ -517,11 +580,12 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => AdminDashboard(
-                              groupId: group.id,
-                              groupName: group.name,
-                              initialTabIndex: 2,
-                            ),
+                            builder:
+                                (context) => AdminDashboard(
+                                  groupId: group.id,
+                                  groupName: group.name,
+                                  initialTabIndex: 2,
+                                ),
                           ),
                         );
                       },
@@ -529,15 +593,25 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
                     FutureBuilder<Map<String, dynamic>>(
                       future: _getGroupAttendance(group.id),
                       builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return _buildGroupStat('Attendance', '...', Icons.trending_up);
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return _buildGroupStat(
+                            'Attendance',
+                            '...',
+                            Icons.trending_up,
+                          );
                         }
 
                         if (!snapshot.hasData) {
-                          return _buildGroupStat('Attendance', '0%', Icons.trending_up);
+                          return _buildGroupStat(
+                            'Attendance',
+                            '0%',
+                            Icons.trending_up,
+                          );
                         }
 
-                        final percentage = snapshot.data!['percentage'] as double? ?? 0.0;
+                        final percentage =
+                            snapshot.data!['percentage'] as double? ?? 0.0;
 
                         return _buildGroupStat(
                           'Attendance',
@@ -551,26 +625,25 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
               },
             ),
             const SizedBox(height: 16),
-
           ],
         ),
       ),
     );
   }
 
-
-  Widget _buildGroupStat(String label, String value, IconData icon, {VoidCallback? onTap}) {
+  Widget _buildGroupStat(
+    String label,
+    String value,
+    IconData icon, {
+    VoidCallback? onTap,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Column(
         children: [
           Row(
             children: [
-              Icon(
-                icon,
-                size: 16,
-                color: AppColors.primaryColor,
-              ),
+              Icon(icon, size: 16, color: AppColors.primaryColor),
               const SizedBox(width: 4),
               Text(
                 value,
@@ -584,183 +657,120 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
           Text(
             label,
             style: TextStyles.bodyText.copyWith(
-              color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+              color: Theme.of(
+                context,
+              ).colorScheme.onBackground.withOpacity(0.7),
             ),
           ),
         ],
       ),
     );
   }
-  
-  Future<bool> _showCreateGroupDialog(BuildContext context) async {
-    final nameController = TextEditingController();
-    final descriptionController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-    final completer = Completer<bool>();
-    
+
+  void _showCreateGroupDialog() async {
+    final userServices = UserServices();
+    final userRole = await userServices.getUserRole();
+
+    if (userRole == null) {
+      _showError('Unable to determine user role');
+      return;
+    }
+
+    final groupService = GroupCreationService(
+      baseUrl: 'https://safari-backend-fgl3.onrender.com',
+    );
+
     showDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Create New Group'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Group Name',
-                  hintText: 'Enter group name',
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a group name';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'Description (Optional)',
-                  hintText: 'Enter group description',
-                ),
-                maxLines: 2,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              completer.complete(false); // No changes made
+      builder:
+          (context) => CreateGroupDialog(
+            userRole: userRole,
+            groupService: groupService,
+            onGroupCreated: () {
+              _loadGroups(); // Reload groups after successful creation
             },
-            child: const Text('Cancel'),
           ),
-          ElevatedButton(
-            onPressed: () async {
-              if (formKey.currentState!.validate()) {
-                try {
-                  // Show loading indicator
-                  setState(() {
-                    _isLoading = true;
-                  });
-                  
-                  final groupProvider = Provider.of<GroupProvider>(context, listen: false);
-                  final name = nameController.text.trim();
-                  final description = descriptionController.text.trim();
-                  final adminId = ''; // Default empty admin ID
-                  final regionId = ''; // Default empty region ID
-                  
-                  print('Creating group with name: $name, description: $description');
-                  
-                  final success = await groupProvider.createGroup(name, description, adminId, regionId);
-                  
-                  setState(() {
-                    _isLoading = false;
-                  });
-                  
-                  if (success) {
-                    Navigator.pop(dialogContext);
-                    _showSuccess('Group "$name" created successfully');
-                    await _loadGroups(); // Reload groups after successful creation
-                    completer.complete(true); // Group created successfully
-                  } else {
-                    _showError('Failed to create group. Please try again.');
-                    completer.complete(false); // Failed to create group
-                  }
-                } catch (e) {
-                  setState(() {
-                    _isLoading = false;
-                  });
-                  _showError('Failed to create group: $e');
-                  completer.complete(false); // Failed to create group
-                }
-              } else {
-                completer.complete(false); // Validation failed
-              }
-            },
-            child: const Text('Create'),
-          ),
-        ],
-      ),
     );
-    
-    return completer.future;
   }
-  
-  Future<bool> _showEditGroupDialog(BuildContext context, GroupModel group) async {
+
+  Future<bool> _showEditGroupDialog(
+    BuildContext context,
+    GroupModel group,
+  ) async {
     final nameController = TextEditingController(text: group.name);
     final formKey = GlobalKey<FormState>();
     final completer = Completer<bool>();
-    
+
     showDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Edit Group'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Group Name',
-                  hintText: 'Enter group name',
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a group name';
-                  }
-                  return null;
+      builder:
+          (dialogContext) => AlertDialog(
+            title: const Text('Edit Group'),
+            content: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: nameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Group Name',
+                      hintText: 'Enter group name',
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter a group name';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  completer.complete(false); // No changes made
                 },
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  if (formKey.currentState!.validate()) {
+                    try {
+                      final groupProvider = Provider.of<GroupProvider>(
+                        context,
+                        listen: false,
+                      );
+                      final updatedGroup = GroupModel(
+                        id: group.id,
+                        name: nameController.text.trim(),
+                        group_admin: group.group_admin,
+                        region_id: group.region_id,
+                      );
+
+                      await groupProvider.updateGroup(updatedGroup);
+
+                      Navigator.pop(dialogContext);
+                      _showSuccess(
+                        'Group "${nameController.text}" updated successfully',
+                      );
+                      completer.complete(true); // Group updated successfully
+                    } catch (e) {
+                      _showError('Failed to update group: $e');
+                      completer.complete(false); // Failed to update group
+                    }
+                  } else {
+                    completer.complete(false); // Validation failed
+                  }
+                },
+                child: const Text('Save'),
               ),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              completer.complete(false); // No changes made
-            },
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (formKey.currentState!.validate()) {
-                try {
-                  final groupProvider = Provider.of<GroupProvider>(context, listen: false);
-                  final updatedGroup = GroupModel(
-                    id: group.id,
-                    name: nameController.text.trim(),
-                    group_admin: group.group_admin,
-                    region_id: group.region_id,
-                  );
-                  
-                  await groupProvider.updateGroup(updatedGroup);
-                  
-                  Navigator.pop(dialogContext);
-                  _showSuccess('Group "${nameController.text}" updated successfully');
-                  completer.complete(true); // Group updated successfully
-                } catch (e) {
-                  _showError('Failed to update group: $e');
-                  completer.complete(false); // Failed to update group
-                }
-              } else {
-                completer.complete(false); // Validation failed
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
     );
-    
+
     return completer.future;
   }
 
@@ -773,30 +783,35 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
     try {
       final userServices = UserServices();
       final adminUser = await userServices.fetchCurrentUser(adminId);
-      final fullName = adminUser.fullName.isNotEmpty ? adminUser.fullName : "Admin #$adminId";
-      final phoneNumber = adminUser.contact.isNotEmpty ? adminUser.contact : "N/A";
+      final fullName =
+          adminUser.fullName.isNotEmpty
+              ? adminUser.fullName
+              : "Admin #$adminId";
+      final phoneNumber =
+          adminUser.contact.isNotEmpty ? adminUser.contact : "N/A";
       return "$fullName : (+$phoneNumber)";
     } catch (e) {
       print('Error fetching admin name: $e');
       return "Admin #$adminId (N/A)";
     }
   }
+
   // Safely fetch group statistics without causing navigation
   Future<Map<String, dynamic>> _fetchGroupStats(String groupId) async {
-    Map<String, dynamic> stats = {
-      'memberCount': 0,
-      'eventCount': 0,
-    };
-    
+    Map<String, dynamic> stats = {'memberCount': 0, 'eventCount': 0};
+
     try {
       // Fetch member count
       final groupProvider = Provider.of<GroupProvider>(context, listen: false);
       final members = await groupProvider.getGroupMembers(groupId);
       stats['memberCount'] = members.length;
-      
+
       // Fetch event count using EventProvider
       try {
-        final eventProvider = Provider.of<EventProvider>(context, listen: false);
+        final eventProvider = Provider.of<EventProvider>(
+          context,
+          listen: false,
+        );
         final events = await eventProvider.getGroupEvents(groupId);
         stats['eventCount'] = events.length;
       } catch (e) {
@@ -806,52 +821,83 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
     } catch (e) {
       print('Error fetching group stats: $e');
     }
-    
+
     return stats;
   }
 
-  Future<bool> _showDeleteGroupDialog(BuildContext context, GroupModel group) async {
+  Future<Map<String, dynamic>> _getGroupAttendance(String groupId) async {
+    try {
+      final data = await GroupServices().fetchGroupAttendancePercentage(
+        groupId,
+      );
+
+      if (data.isEmpty || data['percentage'] == null) {
+        return {'status': 'No Data', 'percentage': 0.0};
+      }
+
+      final percentage = double.tryParse(data['percentage'].toString()) ?? 0.0;
+      final isActive = percentage > 75.0;
+
+      return {
+        'status': isActive ? 'Active' : 'Inactive',
+        'percentage': percentage,
+      };
+    } catch (e) {
+      debugPrint('Error fetching attendance for $groupId: $e');
+      return {'status': 'Error', 'percentage': 0.0};
+    }
+  }
+
+  Future<bool> _showDeleteGroupDialog(
+    BuildContext context,
+    GroupModel group,
+  ) async {
     final completer = Completer<bool>();
-    
+
     showDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete Group'),
-        content: Text('Are you sure you want to delete "${group.name}"? This action cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              completer.complete(false); // No changes made
-            },
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              try {
-                final groupProvider = Provider.of<GroupProvider>(context, listen: false);
-                await groupProvider.deleteGroup(group.id);
-                
-                Navigator.pop(dialogContext);
-                _showSuccess('Group "${group.name}" deleted successfully');
-                completer.complete(true); // Group deleted successfully
-              } catch (e) {
-                _showError('Failed to delete group: $e');
-                completer.complete(false); // Failed to delete group
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+      builder:
+          (dialogContext) => AlertDialog(
+            title: const Text('Delete Group'),
+            content: Text(
+              'Are you sure you want to delete "${group.name}"? This action cannot be undone.',
             ),
-            child: const Text('Delete'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  completer.complete(false); // No changes made
+                },
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  try {
+                    final groupProvider = Provider.of<GroupProvider>(
+                      context,
+                      listen: false,
+                    );
+                    await groupProvider.deleteGroup(group.id);
+
+                    Navigator.pop(dialogContext);
+                    _showSuccess('Group "${group.name}" deleted successfully');
+                    completer.complete(true); // Group deleted successfully
+                  } catch (e) {
+                    _showError('Failed to delete group: $e');
+                    completer.complete(false); // Failed to delete group
+                  }
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                child: const Text('Delete'),
+              ),
+            ],
           ),
-        ],
-      ),
     );
-    
+
     return completer.future;
   }
 }
+
 class _SearchFilterHeader extends SliverPersistentHeaderDelegate {
   final Widget child;
 
@@ -859,7 +905,10 @@ class _SearchFilterHeader extends SliverPersistentHeaderDelegate {
 
   @override
   Widget build(
-      BuildContext context, double shrinkOffset, bool overlapsContent) {
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
     return child;
   }
 

@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'dart:developer';
 
 import 'package:group_management_church_app/core/constants/app_endpoints.dart';
+import 'package:group_management_church_app/core/utils/role_utils.dart';
 import 'package:group_management_church_app/data/models/group_model.dart';
+import 'package:group_management_church_app/data/models/removed_member_model.dart';
 import 'package:group_management_church_app/data/services/user_services.dart';
 import 'package:group_management_church_app/data/services/http_client.dart';
 
@@ -27,8 +29,8 @@ class GroupServices {
         throw Exception('User role is null');
       }
 
-      // Check if user has permission to create a group
-      if (userRole != 'super admin' && userRole != 'admin') {
+      // Check if user has permission to create a group (root bypasses RBAC)
+      if (!RoleUtils.isRoot(userRole) && userRole != 'super_admin' && userRole != 'super admin' && userRole != 'admin') {
         throw Exception('User does not have permission to create a group');
       }
 
@@ -201,7 +203,7 @@ class GroupServices {
 
       if (userRole == null) {
         throw Exception('User role is null');
-      } else if (userRole != 'super_admin' && userRole != 'region_manager') {
+      } else if (!RoleUtils.isRoot(userRole) && userRole != 'super_admin' && userRole != 'region_manager') {
         throw Exception('User is not authorized to assign admin');
       }
 
@@ -252,7 +254,7 @@ class GroupServices {
     }
   }
 
-  // Remove member from group
+  // Remove member from group (legacy, no reason)
   Future<bool> removeMemberFromGroup(String groupId, String userId) async {
     try {
       final response = await _httpClient.delete(ApiEndpoints.removeGroupMember(groupId, userId));
@@ -264,6 +266,57 @@ class GroupServices {
       }
     } catch (e) {
       throw Exception("Failed to remove member from group: $e");
+    }
+  }
+
+  /// Remove member from group with a required reason (stored for Removed Members list).
+  /// If the backend does not support the reason endpoint (404/501), falls back to legacy DELETE.
+  Future<bool> removeMemberFromGroupWithReason(
+    String groupId,
+    String userId,
+    String reason,
+  ) async {
+    try {
+      final response = await _httpClient.post(
+        ApiEndpoints.removeGroupMemberWithReason(groupId, userId),
+        body: jsonEncode({'reason': reason.trim()}),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        return true;
+      }
+      if (response.statusCode == 404 || response.statusCode == 501) {
+        return removeMemberFromGroup(groupId, userId);
+      }
+      throw Exception(
+          "Failed to remove member: HTTP status ${response.statusCode}");
+    } catch (e) {
+      try {
+        return await removeMemberFromGroup(groupId, userId);
+      } catch (_) {
+        throw Exception("Failed to remove member from group: $e");
+      }
+    }
+  }
+
+  /// Fetch list of removed members for a group (with removal reasons).
+  Future<List<RemovedMemberModel>> getRemovedMembers(String groupId) async {
+    try {
+      final response =
+          await _httpClient.get(ApiEndpoints.getRemovedMembers(groupId));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        if (data is! List) return [];
+        return data
+            .map((e) => RemovedMemberModel.fromJson(e as Map<String, dynamic>))
+            .toList();
+      } else {
+        return [];
+      }
+    } catch (e) {
+      log("Failed to fetch removed members: $e");
+      return [];
     }
   }
 

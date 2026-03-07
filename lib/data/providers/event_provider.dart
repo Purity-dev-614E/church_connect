@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:group_management_church_app/data/models/event_model.dart';
+import 'package:group_management_church_app/data/models/participant_model.dart';
 import 'package:group_management_church_app/data/models/user_model.dart';
 import 'package:group_management_church_app/data/services/event_services.dart';
 
@@ -11,7 +12,9 @@ class EventProvider extends ChangeNotifier {
   List<EventModel> _events = [];
   List<EventModel> _upcomingEvents = [];
   List<EventModel> _pastEvents = [];
+  List<EventModel> _leadershipEvents = [];
   List<UserModel> _attendedMembers = [];
+  List<Participant> _participants = [];
   Map<String, dynamic> _eventAttendance = {};
   Map<String, dynamic> _groupAttendance = {};
   bool _isLoading = false;
@@ -22,7 +25,9 @@ class EventProvider extends ChangeNotifier {
   List<EventModel> get events => _events;
   List<EventModel> get upcomingEvents => _upcomingEvents;
   List<EventModel> get pastEvents => _pastEvents;
+  List<EventModel> get leadershipEvents => _leadershipEvents;
   List<UserModel> get attendedMembers => _attendedMembers;
+  List<Participant> get participants => _participants;
   Map<String, dynamic> get eventAttendance => _eventAttendance;
   Map<String, dynamic> get groupAttendance => _groupAttendance;
   bool get isLoading => _isLoading;
@@ -69,22 +74,21 @@ class EventProvider extends ChangeNotifier {
   }
 
   /// Fetch all events for a specific group
- Future<List<EventModel>> fetchEventsByGroup(String groupId) async {
-   _setLoading(true);
-   try {
-     _events = await _eventServices.getEventsByGroup(groupId);
-     _errorMessage = null;
-     print("Fetched events: ${_events.length}");
-     print('Fetched events: $_events');
-     return _events;
-   } catch (error) {
-     _handleError('fetching events', error);
-     return []; // Return an empty list in case of an error
-   } finally {
-     _setLoading(false);
-   }
- }
-
+  Future<List<EventModel>> fetchEventsByGroup(String groupId) async {
+    _setLoading(true);
+    try {
+      _events = await _eventServices.getEventsByGroup(groupId);
+      _errorMessage = null;
+      print("Fetched events: ${_events.length}");
+      print('Fetched events: $_events');
+      return _events;
+    } catch (error) {
+      _handleError('fetching events', error);
+      return []; // Return an empty list in case of an error
+    } finally {
+      _setLoading(false);
+    }
+  }
 
   /// Fetch a specific event by ID
   Future<EventModel?> fetchEventById(String eventId) async {
@@ -100,13 +104,15 @@ class EventProvider extends ChangeNotifier {
       _setLoading(false);
     }
   }
+
   /// Create a new event
   Future<EventModel?> createEvent({
-    required String groupId,
+    String? groupId, // Make nullable for leadership events
     required String title,
     required String description,
     required DateTime dateTime,
     required String location,
+    String tag = 'org',
   }) async {
     _setLoading(true);
     try {
@@ -117,8 +123,12 @@ class EventProvider extends ChangeNotifier {
         description: description,
         dateTime: dateTime,
         location: location,
+        tag: tag,
       );
-      await fetchUpcomingEvents(groupId);
+      // Refresh events list only if this is a group event
+      if (groupId != null) {
+        await fetchUpcomingEvents(groupId);
+      }
 
       _errorMessage = null;
       return event;
@@ -130,8 +140,36 @@ class EventProvider extends ChangeNotifier {
     }
   }
 
+  /// Create a new leadership event
+  Future<EventModel?> createLeadershipEvent({
+    required String title,
+    required String description,
+    required DateTime dateTime,
+    required String location,
+    String? regionId,
+  }) async {
+    _setLoading(true);
+    try {
+      final event = await _eventServices.createLeadershipEvent(
+        title: title,
+        description: description,
+        dateTime: dateTime,
+        location: location,
+        regionId: regionId,
+      );
 
+      // Refresh overall events list to include the new leadership event
+      await fetchOverallEvents();
 
+      _errorMessage = null;
+      return event;
+    } catch (error) {
+      _handleError('creating leadership event', error);
+      return null;
+    } finally {
+      _setLoading(false);
+    }
+  }
 
   /// Update an existing event
   Future<EventModel?> updateEvent({
@@ -199,9 +237,10 @@ class EventProvider extends ChangeNotifier {
       final events = await _eventServices.getUpcomingEvents(groupId);
 
       // Filter only events that are in the future
-      _upcomingEvents = events
-          .where((event) => event.dateTime.isAfter(DateTime.now()))
-          .toList();
+      _upcomingEvents =
+          events
+              .where((event) => event.dateTime.isAfter(DateTime.now()))
+              .toList();
 
       // Sort by soonest first
       _upcomingEvents.sort((a, b) => a.dateTime.compareTo(b.dateTime));
@@ -217,18 +256,18 @@ class EventProvider extends ChangeNotifier {
 
   /// Fetch past events for a group
   Future<List<EventModel>> fetchPastEvents(String groupId) async {
-  _setLoading(true);
-  try {
-    _pastEvents = await _eventServices.getPastEvents(groupId);
-    _errorMessage = null;
-    return _pastEvents; // Return the list of past events
-  } catch (error) {
-    _handleError('fetching past events', error);
-    return []; // Return an empty list in case of an error
-  } finally {
-    _setLoading(false);
+    _setLoading(true);
+    try {
+      _pastEvents = await _eventServices.getPastEvents(groupId);
+      _errorMessage = null;
+      return _pastEvents; // Return the list of past events
+    } catch (error) {
+      _handleError('fetching past events', error);
+      return []; // Return an empty list in case of an error
+    } finally {
+      _setLoading(false);
+    }
   }
-}
 
   Future<EventModel?> fetchLatestEvent(String groupId) async {
     _setLoading(true);
@@ -242,7 +281,9 @@ class EventProvider extends ChangeNotifier {
         return null; // No events at all
       }
 
-      _pastEvents.sort((a, b) => b.dateTime.compareTo(a.dateTime)); // Sort newest first
+      _pastEvents.sort(
+        (a, b) => b.dateTime.compareTo(a.dateTime),
+      ); // Sort newest first
       return _pastEvents.first; // Return the latest event
     } catch (error) {
       _handleError('fetching latest event', error);
@@ -252,19 +293,18 @@ class EventProvider extends ChangeNotifier {
     }
   }
 
-
   /// Fetch events for a specific date range
   Future<List<EventModel>> fetchEventsByDateRange(
     String groupId,
     DateTime startDate,
-    DateTime endDate
+    DateTime endDate,
   ) async {
     _setLoading(true);
     try {
       final events = await _eventServices.getEventsByDateRange(
         groupId,
         startDate,
-        endDate
+        endDate,
       );
       _errorMessage = null;
       return events;
@@ -281,13 +321,13 @@ class EventProvider extends ChangeNotifier {
   /// Create attendance records for an event
   Future<bool> createEventAttendance(
     String eventId,
-    List<String> attendedMemberIds
+    List<String> attendedMemberIds,
   ) async {
     _setLoading(true);
     try {
       final result = await _eventServices.createEventAttendance(
         eventId,
-        attendedMemberIds
+        attendedMemberIds,
       );
       _errorMessage = null;
       return result;
@@ -300,19 +340,19 @@ class EventProvider extends ChangeNotifier {
   }
 
   /// Fetch members who attended an event
- Future<List<UserModel>> fetchAttendedMembers(String eventId) async {
-   _setLoading(true);
-   try {
-     _attendedMembers = await _eventServices.getAttendedMembers(eventId);
-     _errorMessage = null;
-     return _attendedMembers;
-   } catch (error) {
-     _handleError('fetching attended members', error);
-     return [];
-   } finally {
-     _setLoading(false);
-   }
- }
+  Future<List<UserModel>> fetchAttendedMembers(String eventId) async {
+    _setLoading(true);
+    try {
+      _attendedMembers = await _eventServices.getAttendedMembers(eventId);
+      _errorMessage = null;
+      return _attendedMembers;
+    } catch (error) {
+      _handleError('fetching attended members', error);
+      return [];
+    } finally {
+      _setLoading(false);
+    }
+  }
 
   /// Fetch attendance details for an event
   Future<List<AttendanceModel>> fetchEventAttendance(String eventId) async {
@@ -397,7 +437,7 @@ class EventProvider extends ChangeNotifier {
       _setLoading(false);
     }
   }
-  
+
   /// Get events by region
   Future<List<EventModel>> getEventsByRegion(String regionId) async {
     _setLoading(true);
@@ -407,6 +447,92 @@ class EventProvider extends ChangeNotifier {
       return events;
     } catch (error) {
       _handleError('fetching events by region', error);
+      return [];
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  // SECTION: Leadership Event Management
+
+  /// Fetch leadership events
+  Future<List<EventModel>> fetchLeadershipEvents() async {
+    _setLoading(true);
+    try {
+      _leadershipEvents = await _eventServices.getLeadershipEvents();
+      _errorMessage = null;
+      return _leadershipEvents;
+    } catch (error) {
+      _handleError('fetching leadership events', error);
+      return [];
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Fetch leadership event participants
+  Future<List<Participant>> fetchLeadershipEventParticipants(
+    String eventId, {
+    String? targetAudience,
+  }) async {
+    _setLoading(true);
+    try {
+      _participants = await _eventServices.getLeadershipEventParticipants(
+        eventId,
+        targetAudience: targetAudience,
+      );
+      _errorMessage = null;
+      return _participants;
+    } catch (error) {
+      _handleError('fetching leadership event participants', error);
+      return [];
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Mark attendance for leadership events
+  Future<bool> markLeadershipAttendance({
+    required String eventId,
+    required String userId,
+    required bool present,
+    String? notes,
+  }) async {
+    _setLoading(true);
+    try {
+      final result = await _eventServices.markLeadershipAttendance(
+        eventId: eventId,
+        userId: userId,
+        present: present,
+        notes: notes,
+      );
+      _errorMessage = null;
+      return result;
+    } catch (error) {
+      _handleError('marking leadership attendance', error);
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Get all events (both regular and leadership)
+  Future<List<EventModel>> fetchAllEvents() async {
+    _setLoading(true);
+    try {
+      // Load both regular and leadership events
+      final regularEvents = await fetchOverallEvents();
+      final leadershipEvents = await fetchLeadershipEvents();
+
+      // Combine and sort by date
+      final allEvents = [...regularEvents, ...leadershipEvents];
+      allEvents.sort((a, b) => b.dateTime.compareTo(a.dateTime));
+
+      _events = allEvents;
+      _errorMessage = null;
+      return allEvents;
+    } catch (error) {
+      _handleError('fetching all events', error);
       return [];
     } finally {
       _setLoading(false);

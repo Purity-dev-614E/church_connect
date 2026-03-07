@@ -1,11 +1,18 @@
 class EventModel {
+  /// After this duration from [dateTime], attendance and event changes are locked.
+  static const Duration attendanceLockDuration = Duration(hours: 24);
+
   String id;
   String title;
   String description;
   DateTime dateTime;
   String location;
-  String groupId;
-  String regionId;
+  String? groupId;
+  String? regionId;
+  String tag;
+  String? targetAudience; // 'all', 'rc_only', 'regional'
+  int? participantCount;
+  int? invitedCount;
 
   EventModel({
     required this.id,
@@ -13,9 +20,23 @@ class EventModel {
     required this.description,
     required this.dateTime,
     required this.location,
-    required this.groupId,
-    this.regionId = '',
+    this.groupId,
+    this.regionId,
+    this.tag = 'org',
+    this.targetAudience,
+    this.participantCount,
+    this.invitedCount,
   });
+
+  /// True if more than 24 hours have passed since the event start; attendance and edits are then locked.
+  bool get isAttendanceLocked {
+    return DateTime.now().isAfter(
+      dateTime.add(EventModel.attendanceLockDuration),
+    );
+  }
+
+  bool get isLeadershipEvent => tag == 'leadership';
+  bool get hasGroup => groupId != null;
 
   factory EventModel.fromJson(Map<String, dynamic> json) {
     final rawDate = json['date_time'] ?? json['date'];
@@ -42,12 +63,20 @@ class EventModel {
       description: json['description'] ?? '',
       dateTime: parsed,
       location: json['location'] ?? '',
-      groupId: json['group_id'] ?? '',
-      regionId: json['region_id'] ?? '',
+      groupId: json['group_id'],
+      regionId: json['region_id'],
+      tag: json['tag'] ?? 'org',
+      targetAudience: json['target_audience'],
+      participantCount:
+          json['participant_count'] != null
+              ? int.parse(json['participant_count'].toString())
+              : null,
+      invitedCount:
+          json['invited_count'] != null
+              ? int.parse(json['invited_count'].toString())
+              : null,
     );
   }
-
-
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -58,5 +87,9 @@ class EventModel {
     'location': location,
     'group_id': groupId,
     'region_id': regionId,
+    'tag': tag,
+    'target_audience': targetAudience,
+    'participant_count': participantCount,
+    'invited_count': invitedCount,
   };
 }

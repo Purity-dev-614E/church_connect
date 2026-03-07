@@ -213,6 +213,7 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
   Color _getRoleColor(String role) {
     switch (role.toLowerCase()) {
       case 'super_admin':
+      case 'root':
         return AppColors.primaryColor;
       case 'admin':
         return AppColors.secondaryColor;
@@ -227,6 +228,8 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
     switch (role.toLowerCase()) {
       case 'super_admin':
         return 'Super Admin';
+      case 'root':
+        return 'Root';
       case 'admin':
         return 'Group Leader';
       case 'user':

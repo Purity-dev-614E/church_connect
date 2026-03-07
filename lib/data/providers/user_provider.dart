@@ -97,55 +97,32 @@ class UserProvider with ChangeNotifier {
       final alias = await _aliasService.getAlias(userId);
       final mergedUser = user.copyWith(regionalTitle: alias);
       
-      // Log the result for debugging
-      print('UserProvider: Successfully retrieved user: ${user.fullName} (ID: ${user.id})');
-          
       return mergedUser;
     } catch (error) {
-      print('Error fetching user by ID: $error');
+      print('Error getting user by ID: $error');
       return null;
     }
   }
   
-  // Region-specific methods
-  
   Future<List<UserModel>> getUsersByRegion(String regionId) async {
     try {
       final users = await _userService.getUsersByRegion(regionId);
-      final merged = await _attachAliases(users);
-      return merged;
+      return await _attachAliases(users);
     } catch (error) {
       print('Error fetching users by region: $error');
       return [];
     }
   }
   
-  Future<bool> createUser(String fullName, String email, String contact, String gender, String regionId) async {
-    try {
-      return await _userService.createUser(fullName, email, contact, gender, regionId);
-    } catch (error) {
-      print('Error creating user: $error');
-      return false;
-    }
-  }
-  
   Future<bool> assignUserToRegion(String userId, String regionId) async {
     try {
-      // Validate inputs
-      if (userId.isEmpty || regionId.isEmpty) {
-        print('Error: Empty userId or regionId provided to assignUserToRegion');
-        return false;
-      }
-
-      print('Assigning user $userId to region $regionId');
       final success = await _userService.assignUserToRegion(userId, regionId);
       
       if (success) {
-        // Reload the current user if it's the same user
-        if (_currentUser?.id == userId) {
+        // Refresh current user if it's the same user
+        if (_currentUser != null && _currentUser!.id == userId) {
           await loadUser(userId);
         }
-        notifyListeners();
       }
       
       return success;
@@ -160,6 +137,46 @@ class UserProvider with ChangeNotifier {
       return await _userService.removeUserFromRegion(userId, regionId);
     } catch (error) {
       print('Error removing user from region: $error');
+      return false;
+    }
+  }
+
+  /// Change user's group with proper validation and group membership management
+  Future<bool> changeUserGroup(String userId, String newGroupId, String newGroupName) async {
+    try {
+      // Validate inputs
+      if (userId.isEmpty || newGroupId.isEmpty) {
+        print('Error: Invalid user ID or group ID provided');
+        return false;
+      }
+
+      print('UserProvider: Changing group for user $userId to group $newGroupId');
+
+      // Get current user data
+      final currentUser = await _userService.fetchCurrentUser(userId);
+      if (currentUser == null) {
+        print('Error: User not found');
+        return false;
+      }
+
+      // Update user with new group information
+      final updatedUser = currentUser.copyWith(
+        regionId: newGroupId,
+        regionName: newGroupName,
+      );
+
+      // Update user profile
+      final success = await updateUser(updatedUser);
+      
+      if (success) {
+        print('UserProvider: Successfully changed group for user $userId');
+        return true;
+      } else {
+        print('UserProvider: Failed to update user profile');
+        return false;
+      }
+    } catch (error) {
+      print('Error changing user group: $error');
       return false;
     }
   }

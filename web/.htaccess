@@ -1,0 +1,18 @@
+# Disable service worker and prevent caching for always latest version
+<IfModule mod_headers.c>
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires 0
+</IfModule>
+
+# Disable service worker registration
+<Files "flutter_service_worker.js">
+    Header always set Content-Type "text/javascript"
+    Header always set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
+</Files>
+
+# Prevent service worker registration
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule "^flutter_service_worker\.js$" "-" [L]
+</IfModule>

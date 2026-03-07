@@ -37,8 +37,8 @@ void main() async {
 }
 
 class DeviceConfig {
-  static double screenWidth = 1080;   // baseline width
-  static double screenHeight = 2408;  // baseline height
+  static double screenWidth = 1080; // baseline width
+  static double screenHeight = 2408; // baseline height
   static bool isMobile = true;
 
   static void init(BuildContext context) {
@@ -70,8 +70,10 @@ class _AuthErrorObserver extends NavigatorObserver {
         route.settings.name != '/reset-password') {
       Future.delayed(Duration.zero, () {
         if (navigator?.context != null) {
-          final authProvider =
-          Provider.of<AuthProvider>(navigator!.context, listen: false);
+          final authProvider = Provider.of<AuthProvider>(
+            navigator!.context,
+            listen: false,
+          );
           if (authProvider.status == AuthStatus.unauthenticated &&
               authProvider.errorMessage.contains('Authentication failed')) {
             AuthErrorHandler.handleAuthError(navigator!.context);
@@ -96,7 +98,9 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AttendanceProvider()),
         ChangeNotifierProvider(create: (_) => RegionProvider()),
         ChangeNotifierProvider(create: (_) => AdminAnalyticsProvider()),
-        ChangeNotifierProvider(create: (_) => RegionalManagerAnalyticsProvider()),
+        ChangeNotifierProvider(
+          create: (_) => RegionalManagerAnalyticsProvider(),
+        ),
         ChangeNotifierProvider(create: (_) => SuperAdminAnalyticsProvider()),
       ],
       child: MaterialApp(
@@ -105,7 +109,10 @@ class MyApp extends StatelessWidget {
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,
         themeMode: ThemeMode.system,
-        home: AppFlags.maintenanceMode ? const MaintenanceScreen() : const SplashScreen(),
+        home:
+            AppFlags.maintenanceMode
+                ? const MaintenanceScreen()
+                : const SplashScreen(),
         routes: {
           '/login': (context) => const LoginScreen(),
           '/signup': (context) => const SignUpFlowWrapper(),
@@ -121,9 +128,7 @@ class MyApp extends StatelessWidget {
             );
           },
         },
-        navigatorObservers: [
-          _AuthErrorObserver(),
-        ],
+        navigatorObservers: [_AuthErrorObserver()],
 
         builder: (context, child) {
           final mediaQuery = MediaQuery.of(context);
@@ -135,14 +140,13 @@ class MyApp extends StatelessWidget {
           } else if (width <= 800) {
             targetWidth = width; // tablet
           } else {
-            targetWidth = 800;   // cap width on desktop
+            targetWidth = 800; // cap width on desktop
           }
 
           DeviceConfig.init(context);
 
-          final content = AppFlags.maintenanceMode
-              ? const MaintenanceScreen()
-              : child!;
+          final content =
+              AppFlags.maintenanceMode ? const MaintenanceScreen() : child!;
 
           return MediaQuery(
             data: mediaQuery.copyWith(

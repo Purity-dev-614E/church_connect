@@ -13,6 +13,7 @@ import 'package:group_management_church_app/widgets/custom_button.dart';
 import 'package:provider/provider.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
 import 'package:group_management_church_app/core/utils/role_utils.dart';
+import 'package:group_management_church_app/widgets/change_user_group_dialog.dart';
 
 class _RoleOption {
   final String label;
@@ -48,6 +49,7 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
     _RoleOption(label: 'Regional Coordinator', value: 'regional manager', alias: 'Regional Coordinator'),
     _RoleOption(label: 'Regional Focal Person', value: 'regional manager', alias: 'Regional Focal Person'),
     _RoleOption(label: 'Super Admin', value: 'super admin'),
+    _RoleOption(label: 'Root', value: 'root'),
   ];
   
   // Regions list
@@ -100,6 +102,32 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
       message: message,
       type: NotificationType.info,
     );
+  }
+
+  /// Only Root can change Root or Super Admin roles. Super Admin cannot change fellow Super Admin or Root.
+  bool _canCurrentUserChangeRole(UserModel targetUser) {
+    final currentUser = Provider.of<UserProvider>(context, listen: false).currentUser;
+    final currentIsRoot = RoleUtils.isRoot(currentUser?.role);
+    // Root can change anyone
+    if (currentIsRoot) return true;
+    // Super Admin cannot change Root or another Super Admin
+    if (RoleUtils.isRoot(targetUser.role) || RoleUtils.isSuperAdmin(targetUser.role)) {
+      return false;
+    }
+    return true;
+  }
+
+  /// Check if current user can change the target user's group
+  bool _canChangeUserGroup(UserModel targetUser) {
+    final currentUser = Provider.of<UserProvider>(context, listen: false).currentUser;
+    final currentUserRole = currentUser?.role?.toLowerCase() ?? '';
+    
+    // Super Admin can change groups of all users except Root
+    if (RoleUtils.isRoot(targetUser.role)) {
+      return false;
+    }
+    
+    return currentUserRole == 'super admin' || currentUserRole == 'root';
   }
 
   Future<void> _loadUsers() async {
@@ -195,6 +223,11 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
 
     if (user.id.isEmpty) {
       _showError('Invalid user ID. Please try again.');
+      return;
+    }
+
+    if (!_canCurrentUserChangeRole(user)) {
+      _showError('Only Root can change this user\'s role.');
       return;
     }
 
@@ -414,6 +447,7 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
     Color roleColor;
     switch (canonicalRole) {
       case 'super_admin':
+      case 'root':
         roleColor = Colors.red;
         break;
       case 'admin':
@@ -513,11 +547,11 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
             const SizedBox(height: 16),
             const Divider(),
             
-            // Role selection
+            // Action buttons
             Row(
               children: [
                 const Text(
-                  'Change Role:',
+                  'Actions:',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                   ),
@@ -527,38 +561,89 @@ class _UserRoleManagementScreenState extends State<UserRoleManagementScreen> {
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
-                      children: _availableRoles.map((roleOption) {
-                        final isCurrentRole = _optionMatchesUserRole(user, roleOption);
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8.0),
-                          child: ActionChip(
-                            key: ValueKey('${user.id}-${roleOption.label}'),
-                            label: Text(roleOption.label),
-                            backgroundColor: isCurrentRole
-                                ? AppColors.primaryColor
-                                : Colors.grey[200],
-                            labelStyle: TextStyle(
-                              color: isCurrentRole ? Colors.white : Colors.black,
-                              fontWeight: isCurrentRole ? FontWeight.bold : FontWeight.normal,
+                      children: [
+                        // Group change button
+                        if (_canChangeUserGroup(user))
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: ActionChip(
+                              key: ValueKey('${user.id}-group'),
+                              avatar: const Icon(Icons.groups, size: 16),
+                              label: const Text('Change Group'),
+                              backgroundColor: AppColors.primaryColor.withOpacity(0.1),
+                              labelStyle: TextStyle(
+                                color: AppColors.primaryColor,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              onPressed: () => _showChangeGroupDialog(user),
                             ),
-                            onPressed: isCurrentRole
-                                ? null
-                                : () => _showRoleChangeConfirmation(user, roleOption),
                           ),
-                        );
-                      }).toList(),
+                        // Role selection chips
+                        ..._availableRoles.map((roleOption) {
+                          final isCurrentRole = _optionMatchesUserRole(user, roleOption);
+                          final canChange = _canCurrentUserChangeRole(user);
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: ActionChip(
+                              key: ValueKey('${user.id}-${roleOption.label}'),
+                              label: Text(roleOption.label),
+                              backgroundColor: isCurrentRole
+                                  ? AppColors.primaryColor
+                                  : Colors.grey[200],
+                              labelStyle: TextStyle(
+                                color: isCurrentRole ? Colors.white : Colors.black,
+                                fontWeight: isCurrentRole ? FontWeight.bold : FontWeight.normal,
+                              ),
+                              onPressed: (isCurrentRole || !canChange)
+                                  ? null
+                                  : () => _showRoleChangeConfirmation(user, roleOption),
+                            ),
+                          );
+                        }),
+                      ],
                     ),
                   ),
                 ),
               ],
             ),
+            if (!_canCurrentUserChangeRole(user))
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Text(
+                  'Only Root can change this user\'s role.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
           ],
         ),
       ),
     );
   }
+
+  void _showChangeGroupDialog(UserModel user) {
+    showDialog(
+      context: context,
+      builder: (context) => ChangeUserGroupDialog(
+        user: user,
+        currentRegionId: null, // Super Admin has access to all groups
+      ),
+    ).then((result) {
+      if (result == true) {
+        // Refresh the user list if group was changed successfully
+        _loadUsers();
+      }
+    });
+  }
   
   void _showRoleChangeConfirmation(UserModel user, _RoleOption option) {
+    if (!_canCurrentUserChangeRole(user)) {
+      _showInfo('Only Root can change this user\'s role.');
+      return;
+    }
     final mappedRole = RoleUtils.mapToDbRole(option.value);
 
     if (RoleUtils.isRegionalLeadership(mappedRole)) {

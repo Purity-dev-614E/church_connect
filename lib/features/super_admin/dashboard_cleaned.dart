@@ -4,6 +4,7 @@ import 'package:group_management_church_app/core/constants/text_styles.dart';
 import 'package:group_management_church_app/data/models/group_model.dart';
 import 'package:group_management_church_app/data/models/user_model.dart';
 import 'package:group_management_church_app/data/models/region_model.dart';
+import 'package:group_management_church_app/data/models/removed_member_model.dart';
 import 'package:group_management_church_app/features/profile_screen.dart';
 import 'package:group_management_church_app/features/super_admin/group_administration_tab.dart';
 import 'package:group_management_church_app/features/super_admin/region_management_tab.dart';
@@ -26,6 +27,8 @@ import '../../data/services/event_services.dart';
 import '../../data/providers/auth_provider.dart';
 import '../../data/providers/analytics_providers/super_admin_analytics_provider.dart';
 import 'package:flutter/foundation.dart';
+import '../../widgets/removed_members_list.dart';
+import '../../data/services/member_removal_service.dart';
 
 import 'event_management_screen.dart';
 import 'recent_events_screen.dart';
@@ -58,6 +61,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   bool _groupsDataRequested = false;
   bool _eventsDataRequested = false;
 
+  // Removed members data
+  List<RemovedMemberModel> _removedMembers = [];
+  bool _isLoadingRemovedMembers = false;
+
   // Settings state
   bool _notificationsEnabled = true;
   bool _darkModeEnabled = false;
@@ -78,6 +85,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     // Then load actual data
     Future.delayed(Duration.zero, () {
       _initializeData();
+      _loadRemovedMembers();
     });
     _requestPermissions();
   }
@@ -148,7 +156,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
       // Now try to get the dashboard summary with the refreshed token
       await _analyticsProvider.getDashboardSummary();
       // Also load overall attendance trend for the last month (same logic as analytics screen)
-      final overall = await _analyticsProvider.getOverallAttendanceByPeriod('month');
+      final overall = await _analyticsProvider.getOverallAttendanceByPeriod(
+        'month',
+      );
       if (overall.overallStats.attendanceRate != null) {
         final rate = overall.overallStats.attendanceRate;
         _overallAttendance = rate;
@@ -170,11 +180,12 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           if (_analyticsProvider.dashboardSummary != null) {
             _dashboardSummary = _analyticsProvider.dashboardSummary!.toMap();
             print('Dashboard summary loaded successfully');
-            _isLoading = false;  // Clear loading state after data is loaded
+            _isLoading = false; // Clear loading state after data is loaded
           } else {
             _errorMessage = 'Dashboard data is not available';
             print('Dashboard summary is null');
-            _isLoading = false;  // Clear loading state even if data is not available
+            _isLoading =
+                false; // Clear loading state even if data is not available
           }
         });
       }
@@ -228,6 +239,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           _buildGroupAdministrationTab(),
           _buildEventsTab(),
           _buildRegionManagerTab(),
+          _buildRemovedMembersTab(),
           _buildAnalyticsTab(),
           _buildSettingsTab(),
         ],
@@ -241,10 +253,11 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           ),
           BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Users'),
           BottomNavigationBarItem(icon: Icon(Icons.groups), label: 'Groups'),
-          BottomNavigationBarItem(icon: Icon(Icons.event),label: "Events"),
+          BottomNavigationBarItem(icon: Icon(Icons.event), label: "Events"),
+          BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Regions'),
           BottomNavigationBarItem(
-            icon: Icon(Icons.map),
-            label: 'Regions',
+            icon: Icon(Icons.person_remove),
+            label: 'Removed Members',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.analytics),
@@ -376,17 +389,17 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                 Text(
                   'Overall Attendance Trend',
                   style: TextStyles.heading2.copyWith(
-                      fontWeight: FontWeight.bold
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
                 _overallAttendance > 0
                     ? Text(
-                  'Current: ${_overallAttendance.toStringAsFixed(1)}%',
-                  style: TextStyles.heading1.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.red,
-                  ),
-                )
+                      'Current: ${_overallAttendance.toStringAsFixed(1)}%',
+                      style: TextStyles.heading1.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.red,
+                      ),
+                    )
                     : const SizedBox(),
               ],
             ),
@@ -394,62 +407,62 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
             SizedBox(
               height: 300,
               width: double.infinity,
-              child: _attendanceTrend.isEmpty
-                  ? const Center(
-                child: Text(
-                  'No attendance trend data available at this time',
-                  textAlign: TextAlign.center,
-                ),
-              )
-                  : LineChart(
-                LineChartData(
-                  gridData: const FlGridData(
-                    show: true,
-                    drawVerticalLine: false,
-                  ),
-                  titlesData: FlTitlesData(
-                    leftTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: true),
-                    ),
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        getTitlesWidget: (value, meta) {
-                          const labels = [
-                            'Jan',
-                            'Feb',
-                            'Mar',
-                            'Apr',
-                            'May',
-                            'Jun',
-                          ];
-                          final index = value.toInt();
-                          if (index >= 0 && index < labels.length) {
-                            return Text(labels[index]);
-                          }
-                          return const Text('');
-                        },
+              child:
+                  _attendanceTrend.isEmpty
+                      ? const Center(
+                        child: Text(
+                          'No attendance trend data available at this time',
+                          textAlign: TextAlign.center,
+                        ),
+                      )
+                      : LineChart(
+                        LineChartData(
+                          gridData: const FlGridData(
+                            show: true,
+                            drawVerticalLine: false,
+                          ),
+                          titlesData: FlTitlesData(
+                            leftTitles: const AxisTitles(
+                              sideTitles: SideTitles(showTitles: true),
+                            ),
+                            bottomTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                getTitlesWidget: (value, meta) {
+                                  const labels = [
+                                    'Jan',
+                                    'Feb',
+                                    'Mar',
+                                    'Apr',
+                                    'May',
+                                    'Jun',
+                                  ];
+                                  final index = value.toInt();
+                                  if (index >= 0 && index < labels.length) {
+                                    return Text(labels[index]);
+                                  }
+                                  return const Text('');
+                                },
+                              ),
+                            ),
+                          ),
+                          borderData: FlBorderData(show: true),
+                          lineBarsData: [
+                            LineChartBarData(
+                              spots: _attendanceTrend,
+                              isCurved: true,
+                              color: Colors.red,
+                              barWidth: 3,
+                              isStrokeCapRound: true,
+                              dotData: const FlDotData(show: true),
+                              belowBarData: BarAreaData(
+                                show: true,
+                                color: Colors.red.withOpacity(0.2),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ),
-                  borderData: FlBorderData(show: true),
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: _attendanceTrend,
-                      isCurved: true,
-                      color: Colors.red
-                      ,
-                      barWidth: 3,
-                      isStrokeCapRound: true,
-                      dotData: const FlDotData(show: true),
-                      belowBarData: BarAreaData(
-                        show: true,
-                        color: Colors.red.withOpacity(0.2),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             ),
           ],
         ),
@@ -472,12 +485,48 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     return RegionManagementTab();
   }
 
+  // REMOVED MEMBERS TAB
+  Widget _buildRemovedMembersTab() {
+    return RemovedMembersList(
+      groupId: '', // Super admin sees all removed members across all groups
+      userRole: 'super_admin',
+      showRestoreButton: true,
+      showStats: true,
+    );
+  }
+
+  Future<void> _loadRemovedMembers() async {
+    if (!mounted) return;
+
+    setState(() {
+      _isLoadingRemovedMembers = true;
+    });
+
+    try {
+      final groupProvider = Provider.of<GroupProvider>(context, listen: false);
+      final removedMembers = await groupProvider.getAllRemovedMembers();
+
+      if (!mounted) return;
+      setState(() {
+        _removedMembers = removedMembers;
+        _isLoadingRemovedMembers = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _removedMembers = [];
+        _isLoadingRemovedMembers = false;
+      });
+      _showError('Failed to load removed members: $e');
+    }
+  }
+
   // ANALYTICS TAB
   Widget _buildAnalyticsTab() {
     return const SuperAdminAnalyticsScreen();
   }
 
-  Widget _buildEventsTab () {
+  Widget _buildEventsTab() {
     return const EventManagementScreen();
   }
 
@@ -789,7 +838,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           if (mounted) _showInfo('Loading group data. Please wait...');
         });
 
-        final groupProvider = Provider.of<GroupProvider>(context, listen: false);
+        final groupProvider = Provider.of<GroupProvider>(
+          context,
+          listen: false,
+        );
         if (groupProvider.groups.isNotEmpty) {
           totalGroups = groupProvider.groups.length.toString();
         } else {
@@ -811,7 +863,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           if (mounted) _showInfo('Loading event data. Please wait...');
         });
 
-        final eventProvider = Provider.of<EventProvider>(context, listen: false);
+        final eventProvider = Provider.of<EventProvider>(
+          context,
+          listen: false,
+        );
         if (eventProvider.upcomingEvents.isNotEmpty) {
           totalEvents = eventProvider.upcomingEvents.length.toString();
         }
@@ -871,10 +926,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           AppColors.accentColor,
           onTap: () {
             Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const EventManagementScreen()),
+              context,
+              MaterialPageRoute(builder: (_) => const EventManagementScreen()),
             );
-          }
+          },
         ),
         // _buildStatCard(
         //   'Recent Events',
@@ -898,12 +953,12 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   }
 
   Widget _buildStatCard(
-      String title,
-      String value,
-      IconData icon,
-      Color color, {
-        VoidCallback? onTap,
-      }) {
+    String title,
+    String value,
+    IconData icon,
+    Color color, {
+    VoidCallback? onTap,
+  }) {
     return Card(
       elevation: 3,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -930,7 +985,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
               Text(
                 title,
                 style: TextStyles.bodyText.copyWith(
-                  color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onBackground.withOpacity(0.7),
                 ),
                 textAlign: TextAlign.center,
               ),

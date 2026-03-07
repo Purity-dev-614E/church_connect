@@ -96,6 +96,8 @@ class UserModel{
     String role = safeToString(json['role'] ?? 'user').toLowerCase();
     if (role == 'super_admin' || role == 'superadmin' || role == 'super admin') {
       role = 'super_admin';
+    } else if (role == 'root') {
+      role = 'root';
     } else if (role == 'regional_manager' || role == 'regionalmanager' || role == 'regional manager'
         || role == 'regional coordinator' || role == 'regional coordinator' || role == 'regional focal person') {
       role = 'regional manager';

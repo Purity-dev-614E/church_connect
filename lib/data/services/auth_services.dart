@@ -30,22 +30,19 @@ class AuthServices {
       if (email.isEmpty || password.isEmpty) {
         return {
           'success': false,
-          'message': 'Email and password are required.'
+          'message': 'Email and password are required.',
         };
       }
 
       print('Attempting login with email: $email');
-      
+
       final response = await http.post(
         Uri.parse(ApiEndpoints.login),
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
         },
-        body: json.encode({
-          'email': email,
-          'password': password
-        })
+        body: json.encode({'email': email, 'password': password}),
       );
 
       print('Login response status code: ${response.statusCode}');
@@ -58,10 +55,7 @@ class AuthServices {
       } catch (e) {
         print('Error parsing response: $e');
         print('Response body: ${response.body}');
-        return {
-          'success': false,
-          'message': 'Invalid server response'
-        };
+        return {'success': false, 'message': 'Invalid server response'};
       }
 
       print('Parsed login response: $responseData');
@@ -71,20 +65,24 @@ class AuthServices {
         if (responseData['session'] != null && responseData['user'] != null) {
           final session = responseData['session'];
           final user = responseData['user'];
-          
+
           // Store tokens and user data
           // Be tolerant to different API shapes (snake_case vs camelCase, nested vs top-level)
           String? accessToken;
           String? refreshToken;
           if (session is Map) {
-            accessToken = session['access_token']?.toString() ??
+            accessToken =
+                session['access_token']?.toString() ??
                 session['accessToken']?.toString();
-            refreshToken = session['refresh_token']?.toString() ??
+            refreshToken =
+                session['refresh_token']?.toString() ??
                 session['refreshToken']?.toString();
           }
-          accessToken ??= responseData['access_token']?.toString() ??
+          accessToken ??=
+              responseData['access_token']?.toString() ??
               responseData['accessToken']?.toString();
-          refreshToken ??= responseData['refresh_token']?.toString() ??
+          refreshToken ??=
+              responseData['refresh_token']?.toString() ??
               responseData['refreshToken']?.toString();
           final String? userId = (user is Map) ? user['id']?.toString() : null;
 
@@ -96,13 +94,13 @@ class AuthServices {
           if (accessToken == null || accessToken.isEmpty) {
             return {
               'success': false,
-              'message': 'Login failed: server response missing access token.'
+              'message': 'Login failed: server response missing access token.',
             };
           }
           if (userId == null || userId.isEmpty) {
             return {
               'success': false,
-              'message': 'Login failed: server response missing user id.'
+              'message': 'Login failed: server response missing user id.',
             };
           }
 
@@ -116,7 +114,9 @@ class AuthServices {
             await secureStorage.write(key: accessTokenKey, value: accessToken);
             if (refreshToken != null && refreshToken.isNotEmpty) {
               await secureStorage.write(
-                  key: refreshTokenKey, value: refreshToken);
+                key: refreshTokenKey,
+                value: refreshToken,
+              );
             }
             await secureStorage.write(key: userIdKey, value: userId);
           } catch (e) {
@@ -139,33 +139,23 @@ class AuthServices {
             print('SharedPreferences write failed (continuing): $e');
           }
 
-          return {
-            'success': true,
-            'message': 'Login successful',
-            'user': user
-          };
+          return {'success': true, 'message': 'Login successful', 'user': user};
         } else {
           final errorMessage = responseData['message'] ?? 'Login failed';
           print('Login failed: $errorMessage');
-          return {
-            'success': false,
-            'message': errorMessage
-          };
+          return {'success': false, 'message': errorMessage};
         }
       } else {
         final errorMessage = responseData['message'] ?? 'Login failed';
         print('Login failed with status ${response.statusCode}: $errorMessage');
-        return {
-          'success': false,
-          'message': errorMessage
-        };
+        return {'success': false, 'message': errorMessage};
       }
     } catch (e, st) {
       print('Login error: $e');
       print('Login stacktrace: $st');
       return {
         'success': false,
-        'message': 'An error occurred during login: $e'
+        'message': 'An error occurred during login: $e',
       };
     }
   }
@@ -185,9 +175,7 @@ class AuthServices {
           "Content-Type": "application/json",
           "Accept": "application/json",
         },
-        body: json.encode({
-          "refresh_token": refreshToken
-        })
+        body: json.encode({"refresh_token": refreshToken}),
       );
 
       print("Refresh token response status code: ${response.statusCode}");
@@ -202,11 +190,11 @@ class AuthServices {
           print("Raw refresh token response body: ${response.body}");
           return false;
         }
-          
+
         // Get the new tokens (tolerant to API shape)
         String? newAccessToken;
         String? newRefreshToken;
-          
+
         if (data.containsKey('access_token')) {
           newAccessToken = data['access_token']?.toString();
         } else if (data.containsKey('accessToken')) {
@@ -220,7 +208,7 @@ class AuthServices {
             (data['session'] as Map).containsKey('accessToken')) {
           newAccessToken = (data['session'] as Map)['accessToken']?.toString();
         }
-          
+
         if (data.containsKey('refresh_token')) {
           newRefreshToken = data['refresh_token']?.toString();
         } else if (data.containsKey('refreshToken')) {
@@ -236,7 +224,7 @@ class AuthServices {
           newRefreshToken =
               (data['session'] as Map)['refreshToken']?.toString();
         }
-          
+
         if (newAccessToken == null || newAccessToken.isEmpty) {
           print("Invalid refresh token response format");
           return false;
@@ -244,16 +232,19 @@ class AuthServices {
 
         // Update in-memory values first (keeps session alive even if persistence fails)
         _memoryAccessToken = newAccessToken;
-        _memoryRefreshToken = (newRefreshToken != null && newRefreshToken.isNotEmpty)
-            ? newRefreshToken
-            : _memoryRefreshToken;
-          
+        _memoryRefreshToken =
+            (newRefreshToken != null && newRefreshToken.isNotEmpty)
+                ? newRefreshToken
+                : _memoryRefreshToken;
+
         // Store the new tokens (best effort; web storage can be blocked)
         try {
           await secureStorage.write(key: accessTokenKey, value: newAccessToken);
           if (newRefreshToken != null && newRefreshToken.isNotEmpty) {
             await secureStorage.write(
-                key: refreshTokenKey, value: newRefreshToken);
+              key: refreshTokenKey,
+              value: newRefreshToken,
+            );
           }
         } catch (e) {
           print("Secure storage write failed during refresh (continuing): $e");
@@ -266,9 +257,11 @@ class AuthServices {
             await prefs.setString('refresh_token', newRefreshToken);
           }
         } catch (e) {
-          print("SharedPreferences write failed during refresh (continuing): $e");
+          print(
+            "SharedPreferences write failed during refresh (continuing): $e",
+          );
         }
-        
+
         return true;
       } else {
         print("Refresh token failed with status: ${response.statusCode}");
@@ -291,13 +284,13 @@ class AuthServices {
 
       // Try to get from FlutterSecureStorage first
       String? token = await secureStorage.read(key: accessTokenKey);
-      
+
       // If not found, try SharedPreferences
       if (token == null) {
         final prefs = await SharedPreferences.getInstance();
         token = prefs.getString('auth_token');
       }
-      
+
       return token;
     } catch (e) {
       print("Error getting access token: $e");
@@ -315,13 +308,13 @@ class AuthServices {
 
       // Try to get from FlutterSecureStorage first
       String? token = await secureStorage.read(key: refreshTokenKey);
-      
+
       // If not found, try SharedPreferences
       if (token == null) {
         final prefs = await SharedPreferences.getInstance();
         token = prefs.getString('refresh_token');
       }
-      
+
       return token;
     } catch (e) {
       print("Error getting refresh token: $e");
@@ -339,13 +332,13 @@ class AuthServices {
 
       // Try to get from FlutterSecureStorage first
       String? userId = await secureStorage.read(key: userIdKey);
-      
+
       // If not found, try SharedPreferences
       if (userId == null) {
         final prefs = await SharedPreferences.getInstance();
         userId = prefs.getString(userIdKey);
       }
-      
+
       return userId;
     } catch (e) {
       print("Error getting user ID: $e");
@@ -393,17 +386,14 @@ class AuthServices {
   Future<bool> signup(String email, String password) async {
     try {
       print("Attempting signup with email: $email");
-      
+
       final response = await http.post(
         Uri.parse(ApiEndpoints.signup),
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
         },
-        body: json.encode({
-          "email": email,
-          "password": password
-        })
+        body: json.encode({"email": email, "password": password}),
       );
 
       print("Signup response status code: ${response.statusCode}");
@@ -420,13 +410,16 @@ class AuthServices {
       }
 
       if (response.statusCode == 201 || response.statusCode == 200) {
-        print("Signup Successful: ${responseData['message'] ?? 'User created successfully'}");
+        print(
+          "Signup Successful: ${responseData['message'] ?? 'User created successfully'}",
+        );
         return true;
       } else {
         // Extract error message with fallback
-        final errorMessage = responseData['message'] ?? 
-                            responseData['error'] ?? 
-                            'Failed to create account. Email may already be in use.';
+        final errorMessage =
+            responseData['message'] ??
+            responseData['error'] ??
+            'Failed to create account. Email may already be in use.';
         print("Signup Failed: $errorMessage");
         return false;
       }
@@ -445,9 +438,7 @@ class AuthServices {
           "Content-Type": "application/json",
           "Accept": "application/json",
         },
-        body: json.encode({
-          "email": email
-        })
+        body: json.encode({"email": email}),
       );
 
       if (response.statusCode == 200) {
@@ -467,7 +458,8 @@ class AuthServices {
   // Update user profile
   Future<bool> updateProfile(UserModel user) async {
     try {
-      final response = await _httpClient.put(ApiEndpoints.updateUser(user.id),
+      final response = await _httpClient.put(
+        ApiEndpoints.updateUser(user.id),
         body: json.encode({
           "full_name": user.fullName,
           "phone_number": user.contact,
@@ -481,7 +473,7 @@ class AuthServices {
           "citam_assembly": user.citam_Assembly,
           "if_not_member": user.if_Not,
           "region_id": user.regionalID,
-        })
+        }),
       );
 
       if (response.statusCode == 200) {
@@ -489,7 +481,9 @@ class AuthServices {
         return true;
       } else {
         final data = json.decode(response.body);
-        print("Failed to Update Profile: ${data['message']}. \n Response status code: ${response.statusCode}, \n Response body: ${response.body}");
+        print(
+          "Failed to Update Profile: ${data['message']}. \n Response status code: ${response.statusCode}, \n Response body: ${response.body}",
+        );
         return false;
       }
     } catch (e) {

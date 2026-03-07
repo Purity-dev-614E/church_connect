@@ -2,8 +2,11 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:group_management_church_app/core/constants/app_endpoints.dart';
+import 'package:group_management_church_app/core/utils/api_error_handler.dart';
+import 'package:group_management_church_app/core/utils/role_utils.dart';
 import 'package:group_management_church_app/data/models/attendance_model.dart';
 import 'package:group_management_church_app/data/models/event_model.dart';
+import 'package:group_management_church_app/data/models/participant_model.dart';
 import 'package:group_management_church_app/data/models/user_model.dart';
 import 'package:group_management_church_app/data/services/auth_services.dart';
 import 'package:group_management_church_app/data/services/user_services.dart';
@@ -19,9 +22,9 @@ class EventServices {
     AuthServices? authServices,
     UserServices? userServices,
     HttpClient? httpClient,
-  })  : _authServices = authServices ?? AuthServices(),
-        _userServices = userServices ?? UserServices(),
-        _httpClient = httpClient ?? HttpClient();
+  }) : _authServices = authServices ?? AuthServices(),
+       _userServices = userServices ?? UserServices(),
+       _httpClient = httpClient ?? HttpClient();
 
   // SECTION: Authentication and Authorization
 
@@ -40,7 +43,7 @@ class EventServices {
     return {
       "Content-Type": "application/json",
       "Accept": "application/json",
-      "Authorization": "Bearer $token"
+      "Authorization": "Bearer $token",
     };
   }
 
@@ -57,19 +60,25 @@ class EventServices {
       throw Exception('User role is null');
     }
 
-    // Super admin has permission for all groups
-    if (userRole == 'super admin') {
+    // Root and super admin have permission for all groups (root bypasses RBAC)
+    if (RoleUtils.isRoot(userRole) ||
+        userRole == 'super_admin' ||
+        userRole == 'super admin') {
       return;
     }
 
     // For regular admins, check if they are the admin of this group
     try {
-      final response = await _httpClient.get(ApiEndpoints.getGroupById(groupId));
+      final response = await _httpClient.get(
+        ApiEndpoints.getGroupById(groupId),
+      );
 
       if (response.statusCode == 200) {
         final groupData = jsonDecode(response.body);
         if (groupData['admin_id'] != userId) {
-          throw Exception('You do not have permission to manage events for this group');
+          throw Exception(
+            'You do not have permission to manage events for this group',
+          );
         }
       } else {
         throw Exception('Failed to verify group permissions');
@@ -81,35 +90,134 @@ class EventServices {
 
   // SECTION: Event Management
 
-  /// Create a new event for a specific group
+  /// Check if user has permission to create leadership events
+  Future<void> _checkLeadershipPermission() async {
+    final userRole = await _userServices.getUserRole();
+
+    if (userRole == null) {
+      throw Exception('User role is null');
+    }
+
+    // Allow root, super admin, and regional leadership to create leadership events
+    if (!RoleUtils.isRoot(userRole) &&
+        !RoleUtils.isSuperAdmin(userRole) &&
+        !RoleUtils.isRegionalLeadership(userRole)) {
+      throw Exception(
+        'Only super admin, root, and regional managers can create leadership events',
+      );
+    }
+  }
+
+  /// Handle group event specific error messages
+  String _handleGroupEventError(int statusCode, dynamic errorData) {
+    switch (statusCode) {
+      case 400:
+        final error = errorData['error']?.toString() ?? '';
+        if (error.contains(
+          'Leadership events must be created using the /api/events/leadership endpoint',
+        )) {
+          return 'Please select "Leadership Event" type to create this event';
+        }
+        if (error.contains('This endpoint only accepts leadership events')) {
+          return 'Leadership events cannot be created as group events';
+        }
+        return 'Invalid event data';
+      case 404:
+        return 'Group not found - please select a valid group';
+      case 403:
+        return 'Access denied - insufficient permissions';
+      default:
+        return 'Failed to create event: HTTP status $statusCode';
+    }
+  }
+
+  /// Create a new leadership event
   ///
   /// Returns the created [EventModel] with all details
-  Future<EventModel> createEvent({
-    required String groupId,
+  /// Leadership events automatically have group_id set to null by the backend
+  Future<EventModel> createLeadershipEvent({
     required String title,
     required String description,
     required DateTime dateTime,
     required String location,
+    String? regionId,
   }) async {
     try {
+      // Check if user has permission to create leadership events
+      await _checkLeadershipPermission();
+
+      final body = <String, dynamic>{
+        'title': title,
+        'description': description,
+        // Send UTC to avoid server timezone reinterpretation
+        'date': dateTime.toUtc().toIso8601String(),
+        'location': location,
+        'tag': 'leadership',
+        // Do not include group_id - backend will set it to null
+        // Include region_id if provided (for regional managers)
+        if (regionId != null) 'region_id': regionId,
+      };
 
       final response = await _httpClient.post(
-        ApiEndpoints.createGroupEvent(groupId),
+        ApiEndpoints.createLeadershipEvent,
+        body: body,
+      );
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        return EventModel.fromJson(jsonDecode(response.body));
+      } else {
+        final errorData = jsonDecode(response.body);
+        final errorMessage = ApiErrorHandler.getErrorMessage(
+          response.statusCode,
+          errorData,
+        );
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      throw Exception('Failed to create leadership event: $e');
+    }
+  }
+
+  /// Create a new event for a specific group
+  ///
+  /// Returns the created [EventModel] with all details
+  Future<EventModel> createEvent({
+    String? groupId, // Make nullable for leadership events
+    required String title,
+    required String description,
+    required DateTime dateTime,
+    required String location,
+    String tag = 'org',
+  }) async {
+    try {
+      // Use different endpoint for leadership events
+      final endpoint =
+          (tag == 'leadership')
+              ? ApiEndpoints.createLeadershipEvent
+              : ApiEndpoints.createGroupEvent(groupId ?? '');
+
+      final response = await _httpClient.post(
+        endpoint,
         body: {
           'title': title,
           'description': description,
           // Send UTC to avoid server timezone reinterpretation
           'date': dateTime.toUtc().toIso8601String(),
           'location': location,
-          'group_id': groupId,
+          if (groupId != null) 'group_id': groupId, // Only include if not null
+          'tag': tag,
         },
       );
 
       if (response.statusCode == 201 || response.statusCode == 200) {
         return EventModel.fromJson(jsonDecode(response.body));
       } else {
-        throw Exception(
-            'Failed to create event: HTTP status ${response.statusCode}');
+        final errorData = jsonDecode(response.body);
+        final errorMessage = _handleGroupEventError(
+          response.statusCode,
+          errorData,
+        );
+        throw Exception(errorMessage);
       }
     } catch (e) {
       throw Exception('Failed to create event: $e');
@@ -121,13 +229,17 @@ class EventServices {
   /// Returns a list of [EventModel] objects for the specified group
   Future<List<EventModel>> getEventsByGroup(String groupId) async {
     try {
-      final response = await _httpClient.get(ApiEndpoints.getEventsByGroup(groupId));
+      final response = await _httpClient.get(
+        ApiEndpoints.getEventsByGroup(groupId),
+      );
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         return data.map((event) => EventModel.fromJson(event)).toList();
       } else {
-        throw Exception('Failed to fetch group events: HTTP status ${response.statusCode}');
+        throw Exception(
+          'Failed to fetch group events: HTTP status ${response.statusCode}',
+        );
       }
     } catch (e) {
       throw Exception('Failed to fetch group events: $e');
@@ -139,12 +251,16 @@ class EventServices {
   /// Returns the [EventModel] for the specified event ID
   Future<EventModel> getEventById(String eventId) async {
     try {
-      final response = await _httpClient.get(ApiEndpoints.getEventById(eventId));
+      final response = await _httpClient.get(
+        ApiEndpoints.getEventById(eventId),
+      );
 
       if (response.statusCode == 200) {
         return EventModel.fromJson(jsonDecode(response.body));
       } else {
-        throw Exception('Failed to fetch event: HTTP status ${response.statusCode}');
+        throw Exception(
+          'Failed to fetch event: HTTP status ${response.statusCode}',
+        );
       }
     } catch (e) {
       throw Exception('Failed to fetch event: $e');
@@ -163,7 +279,12 @@ class EventServices {
     required String groupId,
   }) async {
     try {
-      // await _checkGroupPermission(groupId);
+      final existing = await getEventById(eventId);
+      if (existing.isAttendanceLocked) {
+        throw Exception(
+          'Event cannot be edited after 24 hours from the event start time.',
+        );
+      }
 
       final response = await _httpClient.put(
         ApiEndpoints.updateEvent(eventId),
@@ -180,7 +301,9 @@ class EventServices {
       if (response.statusCode == 200) {
         return EventModel.fromJson(jsonDecode(response.body));
       } else {
-        throw Exception('Failed to update event: HTTP status ${response.statusCode}');
+        throw Exception(
+          'Failed to update event: HTTP status ${response.statusCode}',
+        );
       }
     } catch (e) {
       throw Exception('Failed to update event: $e');
@@ -192,13 +315,23 @@ class EventServices {
   /// Returns true if deletion was successful
   Future<bool> deleteEvent(String eventId, String groupId) async {
     try {
+      final event = await getEventById(eventId);
+      if (event.isAttendanceLocked) {
+        throw Exception(
+          'Event cannot be deleted after 24 hours from the event start time.',
+        );
+      }
 
-      final response = await _httpClient.delete(ApiEndpoints.deleteEvent(eventId));
+      final response = await _httpClient.delete(
+        ApiEndpoints.deleteEvent(eventId),
+      );
 
       if (response.statusCode == 200) {
         return true;
       } else {
-        throw Exception('Failed to delete event: HTTP status ${response.statusCode}');
+        throw Exception(
+          'Failed to delete event: HTTP status ${response.statusCode}',
+        );
       }
     } catch (e) {
       throw Exception('Failed to delete event: $e');
@@ -238,16 +371,21 @@ class EventServices {
   /// Get events for a specific date range
   ///
   /// Returns a list of [EventModel] objects within the specified date range
-  Future<List<EventModel>> getEventsByDateRange(String groupId,
-      DateTime startDate,
-      DateTime endDate) async {
+  Future<List<EventModel>> getEventsByDateRange(
+    String groupId,
+    DateTime startDate,
+    DateTime endDate,
+  ) async {
     try {
       final allEvents = await getEventsByGroup(groupId);
 
-      return allEvents.where((event) =>
-      event.dateTime.isAfter(startDate) &&
-          event.dateTime.isBefore(endDate)
-      ).toList();
+      return allEvents
+          .where(
+            (event) =>
+                event.dateTime.isAfter(startDate) &&
+                event.dateTime.isBefore(endDate),
+          )
+          .toList();
     } catch (e) {
       throw Exception('Failed to fetch events by date range: $e');
     }
@@ -262,7 +400,8 @@ class EventServices {
         return data.map((event) => EventModel.fromJson(event)).toList();
       } else {
         throw Exception(
-            'Failed to fetch all events: HTTP status ${response.statusCode}');
+          'Failed to fetch all events: HTTP status ${response.statusCode}',
+        );
       }
     } catch (e) {
       throw Exception('Failed to fetch all events: $e');
@@ -275,24 +414,29 @@ class EventServices {
   ///
   /// Takes an event ID and a list of member IDs who attended
   /// Returns true if attendance was successfully recorded
-  Future<bool> createEventAttendance(String eventId,
-      List<String> attendedMemberIds) async {
+  Future<bool> createEventAttendance(
+    String eventId,
+    List<String> attendedMemberIds,
+  ) async {
     try {
       final event = await getEventById(eventId);
+      if (event.isAttendanceLocked) {
+        throw Exception(
+          'Attendance cannot be changed after 24 hours from the event start time.',
+        );
+      }
 
       final response = await _httpClient.post(
         ApiEndpoints.createEventAttendance(eventId),
-        body: {
-          'event_id': eventId,
-          'attended_members': attendedMemberIds,
-        },
+        body: {'event_id': eventId, 'attended_members': attendedMemberIds},
       );
 
       if (response.statusCode == 201 || response.statusCode == 200) {
         return true;
       } else {
         throw Exception(
-            'Failed to create attendance: HTTP status ${response.statusCode}');
+          'Failed to create attendance: HTTP status ${response.statusCode}',
+        );
       }
     } catch (e) {
       throw Exception('Failed to create attendance: $e');
@@ -304,15 +448,17 @@ class EventServices {
   /// Returns a list of user data for members who attended the event
   Future<List<UserModel>> getAttendedMembers(String eventId) async {
     try {
-      final response = await _httpClient.get(ApiEndpoints.getAttendedMembers(eventId));
+      final response = await _httpClient.get(
+        ApiEndpoints.getAttendedMembers(eventId),
+      );
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         return data.map((user) => UserModel.fromJson(user)).toList();
       } else {
         throw Exception(
-            'Failed to fetch attended members: HTTP status ${response
-                .statusCode}');
+          'Failed to fetch attended members: HTTP status ${response.statusCode}',
+        );
       }
     } catch (e) {
       throw Exception('Failed to fetch attended members: $e');
@@ -321,50 +467,86 @@ class EventServices {
   }
 
   /// Get attendance details for an event
-/// Returns attendance statistics and details for the specified event
-Future<List<AttendanceModel>> getEventAttendance(String eventId) async {
-  try {
-    final response = await _httpClient.get(ApiEndpoints.getAttendanceByEvent(eventId));
+  /// Returns attendance statistics and details for the specified event
+  Future<List<AttendanceModel>> getEventAttendance(String eventId) async {
+    try {
+      final response = await _httpClient.get(
+        ApiEndpoints.getAttendanceByEvent(eventId),
+      );
 
-    if (response.statusCode == 200) {
-      final List<dynamic> data = jsonDecode(response.body);
-      // Map the dynamic list to a list of AttendanceModel
-      return data.map((item) => AttendanceModel.fromJson(item)).toList();
-    } else {
-      throw Exception('Failed to fetch event attendance: HTTP status ${response.statusCode}');
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        // Map the dynamic list to a list of AttendanceModel
+        return data.map((item) => AttendanceModel.fromJson(item)).toList();
+      } else {
+        throw Exception(
+          'Failed to fetch event attendance: HTTP status ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Failed to fetch event attendance: $e');
     }
-  } catch (e) {
-    throw Exception('Failed to fetch event attendance: $e');
   }
-}
 
   /// Get attendance statistics for a group
   ///
   /// Returns overall attendance statistics for all events in the group
   Future<Map<String, dynamic>> getGroupAttendance(String groupId) async {
     try {
-      final response = await _httpClient.get(ApiEndpoints.getGroupAttendance(groupId));
+      final response = await _httpClient.get(
+        ApiEndpoints.getGroupAttendance(groupId),
+      );
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
+      } else if (response.statusCode == 500) {
+        // Handle server error gracefully
+        print(
+          'Server error (500) when fetching group attendance for group $groupId',
+        );
+        // Return default attendance data to prevent app crash
+        return {
+          'totalMembers': 0,
+          'averageAttendance': 0.0,
+          'attendanceRate': 0.0,
+          'error': 'Server error occurred while fetching attendance data',
+        };
       } else {
         throw Exception(
-            'Failed to fetch group attendance: HTTP status ${response
-                .statusCode}');
+          'Failed to fetch group attendance: HTTP status ${response.statusCode}',
+        );
       }
     } catch (e) {
-      throw Exception('Failed to fetch group attendance: $e');
+      print('Error in getGroupAttendance: $e');
+      // Return default data on any error to prevent app crash
+      return {
+        'totalMembers': 0,
+        'averageAttendance': 0.0,
+        'attendanceRate': 0.0,
+        'error': 'Failed to fetch attendance data',
+      };
     }
   }
 
   /// Mark attendance for an individual member
   ///
   /// Records attendance for a single user with optional details
-  Future<bool> markAttendance(String eventId,
-      String userId,
-      bool present,
-      {String? topic, String? aob, String? apology}) async {
+  Future<bool> markAttendance(
+    String eventId,
+    String userId,
+    bool present, {
+    String? topic,
+    String? aob,
+    String? apology,
+  }) async {
     try {
+      final event = await getEventById(eventId);
+      if (event.isAttendanceLocked) {
+        throw Exception(
+          'Attendance cannot be changed after 24 hours from the event start time.',
+        );
+      }
+
       final body = buildAttendancePayload(
         eventId: eventId,
         userId: userId,
@@ -383,7 +565,8 @@ Future<List<AttendanceModel>> getEventAttendance(String eventId) async {
         return true;
       } else {
         throw Exception(
-            'Failed to mark attendance: HTTP status ${response.statusCode}');
+          'Failed to mark attendance: HTTP status ${response.statusCode}',
+        );
       }
     } catch (e) {
       throw Exception('Failed to mark attendance: $e');
@@ -419,9 +602,12 @@ Future<List<AttendanceModel>> getEventAttendance(String eventId) async {
   ///
   /// Returns a list of attendance records with event details for the specified user
   Future<List<Map<String, dynamic>>> getUserAttendanceRecords(
-      String userId) async {
+    String userId,
+  ) async {
     try {
-      final response = await _httpClient.get(ApiEndpoints.getAttendanceByUser(userId));
+      final response = await _httpClient.get(
+        ApiEndpoints.getAttendanceByUser(userId),
+      );
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
@@ -439,25 +625,19 @@ Future<List<AttendanceModel>> getEventAttendance(String eventId) async {
                 'event': eventDetails.toJson(),
               });
             } else {
-              attendanceWithEvents.add({
-                'attendance': record,
-                'event': null,
-              });
+              attendanceWithEvents.add({'attendance': record, 'event': null});
             }
           } catch (e) {
             print('Error fetching event details: $e');
-            attendanceWithEvents.add({
-              'attendance': record,
-              'event': null,
-            });
+            attendanceWithEvents.add({'attendance': record, 'event': null});
           }
         }
 
         return attendanceWithEvents;
       } else {
         throw Exception(
-            'Failed to fetch user attendance records: HTTP status ${response
-                .statusCode}');
+          'Failed to fetch user attendance records: HTTP status ${response.statusCode}',
+        );
       }
     } catch (e) {
       throw Exception('Failed to fetch user attendance records: $e');
@@ -467,7 +647,9 @@ Future<List<AttendanceModel>> getEventAttendance(String eventId) async {
   /// Get events by region
   Future<List<EventModel>> getEventsByRegion(String regionId) async {
     try {
-      final response = await _httpClient.get(ApiEndpoints.getEventsByRegion(regionId));
+      final response = await _httpClient.get(
+        ApiEndpoints.getEventsByRegion(regionId),
+      );
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
@@ -476,7 +658,9 @@ Future<List<AttendanceModel>> getEventAttendance(String eventId) async {
         // No events found for this region
         return [];
       } else {
-        throw Exception('Failed to fetch region events: HTTP status ${response.statusCode}');
+        throw Exception(
+          'Failed to fetch region events: HTTP status ${response.statusCode}',
+        );
       }
     } catch (e) {
       print('Error fetching events by region: $e');
@@ -486,7 +670,9 @@ Future<List<AttendanceModel>> getEventAttendance(String eventId) async {
         final allEvents = await getOverallEvents();
         return allEvents.where((event) => event.regionId == regionId).toList();
       } catch (fallbackError) {
-        throw Exception('Failed to fetch region events: $e, Fallback error: $fallbackError');
+        throw Exception(
+          'Failed to fetch region events: $e, Fallback error: $fallbackError',
+        );
       }
     }
   }
@@ -495,15 +681,101 @@ Future<List<AttendanceModel>> getEventAttendance(String eventId) async {
   Future<List<EventModel>> getOverallEvents() async {
     try {
       final response = await _httpClient.get(ApiEndpoints.events);
-      
+
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         return data.map((event) => EventModel.fromJson(event)).toList();
       } else {
-        throw Exception('Failed to fetch all events: HTTP status ${response.statusCode}');
+        throw Exception(
+          'Failed to fetch all events: HTTP status ${response.statusCode}',
+        );
       }
     } catch (e) {
       throw Exception('Failed to fetch all events: $e');
+    }
+  }
+
+  /// Get leadership events
+  Future<List<EventModel>> getLeadershipEvents() async {
+    try {
+      final response = await _httpClient.get(ApiEndpoints.leadershipEvents);
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((event) => EventModel.fromJson(event)).toList();
+      } else {
+        final errorData = jsonDecode(response.body);
+        final errorMessage = ApiErrorHandler.getErrorMessage(
+          response.statusCode,
+          errorData,
+        );
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      throw Exception('Failed to fetch leadership events: $e');
+    }
+  }
+
+  /// Get leadership event participants
+  Future<List<Participant>> getLeadershipEventParticipants(
+    String eventId, {
+    String? targetAudience,
+  }) async {
+    try {
+      String url = ApiEndpoints.getEventParticipants(eventId);
+      if (targetAudience != null) {
+        url += '?target_audience=$targetAudience';
+      }
+
+      final response = await _httpClient.get(url);
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data
+            .map((participant) => Participant.fromJson(participant))
+            .toList();
+      } else {
+        final errorData = jsonDecode(response.body);
+        final errorMessage = ApiErrorHandler.getParticipantErrorMessage(
+          response.statusCode,
+          errorData,
+        );
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      throw Exception('Failed to load participants: $e');
+    }
+  }
+
+  /// Mark attendance for leadership events
+  Future<bool> markLeadershipAttendance({
+    required String eventId,
+    required String userId,
+    required bool present,
+    String? notes,
+  }) async {
+    try {
+      final response = await _httpClient.post(
+        ApiEndpoints.createLeadershipAttendance(eventId),
+        body: json.encode({
+          'user_id': userId,
+          'present': present,
+          'notes': notes ?? '',
+        }),
+      );
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        return true;
+      } else {
+        final errorData = jsonDecode(response.body);
+        final errorMessage = ApiErrorHandler.getAttendanceErrorMessage(
+          response.statusCode,
+          errorData,
+        );
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      throw Exception('Failed to mark attendance: $e');
     }
   }
 }

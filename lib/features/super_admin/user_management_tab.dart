@@ -7,6 +7,7 @@ import 'package:group_management_church_app/data/providers/user_provider.dart';
 import 'package:group_management_church_app/features/member/member_attendance_screen.dart';
 import 'package:group_management_church_app/features/super_admin/user_role_management.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
+import 'package:group_management_church_app/widgets/user_deletion_dialog.dart';
 import 'package:provider/provider.dart';
 import 'package:group_management_church_app/core/utils/role_utils.dart';
 
@@ -22,6 +23,7 @@ class _UserManagementTabState extends State<UserManagementTab> {
   String? _errorMessage;
   List<UserModel> _users = [];
   List<UserModel> _filteredUsers = [];
+  String _currentUserRole = '';
 
   final TextEditingController _searchController = TextEditingController();
   String _selectedRole = 'All';
@@ -29,6 +31,7 @@ class _UserManagementTabState extends State<UserManagementTab> {
   @override
   void initState() {
     super.initState();
+    _loadCurrentUserRole();
     _loadUsers();
   }
 
@@ -63,6 +66,20 @@ class _UserManagementTabState extends State<UserManagementTab> {
     }
   }
 
+  Future<void> _loadCurrentUserRole() async {
+    try {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final currentUser = userProvider.currentUser;
+      if (currentUser != null && mounted) {
+        setState(() {
+          _currentUserRole = RoleUtils.mapToDbRole(currentUser.role);
+        });
+      }
+    } catch (e) {
+      print('Error loading current user role: $e');
+    }
+  }
+
   Future<String?> _getUserGroupDetails(String userId) async {
     try {
       final userGroups = await GroupProvider().getUserGroups(userId);
@@ -82,23 +99,25 @@ class _UserManagementTabState extends State<UserManagementTab> {
     final query = _searchController.text.toLowerCase();
 
     setState(() {
-      _filteredUsers = _users.where((user) {
-        final canonicalRole = RoleUtils.mapToDbRole(user.role);
-        final matchesQuery = query.isEmpty ||
-            user.fullName.toLowerCase().contains(query) ||
-            user.email.toLowerCase().contains(query) ||
-            (user.regionalTitle?.toLowerCase().contains(query) ?? false);
+      _filteredUsers =
+          _users.where((user) {
+            final canonicalRole = RoleUtils.mapToDbRole(user.role);
+            final matchesQuery =
+                query.isEmpty ||
+                user.fullName.toLowerCase().contains(query) ||
+                user.email.toLowerCase().contains(query) ||
+                (user.regionalTitle?.toLowerCase().contains(query) ?? false);
 
-        final matchesRole = _selectedRole == 'All' ||
-            (_selectedRole == 'Members' &&
-                canonicalRole == 'user') ||
-            (_selectedRole == 'Group Leaders' &&
-                canonicalRole == 'admin') ||
-            (_selectedRole == 'Regional Leaders' &&
-                RoleUtils.isRegionalLeadership(canonicalRole));
+            final matchesRole =
+                _selectedRole == 'All' ||
+                (_selectedRole == 'Members' && canonicalRole == 'user') ||
+                (_selectedRole == 'Group Leaders' &&
+                    canonicalRole == 'admin') ||
+                (_selectedRole == 'Regional Leaders' &&
+                    RoleUtils.isRegionalLeadership(canonicalRole));
 
-        return matchesQuery && matchesRole;
-      }).toList();
+            return matchesQuery && matchesRole;
+          }).toList();
     });
   }
 
@@ -119,6 +138,20 @@ class _UserManagementTabState extends State<UserManagementTab> {
     message: message,
     type: NotificationType.info,
   );
+
+  void _showDeleteUserDialog(UserModel user) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => UserDeletionDialog(
+            user: user,
+            currentUserRole: _currentUserRole,
+            onDeletionComplete: () {
+              _loadUsers(); // Refresh the user list after deletion
+            },
+          ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -147,8 +180,7 @@ class _UserManagementTabState extends State<UserManagementTab> {
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      contentPadding:
-                      const EdgeInsets.symmetric(vertical: 12),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                     onChanged: (_) => _filterUsers(),
                   ),
@@ -159,8 +191,8 @@ class _UserManagementTabState extends State<UserManagementTab> {
                     await Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (context) =>
-                          const UserRoleManagementScreen()),
+                        builder: (context) => const UserRoleManagementScreen(),
+                      ),
                     );
                     _loadUsers();
                   },
@@ -178,8 +210,10 @@ class _UserManagementTabState extends State<UserManagementTab> {
             ),
           ),
           Padding(
-            padding:
-            const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 8.0,
+            ),
             child: Row(
               children: [
                 const Text('Filter by:'),
@@ -189,8 +223,14 @@ class _UserManagementTabState extends State<UserManagementTab> {
                   items: const [
                     DropdownMenuItem(value: 'All', child: Text('All')),
                     DropdownMenuItem(value: 'Members', child: Text('Members')),
-                    DropdownMenuItem(value: 'Group Leaders', child: Text('Group Leaders')),
-                    DropdownMenuItem(value: "Regional Leaders", child: Text("Regional Leaders")),
+                    DropdownMenuItem(
+                      value: 'Group Leaders',
+                      child: Text('Group Leaders'),
+                    ),
+                    DropdownMenuItem(
+                      value: "Regional Leaders",
+                      child: Text("Regional Leaders"),
+                    ),
                   ],
                   onChanged: (newValue) {
                     if (newValue != null) {
@@ -203,19 +243,22 @@ class _UserManagementTabState extends State<UserManagementTab> {
             ),
           ),
           Expanded(
-            child: _filteredUsers.isEmpty
-                ? const Center(child: Text('No users found matching criteria'))
-                : RefreshIndicator(
-              onRefresh: _loadUsers,
-              child: ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: _filteredUsers.length,
-                itemBuilder: (context, index) {
-                  final user = _filteredUsers[index];
-                  return _buildUserListItem(user);
-                },
-              ),
-            ),
+            child:
+                _filteredUsers.isEmpty
+                    ? const Center(
+                      child: Text('No users found matching criteria'),
+                    )
+                    : RefreshIndicator(
+                      onRefresh: _loadUsers,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _filteredUsers.length,
+                        itemBuilder: (context, index) {
+                          final user = _filteredUsers[index];
+                          return _buildUserListItem(user);
+                        },
+                      ),
+                    ),
           ),
         ],
       ),
@@ -264,15 +307,18 @@ class _UserManagementTabState extends State<UserManagementTab> {
         roleDisplay = 'Super Admin';
         roleColor = AppColors.primaryColor;
         break;
+      case 'root':
+        roleDisplay = 'Root';
+        roleColor = AppColors.primaryColor;
+        break;
       case 'admin':
         roleDisplay = 'Group Leader';
         roleColor = AppColors.secondaryColor;
         break;
       case 'regional manager':
         final alias = user.regionalTitle?.trim();
-        roleDisplay = (alias != null && alias.isNotEmpty)
-            ? alias
-            : 'Regional Manager';
+        roleDisplay =
+            (alias != null && alias.isNotEmpty) ? alias : 'Regional Manager';
         roleColor = AppColors.accentColor;
         break;
       case 'user':
@@ -285,11 +331,12 @@ class _UserManagementTabState extends State<UserManagementTab> {
         break;
     }
 
+    // Check if current user can delete this user
+    final canDelete = _canDeleteUser(canonicalRole);
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
         contentPadding: const EdgeInsets.all(16),
         leading: CircleAvatar(
@@ -310,16 +357,14 @@ class _UserManagementTabState extends State<UserManagementTab> {
             Text(
               'Phone Number: +${user.contact}',
               style: TextStyles.bodyText.copyWith(
-                color: Theme.of(context)
-                    .colorScheme
-                    .onBackground
-                    .withOpacity(0.7),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onBackground.withOpacity(0.7),
               ),
             ),
             const SizedBox(height: 8),
             Container(
-              padding:
-              const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: roleColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
@@ -335,21 +380,45 @@ class _UserManagementTabState extends State<UserManagementTab> {
             ),
           ],
         ),
+        trailing:
+            canDelete
+                ? IconButton(
+                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                  onPressed: () => _showDeleteUserDialog(user),
+                  tooltip: 'Delete User',
+                )
+                : null,
         onTap: () async {
           final groupId = await _getUserGroupDetails(user.id);
           if (!mounted) return;
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => MemberAttendanceScreen(
-                userId: user.id,
-                groupId: groupId ?? '',
-              ),
+              builder:
+                  (context) => MemberAttendanceScreen(
+                    userId: user.id,
+                    groupId: groupId ?? '',
+                  ),
             ),
           ).then((_) => _loadUsers());
         },
       ),
     );
+  }
+
+  bool _canDeleteUser(String targetUserRole) {
+    // Only super admin and root can delete anyone
+    if (_currentUserRole == 'super_admin' || _currentUserRole == 'root') {
+      return true;
+    }
+
+    // Regional managers can only delete regular users in their region
+    if (_currentUserRole == 'regional manager') {
+      return targetUserRole == 'user';
+    }
+
+    // Other roles cannot delete users
+    return false;
   }
 
   String _titleCase(String value) {

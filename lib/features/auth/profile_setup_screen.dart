@@ -47,7 +47,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final TextEditingController _fullNameController = TextEditingController();
   final TextEditingController _contactController = TextEditingController();
   final TextEditingController _nextOfKinController = TextEditingController();
-  final TextEditingController _nextOfKinContactController = TextEditingController();
+  final TextEditingController _nextOfKinContactController =
+      TextEditingController();
   final TextEditingController _CitamAssembly = TextEditingController();
   final TextEditingController _ifNot = TextEditingController();
 
@@ -55,13 +56,13 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   String _selectedGender = 'female';
   final List<String> _genderOptions = ['male', 'female'];
 
-  // Selected region
+  // Selected region (group)
   String? _selectedRegionId;
   List<GroupModel> _regions = [];
+  String _groupSearchQuery = '';
 
   // Default role is 'user' - only super_admin can change roles
-  final String _userRole = 'User';
-
+  final String _userRole = 'user';
 
   // Profile picture state
   Uint8List? _profileImageBytes;
@@ -69,14 +70,20 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   bool _isUploadingImage = false;
 
   // Age group radio buttons
-  final List<String> _ageGroups = ['Under 20yrs', '21 to 30yrs', '31 to 40yrs', '41 to 50 yrs', 'Above 50yrs'];
+  final List<String> _ageGroups = [
+    'Under 20yrs',
+    '21 to 30yrs',
+    '31 to 40yrs',
+    '41 to 50 yrs',
+    'Above 50yrs',
+  ];
   String _selectedAgeGroup = 'Under 18';
 
   String? _regionalID; // initializer to store the result
 
   void fetchRegionIdForGroup(String groupId) {
     final matchingGroup = _regions.firstWhere(
-          (group) => group.id == groupId,
+      (group) => group.id == groupId,
       orElse: () => GroupModel(id: '', name: '', region_id: 'not specified'),
     );
 
@@ -88,7 +95,6 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     }
   }
 
-
   @override
   void initState() {
     super.initState();
@@ -96,24 +102,117 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadUserData();
       _loadRegions();
+      _checkUserRole();
     });
+  }
+
+  // Check if user has a valid role, if not redirect to waiting screen
+  Future<void> _checkUserRole() async {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    await userProvider.loadUser(widget.userId);
+    final currentUser = userProvider.currentUser;
+
+    final userRole = currentUser?.role;
+    if (userRole == null || userRole.isEmpty) {
+      // User doesn't have a role assigned, show waiting screen
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        _showRoleWaitingDialog();
+      }
+    }
+  }
+
+  void _showRoleWaitingDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Account Activation Required'),
+          content: const Text(
+            'Your account is being set up. Please wait for an administrator to assign your role and activate your account. You will receive an email notification once your account is ready.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (context) => const AuthWrapper()),
+                );
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   // Load available regions
   Future<void> _loadRegions() async {
+    print('ProfileSetup: Starting to load regions...');
+
+    // Check if user is authenticated first
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (!authProvider.isAuthenticated) {
+      print('ProfileSetup: User is not authenticated, cannot load regions');
+      _showError('Please log in again to load regions');
+      return;
+    }
+
     setState(() {
       _isLoadingRegions = true;
     });
 
     try {
+      print('ProfileSetup: Getting GroupProvider instance...');
       final regionProvider = Provider.of<GroupProvider>(context, listen: false);
-      await regionProvider.fetchGroups();
+      print('ProfileSetup: Calling fetchAllGroupsForProfile...');
+      await regionProvider.fetchAllGroupsForProfile();
+      print('ProfileSetup: fetchAllGroupsForProfile completed successfully');
 
       setState(() {
         _regions = regionProvider.groups;
         _isLoadingRegions = false;
       });
+      print('ProfileSetup: Loaded ${_regions.length} regions');
     } catch (e) {
+      print('ProfileSetup: Error loading regions: $e');
+
+      // If it's an authentication error, try to refresh and retry once
+      if (e.toString().contains('401') ||
+          e.toString().contains('Unauthorized')) {
+        print(
+          'ProfileSetup: Authentication error detected, trying to refresh...',
+        );
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final refreshed = await authProvider.handleAuthError();
+
+        if (refreshed) {
+          print(
+            'ProfileSetup: Token refreshed, retrying fetchAllGroupsForProfile...',
+          );
+          try {
+            final regionProvider = Provider.of<GroupProvider>(
+              context,
+              listen: false,
+            );
+            await regionProvider.fetchAllGroupsForProfile();
+            setState(() {
+              _regions = regionProvider.groups;
+              _isLoadingRegions = false;
+            });
+            print(
+              'ProfileSetup: Retry successful, loaded ${_regions.length} regions',
+            );
+            return;
+          } catch (retryError) {
+            print('ProfileSetup: Retry also failed: $retryError');
+          }
+        }
+      }
+
       _showError('Error loading regions: $e');
       setState(() {
         _isLoadingRegions = false;
@@ -145,10 +244,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     );
   }
 
-
   Future<void> _loadUserData() async {
     // Check if we're in edit mode
-    final isEditMode = ModalRoute.of(context)?.settings.arguments == 'edit_mode';
+    final isEditMode =
+        ModalRoute.of(context)?.settings.arguments == 'edit_mode';
 
     if (isEditMode) {
       setState(() {
@@ -169,7 +268,6 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             _nextOfKinController.text = currentUser.nextOfKin;
             _nextOfKinContactController.text = currentUser.nextOfKinContact;
 
-
             // Set gender if it's one of the available options
             if (_genderOptions.contains(currentUser.gender)) {
               _selectedGender = currentUser.gender;
@@ -181,9 +279,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             // Set profile image URL if available
             if (currentUser.profileImageUrl != null) {
               // If the URL is relative, make it absolute
-              _profileImageUrl = currentUser.profileImageUrl!.startsWith('http')
-                  ? currentUser.profileImageUrl
-                  : '${ApiEndpoints.baseUrl}${currentUser.profileImageUrl}';
+              _profileImageUrl =
+                  currentUser.profileImageUrl!.startsWith('http')
+                      ? currentUser.profileImageUrl
+                      : '${ApiEndpoints.baseUrl}${currentUser.profileImageUrl}';
               print('Profile image URL set to: $_profileImageUrl');
             }
           });
@@ -209,20 +308,20 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     super.dispose();
   }
 
-// Validate phone number format
-String? _validatePhoneNumber(String? value) {
-  if (value == null || value.isEmpty) {
-    return 'Phone number is required';
-  }
+  // Validate phone number format
+  String? _validatePhoneNumber(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Phone number is required';
+    }
 
-  // Ensure the phone number starts with '254' and matches the format
-  final phoneRegExp = RegExp(r'^254[0-9]{9}$');
-  if (!phoneRegExp.hasMatch(value)) {
-    return 'Enter a valid phone number starting with 254';
-  }
+    // Ensure the phone number starts with '254' and matches the format
+    final phoneRegExp = RegExp(r'^254[0-9]{9}$');
+    if (!phoneRegExp.hasMatch(value)) {
+      return 'Enter a valid phone number starting with 254';
+    }
 
-  return null;
-}
+    return null;
+  }
 
   // Validate full name
   String? _validateFullName(String? value) {
@@ -236,15 +335,17 @@ String? _validatePhoneNumber(String? value) {
 
     return null;
   }
+
   // get region by group
-String? _getRegionByGroup(String groupId) {
-  return _regions.firstWhere(
-    (region) => region.id == groupId,
-    orElse: () => GroupModel(id: '', name: '', region_id: 'not specified'),
-  ).id;
-}
-
-
+  String? _getRegionByGroup(String groupId) {
+    return _regions
+        .firstWhere(
+          (region) => region.id == groupId,
+          orElse:
+              () => GroupModel(id: '', name: '', region_id: 'not specified'),
+        )
+        .id;
+  }
 
   //Submit Form
   Future<void> _submitForm() async {
@@ -253,15 +354,26 @@ String? _getRegionByGroup(String groupId) {
       return;
     }
 
-    if (_selectedRegionId == null || _selectedRegionId!.isEmpty) {
-      _showError('Please select your region');
-      return;
+    // Validate region selection - either from dropdown or manual entry
+    if (_regions.isNotEmpty) {
+      // If regions are loaded, require selection from dropdown
+      if (_selectedRegionId == null || _selectedRegionId!.isEmpty) {
+        _showError('Please select your region');
+        return;
+      }
+    } else {
+      // If no regions are loaded, require manual group entry
+      if (_CitamAssembly.text.trim().isEmpty) {
+        _showError('Please enter your group/assembly name');
+        return;
+      }
     }
 
     setState(() => _isLoading = true);
 
     try {
-      final isEditMode = ModalRoute.of(context)?.settings.arguments == 'edit_mode';
+      final isEditMode =
+          ModalRoute.of(context)?.settings.arguments == 'edit_mode';
 
       // Show Disclaimer only for signup (not edit)
       if (!isEditMode) {
@@ -282,19 +394,28 @@ String? _getRegionByGroup(String groupId) {
 
       await userProvider.loadUser(widget.userId);
       final currentUser = userProvider.currentUser;
-      final role = currentUser?.role ?? _userRole;
+      // Use 'user' as the default role when completing profile
+      final role = 'user';
 
       String selectedRegionName = 'your place of residence';
-      if (_selectedRegionId != null) {
+      if (_regions.isNotEmpty && _selectedRegionId != null) {
+        // If regions are loaded and user selected from dropdown
         final selectedRegion = _regions.firstWhere(
-              (region) => region.id == _selectedRegionId,
-          orElse: () => GroupModel(id: '', name: '', region_id: 'not specified'),
+          (region) => region.id == _selectedRegionId,
+          orElse:
+              () => GroupModel(id: '', name: '', region_id: 'not specified'),
         );
-        if (selectedRegion.name.isNotEmpty) selectedRegionName = selectedRegion.name;
+        if (selectedRegion.name.isNotEmpty)
+          selectedRegionName = selectedRegion.name;
+      } else if (_regions.isEmpty) {
+        // If no regions are loaded, use manual entry
+        selectedRegionName = _CitamAssembly.text.trim();
       }
 
-      // Get the regional ID for the selected region
-      if (_selectedRegionId != null) fetchRegionIdForGroup(_selectedRegionId!);
+      // Get the regional ID for the selected region (only if regions are loaded)
+      if (_regions.isNotEmpty && _selectedRegionId != null) {
+        fetchRegionIdForGroup(_selectedRegionId!);
+      }
 
       final userModel = UserModel(
         id: widget.userId,
@@ -307,7 +428,8 @@ String? _getRegionByGroup(String groupId) {
         role: role,
         gender: _selectedGender,
         regionId: _selectedRegionId ?? '',
-        regionName: selectedRegionName != 'your region' ? selectedRegionName : null,
+        regionName:
+            selectedRegionName != 'your region' ? selectedRegionName : null,
         citam_Assembly: _CitamAssembly.text.trim(),
         if_Not: _ifNot.text.trim(),
         regionalID: _regionalID ?? '',
@@ -317,9 +439,11 @@ String? _getRegionByGroup(String groupId) {
 
       if (success) {
         await userProvider.loadUser(widget.userId);
-        _showSuccess(isEditMode
-            ? 'Profile updated successfully!'
-            : 'Sign up completed successfully!');
+        _showSuccess(
+          isEditMode
+              ? 'Profile updated successfully!'
+              : 'Sign up completed successfully!',
+        );
 
         if (isEditMode) {
           if (mounted) Navigator.of(context).pop(true);
@@ -331,7 +455,15 @@ String? _getRegionByGroup(String groupId) {
           }
         }
       } else {
-        _showError('Failed to update profile. Please try again.');
+        // Check if this is a role-related error
+        final userRole = currentUser?.role;
+        if (userRole == null || userRole.isEmpty) {
+          _showError(
+            'Your account needs to be activated by an administrator before you can complete your profile. Please contact support.',
+          );
+        } else {
+          _showError('Failed to update profile. Please try again.');
+        }
       }
     } catch (e) {
       _showError('Error: ${e.toString()}');
@@ -339,7 +471,6 @@ String? _getRegionByGroup(String groupId) {
       if (mounted) setState(() => _isLoading = false);
     }
   }
-
 
   Future<void> _pickProfileImage() async {
     try {
@@ -369,13 +500,14 @@ String? _getRegionByGroup(String groupId) {
             .replaceAll('/', '_')
             .replaceAll(RegExp('=+\$'), '');
       }
+
       // Convert image bytes to base64
-    final base64Image = tobase64Url(_profileImageBytes!);
-    print('Base64 Image: $base64Image');
-      
+      final base64Image = tobase64Url(_profileImageBytes!);
+      print('Base64 Image: $base64Image');
+
       // Get auth provider for token
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      
+
       // Upload image to server
       final success = await authProvider.uploadProfileImage(
         widget.userId,
@@ -421,54 +553,58 @@ String? _getRegionByGroup(String groupId) {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 20),
-                  
+
                   // Header
                   Text(
                     ModalRoute.of(context)?.settings.arguments == 'edit_mode'
-                      ? 'Edit Your Profile'
-                      : 'Complete Your Profile',
+                        ? 'Edit Your Profile'
+                        : 'Complete Your Profile',
                     style: TextStyles.heading1.copyWith(
                       color: AppColors.primaryColor,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 12),
-                  
+
                   Text(
                     ModalRoute.of(context)?.settings.arguments == 'edit_mode'
-                      ? 'Update your personal information below.'
-                      : 'Please provide your personal information to complete your account setup.',
+                        ? 'Update your personal information below.'
+                        : 'Please provide your personal information to complete your account setup.',
                     style: TextStyles.bodyText,
                   ),
                   const SizedBox(height: 32),
-                  
+
                   // Profile picture section
                   _buildProfilePictureSection(),
                   const SizedBox(height: 32),
-                  
+
                   // Personal information section
                   _buildPersonalInfoSection(),
                   const SizedBox(height: 32),
-                  
+
                   // Emergency contact section
                   _buildEmergencyContactSection(),
                   const SizedBox(height: 32),
-                  
+
                   // Additional information section
                   _buildAdditionalInfoSection(),
                   const SizedBox(height: 40),
-                  
+
                   // Submit button
                   CustomButton(
-                    label: ModalRoute.of(context)?.settings.arguments == 'edit_mode'
-                      ? 'Save Changes'
-                      : 'Complete Sign Up',
+                    label:
+                        ModalRoute.of(context)?.settings.arguments ==
+                                'edit_mode'
+                            ? 'Save Changes'
+                            : 'Complete Sign Up',
                     onPressed: _submitForm,
                     isLoading: _isLoading,
                     color: AppColors.primaryColor,
-                    icon: ModalRoute.of(context)?.settings.arguments == 'edit_mode'
-                      ? Icons.save
-                      : Icons.check_circle,
+                    icon:
+                        ModalRoute.of(context)?.settings.arguments ==
+                                'edit_mode'
+                            ? Icons.save
+                            : Icons.check_circle,
                     isPulsing: true,
                     pulseEffect: PulseEffectType.glow,
                   ),
@@ -495,43 +631,41 @@ String? _getRegionByGroup(String groupId) {
                 decoration: BoxDecoration(
                   color: AppColors.primaryColor.withOpacity(0.1),
                   shape: BoxShape.circle,
-                  border: Border.all(
-                    color: AppColors.primaryColor,
-                    width: 2,
-                  ),
+                  border: Border.all(color: AppColors.primaryColor, width: 2),
                 ),
-                child: _profileImageBytes != null
-                    ? ClipOval(
-                        child: Image.memory(
-                          _profileImageBytes!,
-                          fit: BoxFit.cover,
-                          width: 120,
-                          height: 120,
-                        ),
-                      )
-                    : _profileImageUrl != null
+                child:
+                    _profileImageBytes != null
                         ? ClipOval(
-                            child: Image.network(
-                              _profileImageUrl!,
-                              fit: BoxFit.cover,
-                              width: 120,
-                              height: 120,
-                              errorBuilder: (context, error, stackTrace) {
-                                return const Icon(
-                                  Icons.person,
-                                  size: 60,
-                                  color: AppColors.primaryColor,
-                                );
-                              },
-                            ),
-                          )
-                        : const Icon(
-                            Icons.person,
-                            size: 60,
-                            color: AppColors.primaryColor,
+                          child: Image.memory(
+                            _profileImageBytes!,
+                            fit: BoxFit.cover,
+                            width: 120,
+                            height: 120,
                           ),
+                        )
+                        : _profileImageUrl != null
+                        ? ClipOval(
+                          child: Image.network(
+                            _profileImageUrl!,
+                            fit: BoxFit.cover,
+                            width: 120,
+                            height: 120,
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Icon(
+                                Icons.person,
+                                size: 60,
+                                color: AppColors.primaryColor,
+                              );
+                            },
+                          ),
+                        )
+                        : const Icon(
+                          Icons.person,
+                          size: 60,
+                          color: AppColors.primaryColor,
+                        ),
               ),
-              
+
               // Edit button
               Positioned(
                 bottom: 0,
@@ -542,10 +676,7 @@ String? _getRegionByGroup(String groupId) {
                   decoration: BoxDecoration(
                     color: AppColors.primaryColor,
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white,
-                      width: 2,
-                    ),
+                    border: Border.all(color: Colors.white, width: 2),
                   ),
                   child: IconButton(
                     icon: const Icon(
@@ -576,13 +707,14 @@ String? _getRegionByGroup(String groupId) {
                   ),
                   const SizedBox(width: 8),
                   TextButton.icon(
-                    onPressed: _isUploadingImage
-                        ? null
-                        : () {
-                            setState(() {
-                              _profileImageBytes = null;
-                            });
-                          },
+                    onPressed:
+                        _isUploadingImage
+                            ? null
+                            : () {
+                              setState(() {
+                                _profileImageBytes = null;
+                              });
+                            },
                     icon: const Icon(Icons.cancel),
                     label: const Text('Cancel'),
                     style: TextButton.styleFrom(
@@ -595,9 +727,7 @@ String? _getRegionByGroup(String groupId) {
           else
             Text(
               'Add Profile Picture',
-              style: TextStyles.bodyText.copyWith(
-                fontWeight: FontWeight.w500,
-              ),
+              style: TextStyles.bodyText.copyWith(fontWeight: FontWeight.w500),
             ),
           if (_isUploadingImage)
             const Padding(
@@ -605,9 +735,7 @@ String? _getRegionByGroup(String groupId) {
               child: SizedBox(
                 width: 24,
                 height: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                ),
+                child: CircularProgressIndicator(strokeWidth: 2),
               ),
             ),
         ],
@@ -621,7 +749,7 @@ String? _getRegionByGroup(String groupId) {
       children: [
         _buildSectionHeader('Personal Information', Icons.person),
         const SizedBox(height: 16),
-        
+
         // Full Name
         EnhancedInputField(
           controller: _fullNameController,
@@ -632,7 +760,7 @@ String? _getRegionByGroup(String groupId) {
           autovalidate: true,
         ),
         const SizedBox(height: 16),
-        
+
         // Email (non-editable, from login)
         EnhancedInputField(
           controller: TextEditingController(text: widget.email),
@@ -642,7 +770,7 @@ String? _getRegionByGroup(String groupId) {
           filled: true,
         ),
         const SizedBox(height: 16),
-        
+
         // Phone Number
         EnhancedInputField(
           controller: _contactController,
@@ -658,7 +786,7 @@ String? _getRegionByGroup(String groupId) {
           autovalidate: true,
         ),
         const SizedBox(height: 16),
-        
+
         // Gender Selection
         _buildDropdownField(
           label: 'Gender',
@@ -686,7 +814,7 @@ String? _getRegionByGroup(String groupId) {
       children: [
         _buildSectionHeader('Emergency Contact', Icons.contact_phone),
         const SizedBox(height: 16),
-        
+
         // Next of Kin
         EnhancedInputField(
           controller: _nextOfKinController,
@@ -696,7 +824,7 @@ String? _getRegionByGroup(String groupId) {
           validator: _validateFullName,
         ),
         const SizedBox(height: 16),
-        
+
         // Next of Kin Contact
         EnhancedInputField(
           controller: _nextOfKinContactController,
@@ -719,7 +847,7 @@ String? _getRegionByGroup(String groupId) {
       children: [
         _buildSectionHeader('Additional Information', Icons.info_outline),
         const SizedBox(height: 16),
-        
+
         // Region selection dropdown
         _buildRegionDropdown(),
         const SizedBox(height: 16),
@@ -740,11 +868,10 @@ String? _getRegionByGroup(String groupId) {
           prefixIcon: Icons.question_mark_outlined,
         ),
         const SizedBox(height: 16),
-
       ],
     );
   }
-  
+
   Widget _buildRegionDropdown() {
     return Container(
       decoration: BoxDecoration(
@@ -783,7 +910,8 @@ String? _getRegionByGroup(String groupId) {
                             Text(
                               'Your Region',
                               style: TextStyles.bodyText.copyWith(
-                                color: Theme.of(context).colorScheme.onBackground,
+                                color:
+                                    Theme.of(context).colorScheme.onBackground,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -799,7 +927,10 @@ String? _getRegionByGroup(String groupId) {
                         TextButton(
                           onPressed: () => _showAllRegions(),
                           style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
                             minimumSize: Size.zero,
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
@@ -822,13 +953,55 @@ String? _getRegionByGroup(String groupId) {
                             ],
                           ),
                         ),
+                        const SizedBox(width: 8),
+                        // Refresh regions button
+                        TextButton(
+                          onPressed:
+                              _isLoadingRegions ? null : () => _loadRegions(),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Refresh',
+                                style: TextStyles.bodyText.copyWith(
+                                  color:
+                                      _isLoadingRegions
+                                          ? Colors.grey
+                                          : AppColors.primaryColor,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(width: 2),
+                              Icon(
+                                _isLoadingRegions
+                                    ? Icons.hourglass_empty
+                                    : Icons.refresh,
+                                color:
+                                    _isLoadingRegions
+                                        ? Colors.grey
+                                        : AppColors.primaryColor,
+                                size: 14,
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'Select the region you belong to for group assignments',
                       style: TextStyles.bodyText.copyWith(
-                        color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onBackground.withOpacity(0.7),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -839,113 +1012,209 @@ String? _getRegionByGroup(String groupId) {
                           child: SizedBox(
                             width: 24,
                             height: 24,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                            ),
+                            child: CircularProgressIndicator(strokeWidth: 2),
                           ),
                         ),
                       )
                     else if (_regions.isEmpty)
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppColors.errorColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppColors.errorColor.withOpacity(0.3)),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.error_outline,
-                              color: AppColors.errorColor,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'No regions available. Please contact an administrator.',
-                                style: TextStyles.bodyText.copyWith(
-                                  color: AppColors.errorColor,
-                                ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.errorColor.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: AppColors.errorColor.withOpacity(0.3),
                               ),
                             ),
-                          ],
-                        ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.info_outline,
+                                  color: AppColors.primaryColor,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Unable to load groups automatically. You can enter your group manually.',
+                                    style: TextStyles.bodyText.copyWith(
+                                      color: AppColors.primaryColor,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          // Manual group entry
+                          EnhancedInputField(
+                            controller: _CitamAssembly,
+                            label: 'Group/Assembly Name',
+                            hintText: 'Enter your group or assembly name',
+                            prefixIcon: Icons.group,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Group/Assembly name is required';
+                              }
+                              return null;
+                            },
+                          ),
+                        ],
                       )
                     else
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surface,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppColors.primaryColor.withOpacity(0.3)),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Theme.of(context).colorScheme.surface,
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
                             ),
-                          ],
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: _selectedRegionId,
-                            isExpanded: true,
-                            hint: Text(
-                              'Select your region',
-                              style: TextStyles.bodyText.copyWith(
-                                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.5),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.surface,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: AppColors.primaryColor.withOpacity(0.3),
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Theme.of(context).colorScheme.surface,
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: Builder(
+                                builder: (context) {
+                                  final query =
+                                      _groupSearchQuery.trim().toLowerCase();
+                                  var filtered =
+                                      query.isEmpty
+                                          ? _regions
+                                          : _regions
+                                              .where(
+                                                (g) => g.name
+                                                    .toLowerCase()
+                                                    .contains(query),
+                                              )
+                                              .toList();
+                                  if (_selectedRegionId != null &&
+                                      filtered.every(
+                                        (g) => g.id != _selectedRegionId,
+                                      )) {
+                                    final selected = _regions.firstWhere(
+                                      (g) => g.id == _selectedRegionId,
+                                      orElse:
+                                          () => GroupModel(
+                                            id: _selectedRegionId!,
+                                            name: '',
+                                            region_id: '',
+                                          ),
+                                    );
+                                    filtered = [selected, ...filtered];
+                                  }
+                                  final hasSelectionInList = filtered.any(
+                                    (g) => g.id == _selectedRegionId,
+                                  );
+                                  return DropdownButton<String>(
+                                    value:
+                                        filtered.isEmpty || !hasSelectionInList
+                                            ? null
+                                            : _selectedRegionId,
+                                    isExpanded: true,
+                                    hint: Text(
+                                      'Select your group',
+                                      style: TextStyles.bodyText.copyWith(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onBackground
+                                            .withOpacity(0.5),
+                                      ),
+                                    ),
+                                    icon: const Icon(
+                                      Icons.arrow_drop_down,
+                                      color: AppColors.primaryColor,
+                                    ),
+                                    style: TextStyles.bodyText.copyWith(
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    onChanged: (String? newValue) {
+                                      if (newValue != null &&
+                                          newValue.isNotEmpty) {
+                                        final selectedRegion = _regions
+                                            .firstWhere(
+                                              (region) => region.id == newValue,
+                                              orElse:
+                                                  () => GroupModel(
+                                                    id: '',
+                                                    name: '',
+                                                    region_id: 'not specified',
+                                                  ),
+                                            );
+                                        if (selectedRegion.id.isNotEmpty) {
+                                          setState(() {
+                                            _selectedRegionId =
+                                                selectedRegion.id;
+                                          });
+                                          _showRegionInfo(selectedRegion);
+                                        }
+                                      }
+                                    },
+                                    items:
+                                        filtered.isEmpty
+                                            ? [
+                                              DropdownMenuItem<String>(
+                                                value: '',
+                                                enabled: false,
+                                                child: Text(
+                                                  'No groups match',
+                                                  style: TextStyles.bodyText
+                                                      .copyWith(
+                                                        color: Theme.of(context)
+                                                            .colorScheme
+                                                            .onBackground
+                                                            .withOpacity(0.5),
+                                                      ),
+                                                ),
+                                              ),
+                                            ]
+                                            : filtered.map<
+                                              DropdownMenuItem<String>
+                                            >((GroupModel region) {
+                                              return DropdownMenuItem<String>(
+                                                value: region.id,
+                                                child: Text(region.name),
+                                              );
+                                            }).toList(),
+                                  );
+                                },
                               ),
                             ),
-                            icon: const Icon(Icons.arrow_drop_down, color: AppColors.primaryColor),
-                            style: TextStyles.bodyText.copyWith(
-                              fontWeight: FontWeight.w500,
-                            ),
-                            onChanged: (String? newValue) {
-                              if (newValue != null) {
-                                // Find the selected region
-                                final selectedRegion = _regions.firstWhere(
-                                  (region) => region.id == newValue,
-                                  orElse: () => GroupModel(id: '', name: '', region_id: 'not specified'),
-                                );
-
-                                if (selectedRegion.id.isNotEmpty) {
-                                  // Debugging: Print selected region details
-                                  print('Selected Region ID: ${selectedRegion.id}');
-                                  print('Selected Region Name: ${selectedRegion.name}');
-
-                                  // Update the selected region ID
-                                  setState(() {
-                                    _selectedRegionId = selectedRegion.id;
-                                  });
-
-                                  // Optionally show region info
-                                  _showRegionInfo(selectedRegion);
-                                }
-                              }
-                            },
-                            items: _regions.map<DropdownMenuItem<String>>((GroupModel region) {
-                              return DropdownMenuItem<String>(
-                                value: region.id,
-                                child: Text(region.name),
-                              );
-                            }).toList(),
                           ),
-                        ),
+                        ],
                       ),
                   ],
                 ),
               ),
             ],
           ),
-          if (!_isLoadingRegions && _regions.isNotEmpty && _selectedRegionId == null)
+          if (!_isLoadingRegions &&
+              _regions.isNotEmpty &&
+              _selectedRegionId == null)
             Container(
               margin: const EdgeInsets.only(top: 12),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: Theme.of(context).cardTheme.color?.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.secondaryColor.withOpacity(0.3)),
+                border: Border.all(
+                  color: AppColors.secondaryColor.withOpacity(0.3),
+                ),
               ),
               child: Row(
                 children: [
@@ -959,7 +1228,9 @@ String? _getRegionByGroup(String groupId) {
                     child: Text(
                       'Please select your region to continue',
                       style: TextStyles.bodyText.copyWith(
-                        color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onBackground.withOpacity(0.7),
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -971,241 +1242,260 @@ String? _getRegionByGroup(String groupId) {
       ),
     );
   }
-  
+
   // Show region information dialog
   void _showRegionInfo(GroupModel region) {
     // Only show dialog if there's a description
     if (region.description == null || region.description!.isEmpty) {
       return;
     }
-    
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(
-              Icons.location_on,
-              color: AppColors.primaryColor,
-              size: 24,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                region.name,
-                style: TextStyles.heading2.copyWith(
-                  fontWeight: FontWeight.bold,
+      builder:
+          (context) => AlertDialog(
+            title: Row(
+              children: [
+                Icon(
+                  Icons.location_on,
+                  color: AppColors.primaryColor,
+                  size: 24,
                 ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    region.name,
+                    style: TextStyles.heading2.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Region Information',
+                  style: TextStyles.bodyText.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.secondaryColor,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  region.description ?? 'No description available',
+                  style: TextStyles.bodyText,
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Close'),
               ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Region Information',
-              style: TextStyles.bodyText.copyWith(
-                fontWeight: FontWeight.bold,
-                color: AppColors.secondaryColor,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              region.description ?? 'No description available',
-              style: TextStyles.bodyText,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
+            ],
           ),
-        ],
-      ),
     );
   }
-  
+
   // Show all available regions in a dialog
-void _showAllRegions() {
-  if (_regions.isEmpty) {
-    _showInfo('No regions available');
-    return;
-  }
+  void _showAllRegions() {
+    if (_regions.isEmpty) {
+      _showInfo('No regions available');
+      return;
+    }
 
-  String searchQuery = '';
+    String searchQuery = '';
 
-  showDialog(
-    context: context,
-    builder: (context) => StatefulBuilder(
-      builder: (context, setState) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(
-              Icons.map,
-              color: AppColors.primaryColor,
-              size: 24,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Available Regions',
-              style: TextStyles.heading2.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Search field
-            TextField(
-              decoration: InputDecoration(
-                hintText: 'Search regions...',
-                prefixIcon: Icon(Icons.search, color: AppColors.primaryColor),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              onChanged: (value) {
-                setState(() {
-                  searchQuery = value.toLowerCase();
-                });
-              },
-            ),
-            const SizedBox(height: 16),
-            // Filtered regions list
-            Expanded(
-              child: Container(
-                width: double.maxFinite,
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(context).size.height * 0.5,
-                ),
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: _regions.length,
-                  itemBuilder: (context, index) {
-                    final region = _regions[index];
-                    final isSelected = _selectedRegionId == region.id;
-
-                    // Filter regions based on search query
-                    if (!region.name.toLowerCase().contains(searchQuery)) {
-                      return const SizedBox.shrink();
-                    }
-
-                    return Card(
-                      elevation: isSelected ? 2 : 0,
-                      color: isSelected
-                          ? AppColors.primaryColor.withOpacity(0.1)
-                          : Colors.white,
-                      margin: const EdgeInsets.only(bottom: 8),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        side: BorderSide(
-                          color: isSelected
-                              ? AppColors.primaryColor
-                              : Colors.grey.withOpacity(0.3),
-                          width: isSelected ? 2 : 1,
+    showDialog(
+      context: context,
+      builder:
+          (context) => StatefulBuilder(
+            builder:
+                (context, setState) => AlertDialog(
+                  title: Row(
+                    children: [
+                      Icon(Icons.map, color: AppColors.primaryColor, size: 24),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Available Regions',
+                        style: TextStyles.heading2.copyWith(
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                      child: InkWell(
-                        onTap: () {
+                    ],
+                  ),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Search field
+                      TextField(
+                        decoration: InputDecoration(
+                          hintText: 'Search regions...',
+                          prefixIcon: Icon(
+                            Icons.search,
+                            color: AppColors.primaryColor,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        onChanged: (value) {
                           setState(() {
-                            _selectedRegionId = region.id;
+                            searchQuery = value.toLowerCase();
                           });
-                          Navigator.of(context).pop();
                         },
-                        borderRadius: BorderRadius.circular(8),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.location_on,
-                                    color: isSelected
-                                        ? AppColors.primaryColor
-                                        : AppColors.secondaryColor,
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      region.name,
-                                      style: TextStyles.bodyText.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                        color: isSelected
+                      ),
+                      const SizedBox(height: 16),
+                      // Filtered regions list
+                      Expanded(
+                        child: Container(
+                          width: double.maxFinite,
+                          constraints: BoxConstraints(
+                            maxHeight: MediaQuery.of(context).size.height * 0.5,
+                          ),
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: _regions.length,
+                            itemBuilder: (context, index) {
+                              final region = _regions[index];
+                              final isSelected = _selectedRegionId == region.id;
+
+                              // Filter regions based on search query
+                              if (!region.name.toLowerCase().contains(
+                                searchQuery,
+                              )) {
+                                return const SizedBox.shrink();
+                              }
+
+                              return Card(
+                                elevation: isSelected ? 2 : 0,
+                                color:
+                                    isSelected
+                                        ? AppColors.primaryColor.withOpacity(
+                                          0.1,
+                                        )
+                                        : Colors.white,
+                                margin: const EdgeInsets.only(bottom: 8),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  side: BorderSide(
+                                    color:
+                                        isSelected
                                             ? AppColors.primaryColor
-                                            : Theme.of(context).colorScheme.onBackground,
-                                      ),
-                                    ),
+                                            : Colors.grey.withOpacity(0.3),
+                                    width: isSelected ? 2 : 1,
                                   ),
-                                  if (isSelected)
-                                    Container(
-                                      padding: const EdgeInsets.all(4),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.primaryColor,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(
-                                        Icons.check,
-                                        color: Colors.white,
-                                        size: 16,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                              if (region.description != null &&
-                                  region.description!.isNotEmpty) ...[
-                                const SizedBox(height: 8),
-                                Text(
-                                  region.description!,
-                                  style: TextStyles.bodyText.copyWith(
-                                    color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
-                                  ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              ],
-                            ],
+                                child: InkWell(
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedRegionId = region.id;
+                                    });
+                                    Navigator.of(context).pop();
+                                  },
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(12.0),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.location_on,
+                                              color:
+                                                  isSelected
+                                                      ? AppColors.primaryColor
+                                                      : AppColors
+                                                          .secondaryColor,
+                                              size: 20,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                region.name,
+                                                style: TextStyles.bodyText
+                                                    .copyWith(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color:
+                                                          isSelected
+                                                              ? AppColors
+                                                                  .primaryColor
+                                                              : Theme.of(
+                                                                    context,
+                                                                  )
+                                                                  .colorScheme
+                                                                  .onBackground,
+                                                    ),
+                                              ),
+                                            ),
+                                            if (isSelected)
+                                              Container(
+                                                padding: const EdgeInsets.all(
+                                                  4,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.primaryColor,
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: const Icon(
+                                                  Icons.check,
+                                                  color: Colors.white,
+                                                  size: 16,
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                        if (region.description != null &&
+                                            region.description!.isNotEmpty) ...[
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            region.description!,
+                                            style: TextStyles.bodyText.copyWith(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onBackground
+                                                  .withOpacity(0.7),
+                                            ),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                         ),
                       ),
-                    );
-                  },
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Cancel'),
+                    ),
+                  ],
                 ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
           ),
-        ],
-      ),
-    ),
-  );
-}
+    );
+  }
+
   Widget _buildSectionHeader(String title, IconData icon) {
     return Row(
       children: [
-        Icon(
-          icon,
-          color: AppColors.primaryColor,
-          size: 24,
-        ),
+        Icon(icon, color: AppColors.primaryColor, size: 24),
         const SizedBox(width: 8),
         Text(
           title,
-          style: TextStyles.heading2.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyles.heading2.copyWith(fontWeight: FontWeight.bold),
         ),
       ],
     );
@@ -1226,11 +1516,7 @@ void _showAllRegions() {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Row(
         children: [
-          Icon(
-            icon,
-            color: AppColors.primaryColor,
-            size: 24,
-          ),
+          Icon(icon, color: AppColors.primaryColor, size: 24),
           const SizedBox(width: 16),
           Expanded(
             child: DropdownButtonHideUnderline(
@@ -1238,17 +1524,24 @@ void _showAllRegions() {
                 dropdownColor: Theme.of(context).colorScheme.background,
                 value: value,
                 isExpanded: true,
-                icon: const Icon(Icons.arrow_drop_down, color: AppColors.primaryColor),
+                icon: const Icon(
+                  Icons.arrow_drop_down,
+                  color: AppColors.primaryColor,
+                ),
                 style: TextStyles.bodyText,
                 onChanged: onChanged,
-                items: items.map<DropdownMenuItem<String>>((String value) {
-                  return DropdownMenuItem<String>(
-                    value: value,
-                    child: Text(value,
-                      style: TextStyles.bodyText.copyWith(color: Theme.of(context).colorScheme.onBackground),
-                    ),
-                  );
-                }).toList(),
+                items:
+                    items.map<DropdownMenuItem<String>>((String value) {
+                      return DropdownMenuItem<String>(
+                        value: value,
+                        child: Text(
+                          value,
+                          style: TextStyles.bodyText.copyWith(
+                            color: Theme.of(context).colorScheme.onBackground,
+                          ),
+                        ),
+                      );
+                    }).toList(),
               ),
             ),
           ),
@@ -1256,6 +1549,7 @@ void _showAllRegions() {
       ),
     );
   }
+
   Widget _buildAgeGroupSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1263,20 +1557,21 @@ void _showAllRegions() {
         _buildSectionHeader('Indicate your Age', Icons.cake_sharp),
         const SizedBox(height: 16),
         Column(
-          children: _ageGroups.map((ageGroup) {
-            return RadioListTile<String>(
-              title: Text(ageGroup),
-              value: ageGroup,
-              groupValue: _selectedAgeGroup,
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() {
-                    _selectedAgeGroup = value;
-                  });
-                }
-              },
-            );
-          }).toList(),
+          children:
+              _ageGroups.map((ageGroup) {
+                return RadioListTile<String>(
+                  title: Text(ageGroup),
+                  value: ageGroup,
+                  groupValue: _selectedAgeGroup,
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() {
+                        _selectedAgeGroup = value;
+                      });
+                    }
+                  },
+                );
+              }).toList(),
         ),
       ],
     );
@@ -1296,16 +1591,38 @@ class _DisclaimerPopupState extends State<DisclaimerPopup> {
   bool _accepted = false;
   bool _showFull = false;
 
+  void _checkIfAtBottom() {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    final atBottom = position.pixels >= position.maxScrollExtent - 4.0;
+    if (atBottom != _isAtBottom) {
+      setState(() => _isAtBottom = atBottom);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    _scrollController.addListener(() {
-      if (_scrollController.offset >= _scrollController.position.maxScrollExtent) {
-        setState(() {
-          _isAtBottom = true;
-        });
+    _scrollController.addListener(_checkIfAtBottom);
+    // After first frame, if content doesn't need scrolling, allow accept
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (!_scrollController.hasClients) {
+        setState(() => _isAtBottom = true);
+        return;
+      }
+      final position = _scrollController.position;
+      if (position.maxScrollExtent <= 0) {
+        setState(() => _isAtBottom = true);
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_checkIfAtBottom);
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -1328,81 +1645,92 @@ class _DisclaimerPopupState extends State<DisclaimerPopup> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       elevation: 8,
       backgroundColor: Theme.of(context).cardTheme.color,
-      actions: _showFull
-          ? [
-        TextButton(
-          onPressed: () => Navigator.pop(context, false),
-          child: Text(
-            "Decline",
-            style: TextStyles.bodyText.copyWith(color: AppColors.errorColor),
-          ),
-        ),
-        ElevatedButton(
-          onPressed: _accepted
-              ? () => Navigator.pop(context, true)
-              : null,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Theme.of(context).colorScheme.primary,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-          child: Text(
-            "Continue",
-            style: TextStyles.bodyText.copyWith(
-              color: Theme.of(context).colorScheme.onBackground,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      ]
-          : [
-        TextButton(
-          onPressed: () => Navigator.pop(context, false),
-          child: Text(
-            "Cancel",
-            style: TextStyles.bodyText.copyWith(color: AppColors.errorColor),
-          ),
-        ),
-        ElevatedButton(
-          onPressed: () => setState(() => _showFull = true),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Theme.of(context).colorScheme.primary,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-          child: Text(
-            "View More",
-            style: TextStyles.bodyText.copyWith(
-              color: Theme.of(context).colorScheme.onBackground,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      ],
+      actions:
+          _showFull
+              ? [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: Text(
+                    "Decline",
+                    style: TextStyles.bodyText.copyWith(
+                      color: AppColors.errorColor,
+                    ),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed:
+                      _accepted ? () => Navigator.pop(context, true) : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Text(
+                    "Continue",
+                    style: TextStyles.bodyText.copyWith(
+                      color: Theme.of(context).colorScheme.onBackground,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ]
+              : [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: Text(
+                    "Cancel",
+                    style: TextStyles.bodyText.copyWith(
+                      color: AppColors.errorColor,
+                    ),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () => setState(() => _showFull = true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Text(
+                    "View More",
+                    style: TextStyles.bodyText.copyWith(
+                      color: Theme.of(context).colorScheme.onBackground,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
     );
   }
 
   Widget _buildShortContent() {
-    return Text(
-      "By creating an account, you consent to the collection and use of your personal data for Safari group Ministry purposes in line with the Kenya Data Protection Act, 2019.",
-      style: TextStyle(
-        fontSize: 14,
-        fontWeight: FontWeight.w500,
-        color: Theme.of(context).colorScheme.onBackground,
-        height: 1.5,
+    return SingleChildScrollView(
+      child: Text(
+        "By creating an account, you consent to the collection and use of your personal data for Safari group Ministry purposes in line with the Kenya Data Protection Act, 2019.",
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+          color: Theme.of(context).colorScheme.onBackground,
+          height: 1.5,
+        ),
+        textAlign: TextAlign.justify,
       ),
-      textAlign: TextAlign.justify,
     );
   }
 
   Widget _buildFullContent() {
+    final maxContentHeight = MediaQuery.of(context).size.height * 0.35;
     return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(
+        SizedBox(
+          height: maxContentHeight,
           child: SingleChildScrollView(
             controller: _scrollController,
+            padding: const EdgeInsets.only(right: 8),
             child: Text(
               "By registering and using this application, you consent to the collection and processing of your personal information by Christ Is The Answer Ministries (CITAM) Valley Road Safari Groups administration, including enrollment, attendance tracking, communication and discipleship reporting. Your information will be stored securely and will not be shared with unauthorized third parties. Access will be restricted to designated Safari Group leaders, coordinators, and ministry administrators for official ministry purposes only. You have the right to request access, correction, or deletion of your personal data in line with the provisions of the Kenya Data Protection Act, 2019. For any questions or to exercise your rights, please contact the Citam valley road safari group leadership.",
               style: TextStyle(
@@ -1415,18 +1743,49 @@ class _DisclaimerPopupState extends State<DisclaimerPopup> {
             ),
           ),
         ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Checkbox(
-              value: _accepted,
-              onChanged: _isAtBottom
-                  ? (val) => setState(() => _accepted = val ?? false)
-                  : null,
-            ),
-            const Flexible(child: Text("I Accept")),
-          ],
+        const SizedBox(height: 12),
+        InkWell(
+          onTap:
+              _isAtBottom ? () => setState(() => _accepted = !_accepted) : null,
+          borderRadius: BorderRadius.circular(4),
+          child: Row(
+            children: [
+              Checkbox(
+                value: _accepted,
+                onChanged:
+                    _isAtBottom
+                        ? (val) => setState(() => _accepted = val ?? false)
+                        : null,
+              ),
+              Expanded(
+                child: Text(
+                  "I have read and accept the above",
+                  style: TextStyles.bodyText.copyWith(
+                    color:
+                        _isAtBottom
+                            ? Theme.of(context).colorScheme.onBackground
+                            : Theme.of(
+                              context,
+                            ).colorScheme.onBackground.withOpacity(0.6),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
+        if (!_isAtBottom)
+          Padding(
+            padding: const EdgeInsets.only(top: 4.0),
+            child: Text(
+              "Scroll to the bottom to enable acceptance",
+              style: TextStyles.bodyText.copyWith(
+                fontSize: 12,
+                color: Theme.of(
+                  context,
+                ).colorScheme.onBackground.withOpacity(0.6),
+              ),
+            ),
+          ),
       ],
     );
   }

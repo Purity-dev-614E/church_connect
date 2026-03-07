@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:group_management_church_app/core/constants/colors.dart';
-import 'package:group_management_church_app/core/constants/text_styles.dart';
+import 'package:group_management_church_app/data/providers/user_provider.dart';
+import 'package:group_management_church_app/data/providers/group_provider.dart';
 import 'package:group_management_church_app/data/models/group_model.dart';
 import 'package:group_management_church_app/data/models/user_model.dart';
-import 'package:group_management_church_app/data/providers/group_provider.dart';
-import 'package:group_management_church_app/data/providers/user_provider.dart';
+import 'package:group_management_church_app/core/constants/colors.dart';
+import 'package:group_management_church_app/core/constants/text_styles.dart';
 import 'package:group_management_church_app/features/region_manager/region_user_management_tab.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
+import 'package:group_management_church_app/data/services/group_creation_service.dart';
+import 'package:group_management_church_app/data/services/user_services.dart';
+import 'package:group_management_church_app/widgets/create_group_dialog.dart';
 import 'package:provider/provider.dart';
 import '../../data/providers/analytics_providers/admin_analytics_provider.dart';
 import '../../data/services/group_services.dart';
@@ -152,6 +155,13 @@ class _RegionGroupAdministrationTabState
           ],
         ),
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showCreateGroupDialog,
+        backgroundColor: AppColors.primaryColor,
+        foregroundColor: Colors.white,
+        child: const Icon(Icons.add),
+        tooltip: 'Create Group',
+      ),
     );
   }
 
@@ -194,7 +204,9 @@ class _RegionGroupAdministrationTabState
           Icon(
             Icons.groups_outlined,
             size: 64,
-            color: Theme.of(context).colorScheme.onBackground.withOpacity(0.5),
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.5),
           ),
           const SizedBox(height: 16),
           Text(
@@ -207,7 +219,7 @@ class _RegionGroupAdministrationTabState
             style: TextStyles.bodyText.copyWith(
               color: Theme.of(
                 context,
-              ).colorScheme.onBackground.withOpacity(0.7),
+              ).colorScheme.onSurface.withValues(alpha: 0.7),
             ),
             textAlign: TextAlign.center,
           ),
@@ -243,7 +255,11 @@ class _RegionGroupAdministrationTabState
                 CircleAvatar(
                   backgroundColor: AppColors.secondaryColor,
                   radius: 24,
-                  child: const Icon(Icons.groups, color: Colors.white, size: 28),
+                  child: const Icon(
+                    Icons.groups,
+                    color: Colors.white,
+                    size: 28,
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -260,17 +276,17 @@ class _RegionGroupAdministrationTabState
                       FutureBuilder<String>(
                         future: _fetchAdminName(group.group_admin!),
                         builder: (context, snapshot) {
-                          final adminName = snapshot.data ??
+                          final adminName =
+                              snapshot.data ??
                               (group.group_admin!.isNotEmpty
                                   ? "Loading..."
                                   : "No admin assigned");
                           return Text(
                             'Admin: $adminName',
                             style: TextStyles.bodyText.copyWith(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onBackground
-                                  .withOpacity(0.7),
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withValues(alpha: 0.7),
                             ),
                           );
                         },
@@ -288,10 +304,11 @@ class _RegionGroupAdministrationTabState
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => GroupDetailsScreen(
-                              groupId: group.id,
-                              groupName: group.name,
-                            ),
+                            builder:
+                                (context) => GroupDetailsScreen(
+                                  groupId: group.id,
+                                  groupName: group.name,
+                                ),
                           ),
                         );
                         break;
@@ -306,48 +323,52 @@ class _RegionGroupAdministrationTabState
                         break;
                     }
                   },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      value: 'view',
-                      child: Row(
-                        children: [
-                          Icon(Icons.visibility, size: 18),
-                          SizedBox(width: 8),
-                          Text('View'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'edit',
-                      child: Row(
-                        children: [
-                          Icon(Icons.edit, size: 18),
-                          SizedBox(width: 8),
-                          Text('Edit'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'assign',
-                      child: Row(
-                        children: [
-                          Icon(Icons.person_add, size: 18),
-                          SizedBox(width: 8),
-                          Text('Assign Admin'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          Icon(Icons.delete, size: 18, color: Colors.red),
-                          SizedBox(width: 8),
-                          Text('Delete', style: TextStyle(color: Colors.red)),
-                        ],
-                      ),
-                    ),
-                  ],
+                  itemBuilder:
+                      (context) => [
+                        const PopupMenuItem(
+                          value: 'view',
+                          child: Row(
+                            children: [
+                              Icon(Icons.visibility, size: 18),
+                              SizedBox(width: 8),
+                              Text('View'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Row(
+                            children: [
+                              Icon(Icons.edit, size: 18),
+                              SizedBox(width: 8),
+                              Text('Edit'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'assign',
+                          child: Row(
+                            children: [
+                              Icon(Icons.person_add, size: 18),
+                              SizedBox(width: 8),
+                              Text('Assign Admin'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete, size: 18, color: Colors.red),
+                              SizedBox(width: 8),
+                              Text(
+                                'Delete',
+                                style: TextStyle(color: Colors.red),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                 ),
               ],
             ),
@@ -372,11 +393,12 @@ class _RegionGroupAdministrationTabState
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => AdminDashboard(
-                              groupId: group.id,
-                              groupName: group.name,
-                              initialTabIndex: 1,
-                            ),
+                            builder:
+                                (context) => AdminDashboard(
+                                  groupId: group.id,
+                                  groupName: group.name,
+                                  initialTabIndex: 1,
+                                ),
                           ),
                         );
                       },
@@ -389,11 +411,12 @@ class _RegionGroupAdministrationTabState
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => AdminDashboard(
-                              groupId: group.id,
-                              groupName: group.name,
-                              initialTabIndex: 2,
-                            ),
+                            builder:
+                                (context) => AdminDashboard(
+                                  groupId: group.id,
+                                  groupName: group.name,
+                                  initialTabIndex: 2,
+                                ),
                           ),
                         );
                       },
@@ -401,7 +424,8 @@ class _RegionGroupAdministrationTabState
                     FutureBuilder<Map<String, dynamic>>(
                       future: _getGroupAttendance(group.id),
                       builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
                           return _buildGroupStat(
                             'Attendance',
                             '...',
@@ -440,7 +464,6 @@ class _RegionGroupAdministrationTabState
     );
   }
 
-
   Widget _buildGroupStat(
     String label,
     String value,
@@ -453,7 +476,7 @@ class _RegionGroupAdministrationTabState
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.background.withOpacity(0.3),
+          color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(8),
         ),
         constraints: const BoxConstraints(minWidth: 80, maxWidth: 100),
@@ -467,7 +490,7 @@ class _RegionGroupAdministrationTabState
               style: TextStyles.bodyText.copyWith(
                 fontWeight: FontWeight.bold,
                 fontSize: 13,
-                color: Theme.of(context).colorScheme.onBackground,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
             Text(
@@ -476,7 +499,7 @@ class _RegionGroupAdministrationTabState
                 fontSize: 11,
                 color: Theme.of(
                   context,
-                ).colorScheme.onBackground.withOpacity(0.6),
+                ).colorScheme.onSurface.withValues(alpha: 0.6),
               ),
               textAlign: TextAlign.center,
             ),
@@ -496,7 +519,7 @@ class _RegionGroupAdministrationTabState
       final admin = await userProvider.getUserById(adminId);
       return admin?.fullName ?? "Unknown";
     } catch (e) {
-      print('Error fetching admin name: $e');
+      debugPrint('Error fetching admin name: $e');
       return "Unknown";
     }
   }
@@ -506,7 +529,7 @@ class _RegionGroupAdministrationTabState
       final groupProvider = Provider.of<GroupProvider>(context, listen: false);
       return await groupProvider.getGroupStats(groupId);
     } catch (e) {
-      print('Error fetching group stats: $e');
+      debugPrint('Error fetching group stats: $e');
       return {'memberCount': 0, 'eventCount': 0};
     }
   }
@@ -552,115 +575,36 @@ class _RegionGroupAdministrationTabState
 
       return {'active': active, 'inactive': inactive};
     } catch (e) {
-      print('Error fetching group activity status: $e');
+      debugPrint('Error fetching group activity status: $e');
       // Return default values on error
       return {'active': 0, 'inactive': 0};
     }
   }
 
-  void _showCreateGroupDialog(BuildContext context) {
-    final TextEditingController nameController = TextEditingController();
-    final TextEditingController descriptionController = TextEditingController();
+  void _showCreateGroupDialog() async {
+    final userServices = UserServices();
+    final userRole = await userServices.getUserRole();
+
+    if (userRole == null) {
+      _showError('Unable to determine user role');
+      return;
+    }
+
+    final groupService = GroupCreationService(
+      baseUrl: 'https://safari-backend-fgl3.onrender.com',
+    );
 
     showDialog(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: Row(
-            children: [
-              const Icon(Icons.group_add, color: AppColors.primaryColor),
-              const SizedBox(width: 8),
-              const Text('Create New Group'),
-            ],
+      builder:
+          (context) => CreateGroupDialog(
+            userRole: userRole,
+            userRegionId: widget.regionId,
+            groupService: groupService,
+            onGroupCreated: () {
+              _loadGroups(); // Reload groups after successful creation
+            },
           ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Group Information',
-                  style: TextStyles.heading2.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: nameController,
-                  decoration: InputDecoration(
-                    labelText: 'Group Name',
-                    prefixIcon: const Icon(Icons.group),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: descriptionController,
-                  decoration: InputDecoration(
-                    labelText: 'Description',
-                    prefixIcon: const Icon(Icons.description),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  maxLines: 3,
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-              style: TextButton.styleFrom(foregroundColor: Colors.grey[600]),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (nameController.text.isEmpty) {
-                  _showError('Group name is required');
-                  return;
-                }
-
-                try {
-                  final groupProvider = Provider.of<GroupProvider>(
-                    context,
-                    listen: false,
-                  );
-                  final success = await groupProvider.createGroup(
-                    nameController.text.trim(),
-                    descriptionController.text.trim(),
-                    '', // Empty admin ID for now
-                    widget.regionId,
-                  );
-
-                  if (success) {
-                    _showSuccess('Group created successfully');
-                    Navigator.pop(context);
-                    _loadGroups(); // Refresh the group list
-                  } else {
-                    _showError('Failed to create group');
-                  }
-                } catch (e) {
-                  _showError('Failed to create group: ${e.toString()}');
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryColor,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text('Create Group'),
-            ),
-          ],
-        );
-      },
     );
   }
 
@@ -684,7 +628,7 @@ class _RegionGroupAdministrationTabState
         availableAdmins = users.where((user) => user.role == 'admin').toList();
         isLoadingAdmins = false;
       } catch (e) {
-        print('Error loading admins: $e');
+        debugPrint('Error loading admins: $e');
         isLoadingAdmins = false;
       }
     }
@@ -880,13 +824,13 @@ class _AssignAdminDialogState extends State<_AssignAdminDialog> {
   }
 
   Future<void> _loadAdmins() async {
-    print('Starting to load admins for region: ${widget.regionId}');
+    debugPrint('Starting to load admins for region: ${widget.regionId}');
 
     try {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
-      print('Fetching users from region...');
+      debugPrint('Fetching users from region...');
       final users = await userProvider.getUsersByRegion(widget.regionId);
-      print('Found ${users.length} total users in region');
+      debugPrint('Found ${users.length} total users in region');
 
       // Filter users with admin role and log their details
       final admins =
@@ -896,17 +840,19 @@ class _AssignAdminDialogState extends State<_AssignAdminDialog> {
                 user.role.toLowerCase() == 'group_leader' ||
                 user.role.toLowerCase() == 'regional_manager';
             if (hasAdminRole) {
-              print(
+              debugPrint(
                 'Found potential admin: ${user.fullName} (${user.email}) with role: ${user.role}',
               );
             }
             return hasAdminRole;
           }).toList();
 
-      print('Found ${admins.length} users with admin roles');
-      print('Available admins:');
+      debugPrint('Found ${admins.length} users with admin roles');
+      debugPrint('Available admins:');
       for (var admin in admins) {
-        print('- ${admin.fullName} (${admin.email}) - Role: ${admin.role}');
+        debugPrint(
+          '- ${admin.fullName} (${admin.email}) - Role: ${admin.role}',
+        );
       }
 
       if (mounted) {
@@ -916,7 +862,7 @@ class _AssignAdminDialogState extends State<_AssignAdminDialog> {
         });
       }
     } catch (e) {
-      print('Error loading admins: $e');
+      debugPrint('Error loading admins: $e');
       if (mounted) {
         setState(() {
           isLoadingAdmins = false;
@@ -988,7 +934,7 @@ class _AssignAdminDialogState extends State<_AssignAdminDialog> {
                       style: TextStyles.bodyText.copyWith(
                         color: Theme.of(
                           context,
-                        ).colorScheme.onBackground.withOpacity(0.7),
+                        ).colorScheme.onSurface.withValues(alpha: 0.7),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -1037,7 +983,7 @@ class _AssignAdminDialogState extends State<_AssignAdminDialog> {
                               CircleAvatar(
                                 radius: 16,
                                 backgroundColor: AppColors.primaryColor
-                                    .withOpacity(0.2),
+                                    .withValues(alpha: 0.2),
                                 child: Text(
                                   admin.fullName.isNotEmpty
                                       ? admin.fullName[0].toUpperCase()
@@ -1064,8 +1010,8 @@ class _AssignAdminDialogState extends State<_AssignAdminDialog> {
                                     style: TextStyles.bodyText.copyWith(
                                       color: Theme.of(context)
                                           .colorScheme
-                                          .onBackground
-                                          .withOpacity(0.7),
+                                          .onSurface
+                                          .withValues(alpha: 0.7),
                                     ),
                                   ),
                                   Text(
@@ -1073,8 +1019,8 @@ class _AssignAdminDialogState extends State<_AssignAdminDialog> {
                                     style: TextStyles.bodyText.copyWith(
                                       color: Theme.of(context)
                                           .colorScheme
-                                          .onBackground
-                                          .withOpacity(0.7),
+                                          .onSurface
+                                          .withValues(alpha: 0.7),
                                     ),
                                   ),
                                 ],
@@ -1084,7 +1030,7 @@ class _AssignAdminDialogState extends State<_AssignAdminDialog> {
                         );
                       }).toList(),
                   onChanged: (value) {
-                    print('Selected admin ID: $value');
+                    debugPrint('Selected admin ID: $value');
                     setState(() {
                       selectedAdminId = value;
                     });
@@ -1107,7 +1053,7 @@ class _AssignAdminDialogState extends State<_AssignAdminDialog> {
               return;
             }
 
-            print(
+            debugPrint(
               'Attempting to assign admin $selectedAdminId to group ${widget.group.id}',
             );
             try {
@@ -1123,20 +1069,20 @@ class _AssignAdminDialogState extends State<_AssignAdminDialog> {
                 context,
                 listen: false,
               );
-              print('Updating group with new admin...');
+              debugPrint('Updating group with new admin...');
               final success = await groupProvider.updateGroup(updatedGroup);
 
               if (success) {
-                print('Successfully assigned admin to group');
+                debugPrint('Successfully assigned admin to group');
                 _showSuccess('Group leader assigned successfully');
                 Navigator.pop(context);
                 widget.onSuccess();
               } else {
-                print('Failed to assign admin to group');
+                debugPrint('Failed to assign admin to group');
                 _showError('Failed to assign group leader');
               }
             } catch (e) {
-              print('Error assigning admin: $e');
+              debugPrint('Error assigning admin: $e');
               _showError('Failed to assign group leader: ${e.toString()}');
             }
           },

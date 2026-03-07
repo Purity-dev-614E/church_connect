@@ -9,12 +9,15 @@ class EventCard extends StatelessWidget {
   final String eventDate;
   final String eventLocation;
   final VoidCallback onTap;
+  final String? tag;
 
-  const EventCard({super.key, 
+  const EventCard({
+    super.key,
     required this.eventTitle,
     required this.eventDate,
     required this.eventLocation,
     required this.onTap,
+    this.tag,
   });
 
   @override
@@ -25,9 +28,18 @@ class EventCard extends StatelessWidget {
         elevation: 3.0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12.0),
-          side: BorderSide(color: AppColors.primaryColor.withOpacity(0.1), width: 1),
+          side: BorderSide(
+            color:
+                tag == 'leadership'
+                    ? Colors.amber.withOpacity(0.3)
+                    : AppColors.primaryColor.withOpacity(0.1),
+            width: 1,
+          ),
         ),
-        color: Theme.of(context).colorScheme.background,
+        color:
+            tag == 'leadership'
+                ? Colors.amber.withOpacity(0.1)
+                : Theme.of(context).colorScheme.background,
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Row(
@@ -37,12 +49,18 @@ class EventCard extends StatelessWidget {
                 width: 50,
                 height: 50,
                 decoration: BoxDecoration(
-                  color: AppColors.primaryColor.withOpacity(0.1),
+                  color:
+                      tag == 'leadership'
+                          ? Colors.amber.withOpacity(0.2)
+                          : AppColors.primaryColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8.0),
                 ),
                 child: Icon(
-                  Icons.event,
-                  color: AppColors.primaryColor,
+                  tag == 'leadership' ? Icons.push_pin : Icons.event,
+                  color:
+                      tag == 'leadership'
+                          ? Colors.amber.shade700
+                          : AppColors.primaryColor,
                   size: 30,
                 ),
               ),
@@ -57,6 +75,27 @@ class EventCard extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                    if (tag == 'leadership') ...[
+                      const SizedBox(height: 4.0),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.push_pin,
+                            size: 14,
+                            color: Colors.amber.shade700,
+                          ),
+                          const SizedBox(width: 4.0),
+                          Text(
+                            'Leadership Meeting',
+                            style: TextStyles.bodyText.copyWith(
+                              color: Colors.amber.shade700,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 8.0),
                     Row(
                       children: [
@@ -81,13 +120,17 @@ class EventCard extends StatelessWidget {
                         Icon(
                           Icons.location_on,
                           size: 16,
-                          color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onBackground.withOpacity(0.7),
                         ),
                         const SizedBox(width: 6.0),
                         Text(
                           eventLocation,
                           style: TextStyles.bodyText.copyWith(
-                            color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onBackground.withOpacity(0.7),
                           ),
                         ),
                       ],

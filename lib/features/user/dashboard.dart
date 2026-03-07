@@ -19,16 +19,14 @@ import 'package:group_management_church_app/features/user/no_group_screen.dart';
 class UserDashboard extends StatefulWidget {
   final String groupId;
 
-  const UserDashboard({
-    super.key,
-    required this.groupId,
-  });
+  const UserDashboard({super.key, required this.groupId});
 
   @override
   State<UserDashboard> createState() => _UserDashboardState();
 }
 
-class _UserDashboardState extends State<UserDashboard> {
+class _UserDashboardState extends State<UserDashboard>
+    with WidgetsBindingObserver {
   int _selectedIndex = 0;
   String? _currentGroupId;
 
@@ -51,8 +49,9 @@ class _UserDashboardState extends State<UserDashboard> {
   @override
   void initState() {
     super.initState();
-    final eventProvider = Provider.of<EventProvider>(context, listen: false);
-    groupId = eventProvider.currentGroupId ?? 'defaultGroupId';
+    WidgetsBinding.instance.addObserver(this);
+    // Initialize with widget.groupId, don't use defaultGroupId string
+    groupId = widget.groupId;
     // Schedule data loading after the current build is complete
     Future.microtask(() => _loadData());
 
@@ -66,6 +65,22 @@ class _UserDashboardState extends State<UserDashboard> {
         });
       }
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // Refresh data when app becomes active again
+    if (state == AppLifecycleState.resumed && mounted) {
+      print('App resumed, refreshing dashboard data');
+      Future.microtask(() => _loadData());
+    }
   }
 
   // Load all necessary data
@@ -102,7 +117,9 @@ class _UserDashboardState extends State<UserDashboard> {
         final role = userProvider.currentUser?.role.toLowerCase() ?? 'user';
 
         if (role == 'user') {
-          print('No groups found for regular user, redirecting to no group screen');
+          print(
+            'No groups found for regular user, redirecting to no group screen',
+          );
           if (mounted) {
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(builder: (context) => const NoGroupScreen()),
@@ -114,10 +131,15 @@ class _UserDashboardState extends State<UserDashboard> {
         // For Super Admins, Admins, and Regional roles, skip the NoGroupScreen
         // and continue loading the dashboard (they may legitimately have no group).
         print('No groups found, but role is "$role"; skipping NoGroupScreen.');
+
+        // For users with no groups, set groupId to empty string to prevent invalid API calls
+        groupId = '';
+      } else {
+        // Use the first group if no specific group is provided
+        groupId =
+            widget.groupId == 'default' ? userGroups.first.id : widget.groupId;
       }
 
-      // Use the first group if no specific group is provided
-      final groupId = widget.groupId == 'default' ? userGroups.first.id : widget.groupId;
       print('Using group ID: $groupId');
 
       // Update the current group ID
@@ -183,7 +205,9 @@ class _UserDashboardState extends State<UserDashboard> {
       if (userId != null) {
         print('Loading user with ID: $userId');
         await userProvider.loadUser(userId);
-        print('User loaded, current user: ${userProvider.currentUser?.fullName}');
+        print(
+          'User loaded, current user: ${userProvider.currentUser?.fullName}',
+        );
 
         // Only update state if the widget is still mounted
         if (mounted && userProvider.currentUser != null) {
@@ -191,7 +215,9 @@ class _UserDashboardState extends State<UserDashboard> {
             _userName = userProvider.currentUser!.fullName;
             _isLoadingUser = false;
           });
-          print('User state updated, name: $_userName, loading: $_isLoadingUser');
+          print(
+            'User state updated, name: $_userName, loading: $_isLoadingUser',
+          );
         } else {
           print('Widget not mounted or user is null after loading');
           if (mounted) {
@@ -222,7 +248,9 @@ class _UserDashboardState extends State<UserDashboard> {
 
   // Load group data
   Future<void> _loadGroupData() async {
-    print('Starting _loadGroupData with groupId: ${_currentGroupId ?? widget.groupId}');
+    print(
+      'Starting _loadGroupData with groupId: ${_currentGroupId ?? widget.groupId}',
+    );
     // Only set loading state if the widget is still mounted
     if (!mounted) {
       print('Widget not mounted in _loadGroupData');
@@ -257,27 +285,50 @@ class _UserDashboardState extends State<UserDashboard> {
         throw Exception('User is not a member of any group');
       }
 
-      // Find the group with matching ID
-      final groupId = _currentGroupId ?? widget.groupId;
-      print('Looking for group with ID: $groupId');
-      final group = userGroups.firstWhere(
-        (g) => g.id == groupId,
-        orElse: () {
-          print('Group not found in user groups');
-          throw Exception('Group not found');
-        },
-      );
+      // Get the user's current group (first group they belong to)
+      // This handles cases where the user changed groups in profile
+      GroupModel? group;
+      if (userGroups.isNotEmpty) {
+        // If a specific groupId is provided, try to find it
+        if (groupId.isNotEmpty) {
+          group = userGroups.firstWhere(
+            (g) => g.id == groupId,
+            orElse:
+                () =>
+                    userGroups
+                        .first, // Fall back to first group if specific group not found
+          );
+        } else {
+          // Use the first group if no specific group is provided
+          group = userGroups.first;
+        }
+      }
+
+      if (group == null) {
+        print('No valid group found for user');
+        throw Exception('No valid group found for user');
+      }
 
       print('Group found: ${group.name} (${group.id})');
+
+      // Update the current group ID if it changed
+      if (mounted && group!.id != _currentGroupId) {
+        setState(() {
+          _currentGroupId = group!.id;
+          groupId = group!.id; // Update the local groupId variable
+        });
+      }
 
       // Only update state if the widget is still mounted
       if (mounted && group != null) {
         setState(() {
           _currentGroup = group;
-          _groupName = group.name;
+          _groupName = group!.name;
           _isLoadingGroup = false;
         });
-        print('Group state updated, name: $_groupName, loading: $_isLoadingGroup');
+        print(
+          'Group state updated, name: $_groupName, loading: $_isLoadingGroup',
+        );
       } else {
         print('Widget not mounted or group is null after loading');
         if (mounted) {
@@ -307,23 +358,65 @@ class _UserDashboardState extends State<UserDashboard> {
     final eventProvider = Provider.of<EventProvider>(context, listen: false);
 
     try {
-      eventProvider.setCurrentGroup(groupId);
-      await eventProvider.refreshAllEventData();
+      // Only set current group and load events if groupId is not empty
+      if (groupId.isNotEmpty) {
+        eventProvider.setCurrentGroup(groupId);
+        await eventProvider.refreshAllEventData();
 
-      setState(() {
-        _allEvents = [
-          ...eventProvider.upcomingEvents,
-          ...eventProvider.pastEvents,
-        ];
-        _isLoading = false;
-      });
+        setState(() {
+          _allEvents = [
+            ...eventProvider.upcomingEvents,
+            ...eventProvider.pastEvents,
+          ];
+
+          // Filter events for this week
+          _weekEvents = _filterEventsForThisWeek(_allEvents);
+        });
+      } else {
+        // For users with no groups, set empty events list
+        setState(() {
+          _allEvents = [];
+          _weekEvents = [];
+        });
+      }
+
+      _isLoading = false;
     } catch (e) {
       debugPrint('Error loading events: $e');
       setState(() => _isLoading = false);
     }
   }
 
+  // Filter events for this week (Monday to Sunday)
+  List<EventModel> _filterEventsForThisWeek(List<EventModel> events) {
+    final now = DateTime.now();
+    final startOfWeek = _getStartOfWeek(now);
+    final endOfWeek = _getEndOfWeek(now);
 
+    return events.where((event) {
+      return event.dateTime.isAfter(
+            startOfWeek.subtract(const Duration(days: 1)),
+          ) &&
+          event.dateTime.isBefore(endOfWeek.add(const Duration(days: 1)));
+    }).toList();
+  }
+
+  // Get start of week (Monday)
+  DateTime _getStartOfWeek(DateTime date) {
+    final daysFromMonday = date.weekday - DateTime.monday;
+    return DateTime(date.year, date.month, date.day - daysFromMonday);
+  }
+
+  // Get end of week (Sunday)
+  DateTime _getEndOfWeek(DateTime date) {
+    final daysFromMonday = date.weekday - DateTime.monday;
+    final sunday = DateTime(
+      date.year,
+      date.month,
+      date.day - daysFromMonday + 6,
+    );
+    return DateTime(sunday.year, sunday.month, sunday.day, 23, 59, 59);
+  }
 
   void _showError(String message) {
     CustomNotification.show(
@@ -372,11 +465,10 @@ class _UserDashboardState extends State<UserDashboard> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => EventDetailsScreen(
-          event: event,
-          groupId: widget.groupId,
-        )
-      )
+        builder:
+            (context) =>
+                EventDetailsScreen(event: event, groupId: widget.groupId),
+      ),
     ).then((_) {
       if (mounted) {
         print('Returned from event details, refreshing events');
@@ -389,7 +481,7 @@ class _UserDashboardState extends State<UserDashboard> {
     // Navigate to profile page
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const ProfileScreen())
+      MaterialPageRoute(builder: (context) => const ProfileScreen()),
     ).then((_) {
       if (mounted) {
         print('Returned from profile, refreshing user data');
@@ -402,7 +494,6 @@ class _UserDashboardState extends State<UserDashboard> {
   Widget build(BuildContext context) {
     final eventProvider = Provider.of<EventProvider>(context, listen: false);
     final groupProvider = Provider.of<GroupProvider>(context, listen: false);
-
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Check for errors
@@ -428,19 +519,11 @@ class _UserDashboardState extends State<UserDashboard> {
         showProfileAvatar: true,
         onProfileTap: _navigateToProfile,
       ),
-      body: _selectedIndex == 0
-          ? _buildHomeTab()
-          : _buildAllEventsTab(),
+      body: _selectedIndex == 0 ? _buildHomeTab() : _buildAllEventsTab(),
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.event),
-            label: 'All Events',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.event), label: 'All Events'),
         ],
         currentIndex: _selectedIndex,
         selectedItemColor: AppColors.primaryColor,
@@ -451,8 +534,29 @@ class _UserDashboardState extends State<UserDashboard> {
 
   // Helper method to format date nicely
   String _formatEventDate(DateTime dateTime) {
-    final List<String> weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    final List<String> months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final List<String> weekdays = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+    final List<String> months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
 
     final String weekday = weekdays[dateTime.weekday - 1];
     final String month = months[dateTime.month - 1];
@@ -498,7 +602,8 @@ class _UserDashboardState extends State<UserDashboard> {
                   ),
                   const Spacer(),
                   TextButton(
-                    onPressed: () => _onItemTapped(1), // Switch to All Events tab
+                    onPressed:
+                        () => _onItemTapped(1), // Switch to All Events tab
                     child: Text(
                       'See All',
                       style: TextStyles.bodyText.copyWith(
@@ -512,27 +617,28 @@ class _UserDashboardState extends State<UserDashboard> {
             ),
             const SizedBox(height: 10),
             _isLoadingEvents
-              ? _buildLoadingEvents()
-              : _weekEvents.isEmpty
+                ? _buildLoadingEvents()
+                : _weekEvents.isEmpty
                 ? _buildEmptyEventsMessage('No events scheduled for this week')
                 : ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _weekEvents.length,
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    itemBuilder: (context, index) {
-                      final event = _weekEvents[index];
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12.0),
-                        child: EventCard(
-                          eventTitle: event.title,
-                          eventDate: _formatEventDate(event.dateTime),
-                          eventLocation: event.location,
-                          onTap: () => _navigateToEventDetails(event),
-                        ),
-                      );
-                    },
-                  ),
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _weekEvents.length,
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  itemBuilder: (context, index) {
+                    final event = _weekEvents[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12.0),
+                      child: EventCard(
+                        eventTitle: event.title,
+                        eventDate: _formatEventDate(event.dateTime),
+                        eventLocation: event.location,
+                        tag: event.tag,
+                        onTap: () => _navigateToEventDetails(event),
+                      ),
+                    );
+                  },
+                ),
             const SizedBox(height: 20),
           ],
         ),
@@ -596,9 +702,7 @@ class _UserDashboardState extends State<UserDashboard> {
       width: MediaQuery.of(context).size.width,
       height: 180,
       child: Card(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(15),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
         elevation: 6,
         shadowColor: AppColors.primaryColor.withOpacity(0.4),
         child: Container(
@@ -647,7 +751,9 @@ class _UserDashboardState extends State<UserDashboard> {
             Text(
               'Loading events...',
               style: TextStyles.bodyText.copyWith(
-                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onBackground.withOpacity(0.7),
               ),
               textAlign: TextAlign.center,
             ),
@@ -667,13 +773,17 @@ class _UserDashboardState extends State<UserDashboard> {
             Icon(
               Icons.event_busy,
               size: 64,
-              color: Theme.of(context).colorScheme.onBackground.withOpacity(0.5),
+              color: Theme.of(
+                context,
+              ).colorScheme.onBackground.withOpacity(0.5),
             ),
             const SizedBox(height: 16),
             Text(
               message,
               style: TextStyles.bodyText.copyWith(
-                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onBackground.withOpacity(0.7),
               ),
               textAlign: TextAlign.center,
             ),
@@ -711,19 +821,15 @@ class _UserDashboardState extends State<UserDashboard> {
           ),
           TabBar(
             labelColor: AppColors.primaryColor,
-            unselectedLabelColor: Theme.of(context).colorScheme.onBackground.withOpacity(0.5),
+            unselectedLabelColor: Theme.of(
+              context,
+            ).colorScheme.onBackground.withOpacity(0.5),
             indicatorColor: AppColors.primaryColor,
-            tabs: const [
-              Tab(text: 'Upcoming'),
-              Tab(text: 'Past'),
-            ],
+            tabs: const [Tab(text: 'Upcoming'), Tab(text: 'Past')],
           ),
           Expanded(
             child: TabBarView(
-              children: [
-                _buildUpcomingEventsTab(),
-                _buildPastEventsTab(),
-              ],
+              children: [_buildUpcomingEventsTab(), _buildPastEventsTab()],
             ),
           ),
         ],
@@ -734,61 +840,67 @@ class _UserDashboardState extends State<UserDashboard> {
   Widget _buildUpcomingEventsTab() {
     return _isLoadingEvents
         ? Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const CircularProgressIndicator(),
-                const SizedBox(height: 16),
-                Text(
-                  'Loading events...',
-                  style: TextStyles.bodyText.copyWith(
-                    color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
-                  ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              Text(
+                'Loading events...',
+                style: TextStyles.bodyText.copyWith(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onBackground.withOpacity(0.7),
                 ),
-              ],
-            ),
-          )
+              ),
+            ],
+          ),
+        )
         : _allEvents.isEmpty
-            ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.event_busy,
-                      size: 64,
-                      color: Theme.of(context).colorScheme.onBackground.withOpacity(0.5),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No upcoming events',
-                      style: TextStyles.bodyText.copyWith(
-                        color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
-                      ),
-                    ),
-                  ],
+        ? Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.event_busy,
+                size: 64,
+                color: Theme.of(
+                  context,
+                ).colorScheme.onBackground.withOpacity(0.5),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No upcoming events',
+                style: TextStyles.bodyText.copyWith(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onBackground.withOpacity(0.7),
                 ),
-              )
-            : RefreshIndicator(
-                onRefresh: () async {
-                  await Future.microtask(() => _loadEventData());
-                },
-                child: ListView.builder(
-                  itemCount: _allEvents.length,
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  itemBuilder: (context, index) {
-                    final event = _allEvents[index];
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12.0),
-                      child: EventCard(
-                        eventTitle: event.title,
-                        eventDate: _formatEventDate(event.dateTime),
-                        eventLocation: event.location,
-                        onTap: () => _navigateToEventDetails(event),
-                      ),
-                    );
-                  },
+              ),
+            ],
+          ),
+        )
+        : RefreshIndicator(
+          onRefresh: () async {
+            await Future.microtask(() => _loadEventData());
+          },
+          child: ListView.builder(
+            itemCount: _allEvents.length,
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            itemBuilder: (context, index) {
+              final event = _allEvents[index];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12.0),
+                child: EventCard(
+                  eventTitle: event.title,
+                  eventDate: _formatEventDate(event.dateTime),
+                  eventLocation: event.location,
+                  onTap: () => _navigateToEventDetails(event),
                 ),
               );
+            },
+          ),
+        );
   }
 
   Widget _buildPastEventsTab() {
@@ -828,7 +940,7 @@ class _UserDashboardState extends State<UserDashboard> {
       },
     );
   }
-  }
+}
 
 //card widget for user
 class CardWidget extends StatefulWidget {
@@ -836,7 +948,8 @@ class CardWidget extends StatefulWidget {
   final IconData icon;
   final String? group_name;
 
-  const CardWidget({super.key, 
+  const CardWidget({
+    super.key,
     required this.userName,
     required this.icon,
     this.group_name,
@@ -846,7 +959,8 @@ class CardWidget extends StatefulWidget {
   State<CardWidget> createState() => _CardWidgetState();
 }
 
-class _CardWidgetState extends State<CardWidget> with SingleTickerProviderStateMixin {
+class _CardWidgetState extends State<CardWidget>
+    with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
 
   @override
@@ -870,9 +984,7 @@ class _CardWidgetState extends State<CardWidget> with SingleTickerProviderStateM
       width: MediaQuery.of(context).size.width,
       height: 180,
       child: Card(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(15),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
         elevation: 6,
         shadowColor: AppColors.primaryColor.withOpacity(0.4),
         child: Container(

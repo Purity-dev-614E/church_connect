@@ -11,18 +11,18 @@ class HttpClient {
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
   String? _memoryAccessToken;
   String? _memoryRefreshToken;
-  
+
   // Token keys
   static const String accessTokenKey = 'accessToken';
   static const String refreshTokenKey = 'refreshToken';
-  
+
   factory HttpClient() {
     _instance ??= HttpClient._internal();
     return _instance!;
   }
-  
+
   HttpClient._internal();
-  
+
   /// Get authentication token
   Future<String> _getToken() async {
     if (_memoryAccessToken != null && _memoryAccessToken!.isNotEmpty) {
@@ -36,7 +36,7 @@ class HttpClient {
     } catch (e) {
       print('Secure storage read failed (continuing): $e');
     }
-    
+
     // If not found, try SharedPreferences
     if (token == null) {
       try {
@@ -46,15 +46,15 @@ class HttpClient {
         print('SharedPreferences read failed (continuing): $e');
       }
     }
-    
+
     if (token == null || token.isEmpty) {
       throw Exception('Authentication token is null');
     }
-    
+
     _memoryAccessToken = token;
     return token;
   }
-  
+
   /// Get refresh token
   Future<String?> _getRefreshToken() async {
     if (_memoryRefreshToken != null && _memoryRefreshToken!.isNotEmpty) {
@@ -68,7 +68,7 @@ class HttpClient {
     } catch (e) {
       print('Secure storage read failed (continuing): $e');
     }
-    
+
     // If not found, try SharedPreferences
     if (token == null) {
       try {
@@ -78,13 +78,13 @@ class HttpClient {
         print('SharedPreferences read failed (continuing): $e');
       }
     }
-    
+
     if (token != null && token.isNotEmpty) {
       _memoryRefreshToken = token;
     }
     return token;
   }
-  
+
   /// Refresh the access token
   Future<bool> _refreshToken() async {
     try {
@@ -100,9 +100,7 @@ class HttpClient {
           "Content-Type": "application/json",
           "Accept": "application/json",
         },
-        body: json.encode({
-          "refresh_token": refreshToken
-        })
+        body: json.encode({"refresh_token": refreshToken}),
       );
 
       if (response.statusCode == 200) {
@@ -114,11 +112,11 @@ class HttpClient {
           print("Raw refresh token response body: ${response.body}");
           return false;
         }
-          
+
         // Get the new tokens
         String? newAccessToken;
         String? newRefreshToken;
-          
+
         if (data.containsKey('access_token')) {
           newAccessToken = data['access_token']?.toString();
         } else if (data.containsKey('accessToken')) {
@@ -132,7 +130,7 @@ class HttpClient {
             (data['session'] as Map).containsKey('accessToken')) {
           newAccessToken = (data['session'] as Map)['accessToken']?.toString();
         }
-          
+
         if (data.containsKey('refresh_token')) {
           newRefreshToken = data['refresh_token']?.toString();
         } else if (data.containsKey('refreshToken')) {
@@ -148,7 +146,7 @@ class HttpClient {
           newRefreshToken =
               (data['session'] as Map)['refreshToken']?.toString();
         }
-          
+
         if (newAccessToken == null || newAccessToken.isEmpty) {
           print("Invalid refresh token response format");
           return false;
@@ -159,13 +157,18 @@ class HttpClient {
         if (newRefreshToken != null && newRefreshToken.isNotEmpty) {
           _memoryRefreshToken = newRefreshToken;
         }
-          
+
         // Store the new tokens (best effort)
         try {
-          await _secureStorage.write(key: accessTokenKey, value: newAccessToken);
+          await _secureStorage.write(
+            key: accessTokenKey,
+            value: newAccessToken,
+          );
           if (newRefreshToken != null && newRefreshToken.isNotEmpty) {
             await _secureStorage.write(
-                key: refreshTokenKey, value: newRefreshToken);
+              key: refreshTokenKey,
+              value: newRefreshToken,
+            );
           }
         } catch (e) {
           print("Secure storage write failed during refresh (continuing): $e");
@@ -178,9 +181,11 @@ class HttpClient {
             await prefs.setString('refresh_token', newRefreshToken);
           }
         } catch (e) {
-          print("SharedPreferences write failed during refresh (continuing): $e");
+          print(
+            "SharedPreferences write failed during refresh (continuing): $e",
+          );
         }
-        
+
         return true;
       } else {
         print("Refresh token failed with status: ${response.statusCode}");
@@ -192,29 +197,34 @@ class HttpClient {
       return false;
     }
   }
-  
+
   /// Get default HTTP headers with authentication
   Future<Map<String, String>> getHeaders() async {
     final token = await _getToken();
+    print(
+      'DEBUG: Retrieved token for request: ${token.isNotEmpty ? "Present (${token.length} chars)" : "MISSING"}',
+    );
     return {
       "Content-Type": "application/json",
       "Accept": "application/json",
-      "Authorization": "Bearer $token"
+      "Authorization": "Bearer $token",
     };
   }
-  
+
   /// Handle HTTP response and refresh token if needed
-  Future<http.Response> _handleResponse(Future<http.Response> Function() requestFunction) async {
+  Future<http.Response> _handleResponse(
+    Future<http.Response> Function() requestFunction,
+  ) async {
     try {
       final response = await requestFunction();
-      
+
       // If unauthorized and not already refreshing, try to refresh token
       if (response.statusCode == 401 && !_isRefreshing) {
         _isRefreshing = true;
         try {
           print('Token expired, attempting to refresh...');
           final refreshed = await _refreshToken();
-          
+
           if (refreshed) {
             print('Token refreshed successfully, retrying request...');
             final retryResponse = await requestFunction();
@@ -230,14 +240,14 @@ class HttpClient {
           rethrow;
         }
       }
-      
+
       return response;
     } catch (e) {
       print('HTTP request error: $e');
       throw e;
     }
   }
-  
+
   /// GET request with automatic token refresh
   Future<http.Response> get(String url) async {
     print('HTTP GET request to: $url');
@@ -246,41 +256,39 @@ class HttpClient {
         final headers = await getHeaders();
         return await http.get(Uri.parse(url), headers: headers);
       });
-      if (response.statusCode >= 400) {
-       
-      }
-      
+      if (response.statusCode >= 400) {}
+
       return response;
     } catch (e) {
       print('HTTP GET request failed: $e');
       rethrow;
     }
   }
-  
+
   /// POST request with automatic token refresh
   Future<http.Response> post(String url, {Object? body}) async {
     return _handleResponse(() async {
       final headers = await getHeaders();
       return await http.post(
-        Uri.parse(url), 
+        Uri.parse(url),
         headers: headers,
         body: body is String ? body : jsonEncode(body),
       );
     });
   }
-  
+
   /// PUT request with automatic token refresh
   Future<http.Response> put(String url, {Object? body}) async {
     return _handleResponse(() async {
       final headers = await getHeaders();
       return await http.put(
-        Uri.parse(url), 
+        Uri.parse(url),
         headers: headers,
         body: body is String ? body : jsonEncode(body),
       );
     });
   }
-  
+
   /// DELETE request with automatic token refresh
   Future<http.Response> delete(String url) async {
     return _handleResponse(() async {

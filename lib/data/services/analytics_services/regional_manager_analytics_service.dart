@@ -10,9 +10,7 @@ class RegionAnalyticsService {
   final String baseUrl;
   final HttpClient _httpClient = HttpClient();
 
-  RegionAnalyticsService({
-    required this.baseUrl,
-  });
+  RegionAnalyticsService({required this.baseUrl});
 
   // Helper method to validate UUID
   bool _isValidUuid(String id) {
@@ -29,14 +27,14 @@ class RegionAnalyticsService {
 
     try {
       final response = await _httpClient.get(
-        '$baseUrl/api/analytics/region/group/$groupId/demographics'
+        '$baseUrl/api/analytics/region/group/$groupId/demographics',
       );
 
       if (response.statusCode == 200) {
         return GroupDemographics.fromJson(json.decode(response.body));
       } else {
         throw Exception(
-          'Failed to fetch group demographics: ${response.statusCode}'
+          'Failed to fetch group demographics: ${response.statusCode}',
         );
       }
     } catch (error) {
@@ -48,30 +46,62 @@ class RegionAnalyticsService {
   Future<DashboardSummary> getDashboardSummaryForRegion(String regionId) async {
     try {
       print('Fetching dashboard summary for region: $regionId');
-      print('API Endpoint: ${ApiEndpoints.baseUrl}/regional-manager/analytics/dashboard/summary');
-      
+      print('API Endpoint: ${ApiEndpoints.getRegionalManagerDashboardSummary}');
+
       final response = await _httpClient.get(
-        '${ApiEndpoints.baseUrl}/regional-manager/analytics/dashboard/summary',
+        '${ApiEndpoints.getRegionalManagerDashboardSummary}',
       );
 
       print('Dashboard Summary API Response Status: ${response.statusCode}');
       print('Dashboard Summary API Response Body: ${response.body}');
 
       if (response.statusCode == 200) {
+        // Check if response is HTML (error page) instead of JSON
+        final contentType = response.headers['content-type'] ?? '';
+        if (contentType.contains('text/html')) {
+          throw Exception(
+            'Server returned HTML instead of JSON for dashboard summary. The API endpoint may not exist.',
+          );
+        }
+
+        // Check if response body starts with HTML DOCTYPE
+        if (response.body.trim().startsWith('<!DOCTYPE')) {
+          throw Exception(
+            'Server returned HTML error page instead of JSON for dashboard summary.',
+          );
+        }
+
         final Map<String, dynamic> data = json.decode(response.body);
         print('Parsed dashboard data: $data');
-        
+        print('Raw API response body: ${response.body}');
+
+        // Check if required fields exist
+        print('Available keys in data: ${data.keys.toList()}');
+        print(
+          'userCount value: ${data['userCount']} (type: ${data['userCount'].runtimeType})',
+        );
+        print(
+          'groupCount value: ${data['groupCount']} (type: ${data['groupCount'].runtimeType})',
+        );
+        print(
+          'eventCount value: ${data['eventCount']} (type: ${data['eventCount'].runtimeType})',
+        );
+
         // Ensure all required fields are present with proper types
         return DashboardSummary(
-          userCount: data['userCount'] is int ? data['userCount'] : 0,
-          groupCount: data['groupCount'] is int ? data['groupCount'] : 0,
-          eventCount: data['eventCount'] is int ? data['eventCount'] : 0,
-          attendanceCount: data['attendanceCount'] is int ? data['attendanceCount'] : null,
-          recentEvents: data['recentEvents'] is List ? data['recentEvents'] : [],
+          userCount: data['userCount'] as int? ?? 0,
+          groupCount: data['groupCount'] as int? ?? 0,
+          eventCount: data['eventCount'] as int? ?? 0,
+          attendanceCount: data['attendanceCount'] as int? ?? 0,
+          recentEvents: data['recentEvents'] as List? ?? [],
         );
       } else {
-        print('Error response from API: ${response.statusCode} - ${response.body}');
-        throw Exception('Failed to fetch dashboard summary: ${response.statusCode}');
+        print(
+          'Error response from API: ${response.statusCode} - ${response.body}',
+        );
+        throw Exception(
+          'Failed to fetch dashboard summary: ${response.statusCode}',
+        );
       }
     } catch (e) {
       print('Error fetching dashboard summary: $e');
@@ -91,21 +121,23 @@ class RegionAnalyticsService {
   }
 
   // Get region attendance stats
-  Future<RegionAttendanceStats> getRegionAttendanceStats(String regionId) async {
+  Future<RegionAttendanceStats> getRegionAttendanceStats(
+    String regionId,
+  ) async {
     if (!_isValidUuid(regionId)) {
       throw Exception('Invalid region UUID format');
     }
 
     try {
       final response = await _httpClient.get(
-        '$baseUrl/api/analytics/region/$regionId/attendance'
+        '$baseUrl/api/analytics/region/$regionId/attendance',
       );
 
       if (response.statusCode == 200) {
         return RegionAttendanceStats.fromJson(json.decode(response.body));
       } else {
         throw Exception(
-          'Failed to fetch region attendance stats: ${response.statusCode}'
+          'Failed to fetch region attendance stats: ${response.statusCode}',
         );
       }
     } catch (error) {
@@ -114,21 +146,23 @@ class RegionAnalyticsService {
   }
 
   // Get region growth analytics
-  Future<RegionGrowthAnalytics> getRegionGrowthAnalytics(String regionId) async {
+  Future<RegionGrowthAnalytics> getRegionGrowthAnalytics(
+    String regionId,
+  ) async {
     if (!_isValidUuid(regionId)) {
       throw Exception('Invalid region UUID format');
     }
 
     try {
       final response = await _httpClient.get(
-        '$baseUrl/api/analytics/region/$regionId/growth'
+        '$baseUrl/api/analytics/region/$regionId/growth',
       );
 
       if (response.statusCode == 200) {
         return RegionGrowthAnalytics.fromJson(json.decode(response.body));
       } else {
         throw Exception(
-          'Failed to fetch region growth analytics: ${response.statusCode}'
+          'Failed to fetch region growth analytics: ${response.statusCode}',
         );
       }
     } catch (error) {
@@ -159,7 +193,7 @@ class RegionAnalyticsService {
     try {
       final response = await _httpClient.post(
         '$baseUrl/api/analytics/region/$regionId/compare-groups',
-        body: {'groupIds': groupIds}
+        body: {'groupIds': groupIds},
       );
 
       if (response.statusCode == 200) {
@@ -182,14 +216,14 @@ class RegionAnalyticsService {
 
     try {
       final response = await _httpClient.get(
-        '$baseUrl/api/analytics/region/event/$eventId/participation'
+        '$baseUrl/api/analytics/region/event/$eventId/participation',
       );
 
       if (response.statusCode == 200) {
         return EventParticipationStats.fromJson(json.decode(response.body));
       } else {
         throw Exception(
-          'Failed to fetch event participation stats: ${response.statusCode}'
+          'Failed to fetch event participation stats: ${response.statusCode}',
         );
       }
     } catch (error) {
@@ -220,7 +254,7 @@ class RegionAnalyticsService {
     try {
       final response = await _httpClient.post(
         '$baseUrl/api/analytics/region/$regionId/compare-events',
-        body: {'eventIds': eventIds}
+        body: {'eventIds': eventIds},
       );
 
       if (response.statusCode == 200) {
@@ -230,7 +264,7 @@ class RegionAnalyticsService {
             .toList();
       } else {
         throw Exception(
-          'Failed to compare event attendance: ${response.statusCode}'
+          'Failed to compare event attendance: ${response.statusCode}',
         );
       }
     } catch (error) {
@@ -253,14 +287,14 @@ class RegionAnalyticsService {
 
     try {
       final response = await _httpClient.get(
-        '$baseUrl/api/analytics/region/$regionId/user/$userId/attendance'
+        '$baseUrl/api/analytics/region/$regionId/user/$userId/attendance',
       );
 
       if (response.statusCode == 200) {
         return UserAttendanceTrends.fromJson(json.decode(response.body));
       } else {
         throw Exception(
-          'Failed to fetch user attendance trends: ${response.statusCode}'
+          'Failed to fetch user attendance trends: ${response.statusCode}',
         );
       }
     } catch (error) {
@@ -284,10 +318,12 @@ class RegionAnalyticsService {
     try {
       print('Fetching overall attendance by period for region: $regionId');
       print('Period: $period');
-      print('API Endpoint: $baseUrl/regional-manager/analytics/attendance/overall/$period');
-      
+      print(
+        'API Endpoint: ${ApiEndpoints.getRegionalManagerOverallAttendanceByPeriod(period)}',
+      );
+
       final response = await _httpClient.get(
-        '${ApiEndpoints.baseUrl}/regional-manager/analytics/attendance/overall/$period'
+        '${ApiEndpoints.getRegionalManagerOverallAttendanceByPeriod(period)}',
       );
 
       print('Overall Attendance API Response Status: ${response.statusCode}');
@@ -295,10 +331,25 @@ class RegionAnalyticsService {
       print('Overall Attendance API Response Body: ${response.body}');
 
       if (response.statusCode == 200) {
+        // Check if response is HTML (error page) instead of JSON
+        final contentType = response.headers['content-type'] ?? '';
+        if (contentType.contains('text/html')) {
+          throw Exception(
+            'Server returned HTML instead of JSON for overall attendance. The API endpoint may not exist.',
+          );
+        }
+
+        // Check if response body starts with HTML DOCTYPE
+        if (response.body.trim().startsWith('<!DOCTYPE')) {
+          throw Exception(
+            'Server returned HTML error page instead of JSON for overall attendance.',
+          );
+        }
+
         return AttendanceByPeriod.fromJson(json.decode(response.body));
       } else {
         throw Exception(
-          'Failed to fetch overall attendance: ${response.statusCode} - ${response.body}'
+          'Failed to fetch overall attendance: ${response.statusCode} - ${response.body}',
         );
       }
     } catch (error) {
@@ -320,14 +371,33 @@ class RegionAnalyticsService {
 
     try {
       final response = await _httpClient.get(
-        '${ApiEndpoints.baseUrl}/regional-manager/analytics/groups/$groupId/attendance',
+        '${ApiEndpoints.getRegionalManagerGroupAttendance(groupId)}',
       );
 
+      print('Group Attendance API Response Status: ${response.statusCode}');
+      print('Group Attendance API Response Headers: ${response.headers}');
+      print('Group Attendance API Response Body: ${response.body}');
+
       if (response.statusCode == 200) {
+        // Check if response is HTML (error page) instead of JSON
+        final contentType = response.headers['content-type'] ?? '';
+        if (contentType.contains('text/html')) {
+          throw Exception(
+            'Server returned HTML instead of JSON. The API endpoint may not exist or returned an error page.',
+          );
+        }
+
+        // Check if response body starts with HTML DOCTYPE
+        if (response.body.trim().startsWith('<!DOCTYPE')) {
+          throw Exception(
+            'Server returned HTML error page instead of JSON. The API endpoint may not exist.',
+          );
+        }
+
         return GroupAttendanceStats.fromJson(json.decode(response.body));
       } else {
         throw Exception(
-          'Failed to fetch group attendance stats: ${response.statusCode}'
+          'Failed to fetch group attendance stats: ${response.statusCode} - ${response.body}',
         );
       }
     } catch (error) {
@@ -345,14 +415,14 @@ class RegionAnalyticsService {
 
     try {
       final response = await _httpClient.get(
-        '$baseUrl/api/analytics/region/group/$groupId/growth'
+        '$baseUrl/api/analytics/region/group/$groupId/growth',
       );
 
       if (response.statusCode == 200) {
         return GroupGrowthAnalytics.fromJson(json.decode(response.body));
       } else {
         throw Exception(
-          'Failed to fetch group growth analytics: ${response.statusCode}'
+          'Failed to fetch group growth analytics: ${response.statusCode}',
         );
       }
     } catch (error) {
@@ -369,14 +439,14 @@ class RegionAnalyticsService {
 
     try {
       final response = await _httpClient.get(
-        '$baseUrl/api/analytics/region/group/$groupId/dashboard'
+        '$baseUrl/api/analytics/region/group/$groupId/dashboard',
       );
 
       if (response.statusCode == 200) {
         return GroupDashboardData.fromJson(json.decode(response.body));
       } else {
         throw Exception(
-          'Failed to fetch group dashboard data: ${response.statusCode}'
+          'Failed to fetch group dashboard data: ${response.statusCode}',
         );
       }
     } catch (error) {
@@ -392,14 +462,14 @@ class RegionAnalyticsService {
 
     try {
       final response = await _httpClient.get(
-        '$baseUrl/api/analytics/region/$regionId/demographics'
+        '$baseUrl/api/analytics/region/$regionId/demographics',
       );
 
       if (response.statusCode == 200) {
         return RegionDemographics.fromJson(json.decode(response.body));
       } else {
         throw Exception(
-          'Failed to fetch region demographics: ${response.statusCode}'
+          'Failed to fetch region demographics: ${response.statusCode}',
         );
       }
     } catch (error) {
@@ -422,10 +492,12 @@ class RegionAnalyticsService {
     try {
       print('Fetching attendance by period for region: $regionId');
       print('Period: $period');
-      print('API Endpoint: $baseUrl/analytics/region/$regionId/attendance-by-period/$period');
-      
+      print(
+        'API Endpoint: $baseUrl/analytics/region/$regionId/attendance-by-period/$period',
+      );
+
       final response = await _httpClient.get(
-        '$baseUrl/analytics/region/$regionId/attendance-by-period/$period'
+        '$baseUrl/analytics/region/$regionId/attendance-by-period/$period',
       );
 
       print('Attendance API Response Status: ${response.statusCode}');
@@ -436,7 +508,7 @@ class RegionAnalyticsService {
         return AttendanceByPeriodStats.fromJson(json.decode(response.body));
       } else {
         throw Exception(
-          'Failed to fetch attendance by period: ${response.statusCode} - ${response.body}'
+          'Failed to fetch attendance by period: ${response.statusCode} - ${response.body}',
         );
       }
     } catch (error) {
@@ -458,10 +530,12 @@ class RegionAnalyticsService {
 
     try {
       print('Fetching member activity status for region: $regionId');
-      print('API Endpoint: $baseUrl/analytics/region/$regionId/member-activity');
-      
+      print(
+        'API Endpoint: ${ApiEndpoints.getRegionalManagerMemberActivityStatus}',
+      );
+
       final response = await _httpClient.get(
-        '${ApiEndpoints.baseUrl}/regional-manager/analytics/members/activity-status',
+        '${ApiEndpoints.getRegionalManagerMemberActivityStatus}',
       );
 
       print('Member Activity API Response Status: ${response.statusCode}');
@@ -469,10 +543,25 @@ class RegionAnalyticsService {
       print('Member Activity API Response Body: ${response.body}');
 
       if (response.statusCode == 200) {
+        // Check if response is HTML (error page) instead of JSON
+        final contentType = response.headers['content-type'] ?? '';
+        if (contentType.contains('text/html')) {
+          throw Exception(
+            'Server returned HTML instead of JSON for member activity status. The API endpoint may not exist.',
+          );
+        }
+
+        // Check if response body starts with HTML DOCTYPE
+        if (response.body.trim().startsWith('<!DOCTYPE')) {
+          throw Exception(
+            'Server returned HTML error page instead of JSON for member activity status.',
+          );
+        }
+
         return MemberActivityStatus.fromJson(json.decode(response.body));
       } else {
         throw Exception(
-          'Failed to fetch member activity status: ${response.statusCode} - ${response.body}'
+          'Failed to fetch member activity status: ${response.statusCode} - ${response.body}',
         );
       }
     } catch (error) {

@@ -5,12 +5,14 @@ import 'package:group_management_church_app/data/models/group_model.dart';
 import 'package:group_management_church_app/data/models/user_model.dart';
 import 'package:group_management_church_app/data/models/region_model.dart';
 import 'package:group_management_church_app/data/models/regional_analytics_model.dart';
+import 'package:group_management_church_app/data/models/removed_member_model.dart';
 import 'package:group_management_church_app/data/services/analytics_services/regional_manager_analytics_service.dart';
 import 'package:group_management_church_app/data/services/user_services.dart';
 import 'package:group_management_church_app/features/profile_screen.dart';
 import 'package:group_management_church_app/features/region_manager/group_details_screen.dart';
 import 'package:group_management_church_app/features/region_manager/region_user_management_tab.dart';
 import 'package:group_management_church_app/features/region_manager/region_group_administration_tab.dart';
+import 'package:group_management_church_app/features/region_manager/region_events_tab.dart';
 import 'package:group_management_church_app/features/region_manager/screens/analytics_screen.dart';
 import 'package:group_management_church_app/widgets/custom_app_bar.dart';
 import 'package:provider/provider.dart';
@@ -30,11 +32,14 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:group_management_church_app/data/services/auth_services.dart';
+import 'package:intl/intl.dart';
+import '../../widgets/region_removed_members_list.dart';
+import '../../data/services/member_removal_service.dart';
 
 class RegionDashboard extends StatefulWidget {
   final String regionId;
   final bool actingAsSuperAdmin;
-  
+
   const RegionDashboard({
     super.key,
     required this.regionId,
@@ -59,12 +64,21 @@ class _RegionDashboardState extends State<RegionDashboard> {
   RegionModel? _region;
   bool _isLoading = true;
   String? _errorMessage;
-  
+
+  // Removed members data
+  List<RemovedMemberModel> _removedMembers = [];
+  bool _isLoadingRemovedMembers = false;
+
   // Settings state
   bool _notificationsEnabled = true;
   bool _darkModeEnabled = false;
   final String _selectedDateRange = 'Last 6 Months';
-  final List<String> _availableDateRanges = ['Last Month', 'Last 3 Months', 'Last 6 Months', 'Last Year'];
+  final List<String> _availableDateRanges = [
+    'Last Month',
+    'Last 3 Months',
+    'Last 6 Months',
+    'Last Year',
+  ];
 
   // Export options
   final List<String> _exportFormats = ['CSV', 'PDF', 'Excel'];
@@ -79,7 +93,7 @@ class _RegionDashboardState extends State<RegionDashboard> {
     super.initState();
     try {
       _analyticsServices = RegionAnalyticsService(
-        baseUrl: 'https://safari-backend-fgl3.onrender.com/api'
+        baseUrl: 'https://safari-backend-fgl3.onrender.com/api',
       );
       _eventServices = EventServices();
 
@@ -95,7 +109,7 @@ class _RegionDashboardState extends State<RegionDashboard> {
       });
     }
   }
-  
+
   Future<void> _checkAuthAndLoadData() async {
     if (!mounted) return;
 
@@ -108,39 +122,37 @@ class _RegionDashboardState extends State<RegionDashboard> {
       // Check if user is authenticated
       final authServices = AuthServices();
       final isLoggedIn = await authServices.isLoggedIn();
-      
+
       if (!isLoggedIn) {
         throw Exception('You must be logged in to access this dashboard');
       }
 
       // Get current user's role
       final userId = await authServices.getUserId();
-      
+
       if (userId == null) {
         throw Exception('User ID not found');
       }
 
       final userData = await UserServices().fetchCurrentUser(userId);
-      
+
       if (userData == null) {
         throw Exception('User data not found');
       }
 
       // Load region data
-      final regionProvider = Provider.of<RegionProvider>(context, listen: false);
+      final regionProvider = Provider.of<RegionProvider>(
+        context,
+        listen: false,
+      );
       _region = await regionProvider.getRegionById(widget.regionId);
-      
+
       if (_region == null) {
         throw Exception('Region not found');
       }
 
-      // Fetch data in parallel
-      await Future.wait([
-        _loadRegionUsers(),
-        _loadRegionGroups(),
-        _loadRegionEvents(),
-        _loadRegionAnalytics()
-      ]);
+      // Only load essential dashboard data initially
+      await _loadDashboardSummary();
 
       // Set final loading state
       if (mounted) {
@@ -157,12 +169,52 @@ class _RegionDashboardState extends State<RegionDashboard> {
       }
     }
   }
-  
+
+  // Track which tabs have been loaded
+  final Set<int> _loadedTabs = <int>{};
+
+  Future<void> _loadDashboardSummary() async {
+    // Load summary data for dashboard overview including correct analytics data
+    await Future.wait([
+      _loadRegionGroups(onlySummary: true),
+      _loadRegionEvents(onlySummary: true),
+      _loadRegionAnalytics(), // Load correct dashboard summary data on app start
+    ]);
+  }
+
+  Future<void> _loadTabData(int tabIndex) async {
+    if (_loadedTabs.contains(tabIndex)) return;
+
+    try {
+      switch (tabIndex) {
+        case 1: // Users tab
+          await _loadRegionUsers();
+          break;
+        case 2: // Groups tab
+          await _loadRegionGroups();
+          break;
+        case 3: // Events tab
+          await _loadRegionEvents();
+          break;
+        case 4: // Removed Members tab
+          await _loadRemovedMembers();
+          break;
+        case 5: // Analytics tab
+          // Analytics data already loaded on app start, no need to reload
+          break;
+      }
+      _loadedTabs.add(tabIndex);
+    } catch (e) {
+      // Handle tab-specific loading errors silently or show notification
+      print('Error loading tab $tabIndex: $e');
+    }
+  }
+
   Future<void> _loadRegionUsers() async {
     try {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       final users = await userProvider.getUsersByRegion(widget.regionId);
-      
+
       if (mounted) {
         setState(() {
           _regionUsers = users;
@@ -173,12 +225,12 @@ class _RegionDashboardState extends State<RegionDashboard> {
       // Continue without users data
     }
   }
-  
-  Future<void> _loadRegionGroups() async {
+
+  Future<void> _loadRegionGroups({bool onlySummary = false}) async {
     try {
       final groupProvider = Provider.of<GroupProvider>(context, listen: false);
       final groups = await groupProvider.getGroupsByRegion(widget.regionId);
-      
+
       if (mounted) {
         setState(() {
           _regionGroups = groups;
@@ -189,12 +241,23 @@ class _RegionDashboardState extends State<RegionDashboard> {
       // Continue without groups data
     }
   }
-  
-  Future<void> _loadRegionEvents() async {
+
+  Future<void> _loadRegionEvents({bool onlySummary = false}) async {
     try {
       final eventProvider = Provider.of<EventProvider>(context, listen: false);
-      final events = await eventProvider.getEventsByRegion(widget.regionId);
-      
+      // Use fetchAllEvents to include both regular and leadership events
+      await eventProvider.fetchAllEvents();
+      final events =
+          eventProvider.events
+              .where(
+                (event) =>
+                    // Include regular events from this region OR leadership events targeting this region
+                    (event.groupId != null && event.groupId!.isNotEmpty) ||
+                    (event.isLeadershipEvent &&
+                        event.regionId == widget.regionId),
+              )
+              .toList();
+
       if (mounted) {
         setState(() {
           _upcomingEvents = events;
@@ -205,18 +268,22 @@ class _RegionDashboardState extends State<RegionDashboard> {
       // Continue without events data
     }
   }
-  
+
   Future<void> _loadRegionAnalytics() async {
+    print('=== Starting _loadRegionAnalytics ===');
     try {
       // Load region dashboard summary
-      final summary = await _analyticsServices.getDashboardSummaryForRegion(widget.regionId);
-      
+      final summary = await _analyticsServices.getDashboardSummaryForRegion(
+        widget.regionId,
+      );
+
+      print('Dashboard API call completed. Summary: $summary');
+
       if (mounted) {
         setState(() {
           _dashboardSummary = summary;
         });
       }
-
     } catch (e) {
       print('Error loading region analytics: $e');
       // Continue without analytics data
@@ -276,23 +343,31 @@ class _RegionDashboardState extends State<RegionDashboard> {
     return Scaffold(
       appBar: CustomAppBar(
         title: _region?.name ?? 'Region Dashboard',
-        showBackButton: widget.actingAsSuperAdmin, // allow back when coming from Super Admin
+        showBackButton:
+            widget
+                .actingAsSuperAdmin, // allow back when coming from Super Admin
         showProfileAvatar: !widget.actingAsSuperAdmin,
         onProfileTap: _navigateToProfile,
-        actions: widget.actingAsSuperAdmin
-            ? [
-                IconButton(
-                  icon: const Icon(Icons.admin_panel_settings, color: Colors.white),
-                  tooltip: 'Back to Super Admin',
-                  onPressed: () {
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (_) => const SuperAdminDashboard()),
-                      (route) => false,
-                    );
-                  },
-                ),
-              ]
-            : null,
+        actions:
+            widget.actingAsSuperAdmin
+                ? [
+                  IconButton(
+                    icon: const Icon(
+                      Icons.admin_panel_settings,
+                      color: Colors.white,
+                    ),
+                    tooltip: 'Back to Super Admin',
+                    onPressed: () {
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(
+                          builder: (_) => const SuperAdminDashboard(),
+                        ),
+                        (route) => false,
+                      );
+                    },
+                  ),
+                ]
+                : null,
       ),
       body: PageView(
         controller: _pageController,
@@ -300,11 +375,15 @@ class _RegionDashboardState extends State<RegionDashboard> {
           setState(() {
             _selectedIndex = index;
           });
+          // Load data for the selected tab if not already loaded
+          _loadTabData(index);
         },
         children: [
           _buildDashboardTab(),
           RegionUserManagementTab(regionId: widget.regionId),
           RegionGroupAdministrationTab(regionId: widget.regionId),
+          RegionEventsTab(regionId: widget.regionId),
+          _buildRemovedMembersTab(),
           _buildAnalyticsTab(),
           _buildSettingsTab(),
         ],
@@ -316,13 +395,12 @@ class _RegionDashboardState extends State<RegionDashboard> {
             icon: Icon(Icons.dashboard),
             label: 'Dashboard',
           ),
+          BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Users'),
+          BottomNavigationBarItem(icon: Icon(Icons.groups), label: 'Groups'),
+          BottomNavigationBarItem(icon: Icon(Icons.event), label: 'Events'),
           BottomNavigationBarItem(
-            icon: Icon(Icons.people),
-            label: 'Users',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.groups),
-            label: 'Groups',
+            icon: Icon(Icons.person_remove),
+            label: 'Removed Members',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.analytics),
@@ -344,9 +422,7 @@ class _RegionDashboardState extends State<RegionDashboard> {
   // DASHBOARD TAB
   Widget _buildDashboardTab() {
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (_errorMessage != null) {
@@ -354,17 +430,11 @@ class _RegionDashboardState extends State<RegionDashboard> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.error_outline,
-              color: Colors.red,
-              size: 48,
-            ),
+            const Icon(Icons.error_outline, color: Colors.red, size: 48),
             const SizedBox(height: 16),
             Text(
               'Error Loading Dashboard',
-              style: TextStyles.heading2.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyles.heading2.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
@@ -379,7 +449,10 @@ class _RegionDashboardState extends State<RegionDashboard> {
               label: const Text('Retry'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryColor,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
               ),
             ),
           ],
@@ -416,15 +489,14 @@ class _RegionDashboardState extends State<RegionDashboard> {
   Widget _buildWelcomeCard() {
     // Get user name from UserProvider if available
     final userProvider = Provider.of<UserProvider>(context, listen: false);
-    final userName = widget.actingAsSuperAdmin
-        ? 'Super Admin'
-        : (userProvider.currentUser?.fullName ?? 'Region Manager');
+    final userName =
+        widget.actingAsSuperAdmin
+            ? 'Super Admin'
+            : (userProvider.currentUser?.fullName ?? 'Region Manager');
 
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(20),
@@ -433,10 +505,7 @@ class _RegionDashboardState extends State<RegionDashboard> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              AppColors.secondaryColor,
-              AppColors.primaryColor,
-            ],
+            colors: [AppColors.secondaryColor, AppColors.primaryColor],
           ),
         ),
         child: Column(
@@ -444,11 +513,7 @@ class _RegionDashboardState extends State<RegionDashboard> {
           children: [
             Row(
               children: [
-                const Icon(
-                  Icons.location_on,
-                  color: Colors.white,
-                  size: 48,
-                ),
+                const Icon(Icons.location_on, color: Colors.white, size: 48),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
@@ -498,7 +563,11 @@ class _RegionDashboardState extends State<RegionDashboard> {
     );
   }
 
-  Widget _buildQuickActionButton(String label, IconData icon, VoidCallback onTap) {
+  Widget _buildQuickActionButton(
+    String label,
+    IconData icon,
+    VoidCallback onTap,
+  ) {
     return InkWell(
       onTap: onTap,
       child: Container(
@@ -509,11 +578,7 @@ class _RegionDashboardState extends State<RegionDashboard> {
         ),
         child: Column(
           children: [
-            Icon(
-              icon,
-              color: Colors.white,
-              size: 24,
-            ),
+            Icon(icon, color: Colors.white, size: 24),
             const SizedBox(height: 8),
             Text(
               label,
@@ -529,14 +594,42 @@ class _RegionDashboardState extends State<RegionDashboard> {
   }
 
   Widget _buildStatisticsGrid() {
-    // Get data from dashboard summary
-    String totalUsers = _dashboardSummary?.userCount.toString() ?? _regionUsers.length.toString();
-    String totalGroups = _dashboardSummary?.groupCount.toString() ?? _regionGroups.length.toString();
-    String activeEvents = _dashboardSummary?.eventCount.toString() ?? _upcomingEvents.length.toString();
-    
+    // Get data from dashboard summary, with fallbacks only if summary is null or has null values
+    final userCount = _dashboardSummary?.userCount;
+    final groupCount = _dashboardSummary?.groupCount;
+    final eventCount = _dashboardSummary?.eventCount;
+
+    // Use backend data if available and valid, otherwise use local data as fallback
+    String totalUsers =
+        (userCount != null && userCount > 0)
+            ? userCount.toString()
+            : _regionUsers.length.toString();
+    String totalGroups =
+        (groupCount != null && groupCount > 0)
+            ? groupCount.toString()
+            : _regionGroups.length.toString();
+    String activeEvents =
+        (eventCount != null && eventCount > 0)
+            ? eventCount.toString()
+            : _upcomingEvents.length.toString();
+
     // Format attendance rate with percentage
     final attendanceRate = _dashboardSummary?.attendanceCount ?? 0;
-    String formattedAttendance = '${(attendanceRate / 100).toStringAsFixed(1)}%';
+    String formattedAttendance =
+        '${(attendanceRate / 100).toStringAsFixed(1)}%';
+
+    // Debug logging to check data accuracy
+    print('Dashboard Summary Data:');
+    print(
+      '  User Count: ${_dashboardSummary?.userCount} (fallback: ${_regionUsers.length})',
+    );
+    print(
+      '  Group Count: ${_dashboardSummary?.groupCount} (fallback: ${_regionGroups.length})',
+    );
+    print(
+      '  Event Count: ${_dashboardSummary?.eventCount} (fallback: ${_upcomingEvents.length})',
+    );
+    print('  Attendance: $attendanceRate');
 
     return GridView.count(
       crossAxisCount: 3,
@@ -545,30 +638,49 @@ class _RegionDashboardState extends State<RegionDashboard> {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       children: [
-        _buildStatCard('Total Users', totalUsers, Icons.people, AppColors.primaryColor),
-        _buildStatCard('Total Groups', totalGroups, Icons.groups, AppColors.secondaryColor),
-        _buildStatCard('Active Events', activeEvents, Icons.event, AppColors.accentColor),
-        // _buildStatCard('Attendance', formattedAttendance, Icons.trending_up, Colors.green),
+        _buildStatCard(
+          'Total Users',
+          totalUsers,
+          Icons.people,
+          AppColors.primaryColor,
+        ),
+        _buildStatCard(
+          'Total Groups',
+          totalGroups,
+          Icons.groups,
+          AppColors.secondaryColor,
+        ),
+        _buildStatCard(
+          'Active Events',
+          activeEvents,
+          Icons.event,
+          AppColors.accentColor,
+        ),
+        _buildStatCard(
+          'Attendance',
+          formattedAttendance,
+          Icons.trending_up,
+          Colors.green,
+        ),
       ],
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color ) {
+  Widget _buildStatCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              color: color,
-              size: 32,
-            ),
+            Icon(icon, color: color, size: 32),
             const SizedBox(height: 12),
             Text(
               value,
@@ -581,7 +693,9 @@ class _RegionDashboardState extends State<RegionDashboard> {
             Text(
               title,
               style: TextStyles.bodyText.copyWith(
-                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onBackground.withOpacity(0.7),
               ),
               textAlign: TextAlign.center,
             ),
@@ -591,23 +705,21 @@ class _RegionDashboardState extends State<RegionDashboard> {
     );
   }
 
-  Widget _buildSectionHeader(String title, IconData icon, VoidCallback onViewAll) {
+  Widget _buildSectionHeader(
+    String title,
+    IconData icon,
+    VoidCallback onViewAll,
+  ) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Row(
           children: [
-            Icon(
-              icon,
-              color: AppColors.primaryColor,
-              size: 24,
-            ),
+            Icon(icon, color: AppColors.primaryColor, size: 24),
             const SizedBox(width: 8),
             Text(
               title,
-              style: TextStyles.heading2.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyles.heading2.copyWith(fontWeight: FontWeight.bold),
             ),
           ],
         ),
@@ -638,9 +750,7 @@ class _RegionDashboardState extends State<RegionDashboard> {
   Widget _buildRecentUsersList() {
     if (_regionUsers.isEmpty) {
       return Card(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Center(
@@ -649,13 +759,17 @@ class _RegionDashboardState extends State<RegionDashboard> {
                 Icon(
                   Icons.people_outline,
                   size: 48,
-                  color: Theme.of(context).colorScheme.onBackground.withOpacity(0.5),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onBackground.withOpacity(0.5),
                 ),
                 const SizedBox(height: 16),
                 Text(
                   'No users in this region yet',
                   style: TextStyles.bodyText.copyWith(
-                    color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onBackground.withOpacity(0.7),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -674,12 +788,11 @@ class _RegionDashboardState extends State<RegionDashboard> {
     }
 
     // Show only the first 5 users
-    final displayUsers = _regionUsers.length > 5 ? _regionUsers.sublist(0, 5) : _regionUsers;
+    final displayUsers =
+        _regionUsers.length > 5 ? _regionUsers.sublist(0, 5) : _regionUsers;
 
     return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListView.separated(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
@@ -700,14 +813,14 @@ class _RegionDashboardState extends State<RegionDashboard> {
             ),
             title: Text(
               user.fullName,
-              style: TextStyles.bodyText.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyles.bodyText.copyWith(fontWeight: FontWeight.bold),
             ),
             subtitle: Text(
               user.email,
               style: TextStyles.bodyText.copyWith(
-                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onBackground.withOpacity(0.7),
               ),
             ),
             trailing: const Icon(Icons.chevron_right),
@@ -723,9 +836,7 @@ class _RegionDashboardState extends State<RegionDashboard> {
   Widget _buildRecentGroupsList() {
     if (_regionGroups.isEmpty) {
       return Card(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Center(
@@ -734,13 +845,17 @@ class _RegionDashboardState extends State<RegionDashboard> {
                 Icon(
                   Icons.groups_outlined,
                   size: 48,
-                  color: Theme.of(context).colorScheme.onBackground.withOpacity(0.5),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onBackground.withOpacity(0.5),
                 ),
                 const SizedBox(height: 16),
                 Text(
                   'No groups in this region yet',
                   style: TextStyles.bodyText.copyWith(
-                    color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onBackground.withOpacity(0.7),
                   ),
                 ),
               ],
@@ -750,7 +865,8 @@ class _RegionDashboardState extends State<RegionDashboard> {
       );
     }
 
-    final displayGroups = _regionGroups.length > 5 ? _regionGroups.sublist(0, 5) : _regionGroups;
+    final displayGroups =
+        _regionGroups.length > 5 ? _regionGroups.sublist(0, 5) : _regionGroups;
 
     return Column(
       children: [
@@ -781,7 +897,16 @@ class _RegionDashboardState extends State<RegionDashboard> {
                 ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => GroupDetailsScreen(groupId: group.id, groupName: group.name)));
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder:
+                          (_) => GroupDetailsScreen(
+                            groupId: group.id,
+                            groupName: group.name,
+                          ),
+                    ),
+                  );
                 },
               );
             },
@@ -820,7 +945,10 @@ class _RegionDashboardState extends State<RegionDashboard> {
             ),
             ElevatedButton(
               onPressed: () async {
-                final groupProvider = Provider.of<GroupProvider>(context, listen: false);
+                final groupProvider = Provider.of<GroupProvider>(
+                  context,
+                  listen: false,
+                );
                 final success = await groupProvider.createGroup(
                   nameController.text,
                   descriptionController.text,
@@ -844,6 +972,44 @@ class _RegionDashboardState extends State<RegionDashboard> {
     );
   }
 
+  // REMOVED MEMBERS TAB
+  Widget _buildRemovedMembersTab() {
+    return RegionRemovedMembersList(
+      regionId: widget.regionId,
+      userRole: 'regional_manager',
+      showRestoreButton: true,
+      showStats: true,
+    );
+  }
+
+  Future<void> _loadRemovedMembers() async {
+    if (!mounted) return;
+
+    setState(() {
+      _isLoadingRemovedMembers = true;
+    });
+
+    try {
+      final groupProvider = Provider.of<GroupProvider>(context, listen: false);
+      final removedMembers = await groupProvider.getRemovedMembersByRegion(
+        widget.regionId,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _removedMembers = removedMembers;
+        _isLoadingRemovedMembers = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _removedMembers = [];
+        _isLoadingRemovedMembers = false;
+      });
+      _showError('Failed to load removed members: $e');
+    }
+  }
+
   // ANALYTICS TAB
   Widget _buildAnalyticsTab() {
     return RegionManagerAnalyticsScreen(regionId: widget.regionId);
@@ -858,9 +1024,7 @@ class _RegionDashboardState extends State<RegionDashboard> {
         children: [
           Text(
             'Settings',
-            style: TextStyles.heading1.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyles.heading1.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
           Text(
@@ -868,7 +1032,7 @@ class _RegionDashboardState extends State<RegionDashboard> {
             style: TextStyles.bodyText,
           ),
           const SizedBox(height: 24),
-          
+
           // Notifications settings
           Card(
             shape: RoundedRectangleBorder(
@@ -902,7 +1066,7 @@ class _RegionDashboardState extends State<RegionDashboard> {
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // Display settings
           Card(
             shape: RoundedRectangleBorder(
@@ -937,7 +1101,7 @@ class _RegionDashboardState extends State<RegionDashboard> {
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // About section
           Card(
             shape: RoundedRectangleBorder(

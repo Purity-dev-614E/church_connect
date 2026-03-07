@@ -81,8 +81,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final groupProvider = Provider.of<GroupProvider>(context, listen: false);
       _userGroups = await groupProvider.getGroupById(_user!.regionalID);
 
-
-
       setState(() {
         _isLoading = false;
       });
@@ -94,7 +92,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       print('Error loading profile data: $e');
     }
   }
-
 
   Future<void> _pickProfileImage() async {
     try {
@@ -176,9 +173,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         initials = nameParts[0][0] + nameParts[nameParts.length - 1][0];
       } else {
         // If only one name, get first two letters or just first letter if name is only one character
-        initials = nameParts[0].length > 1
-            ? nameParts[0].substring(0, 2)
-            : nameParts[0][0];
+        initials =
+            nameParts[0].length > 1
+                ? nameParts[0].substring(0, 2)
+                : nameParts[0][0];
       }
     }
 
@@ -201,18 +199,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final result = await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) =>
-              ProfileSetupScreen(
-                userId: userId,
-                email: _user!.email,
-              ),
+          builder:
+              (context) =>
+                  ProfileSetupScreen(userId: userId, email: _user!.email),
           settings: const RouteSettings(arguments: 'edit_mode'),
         ),
       );
 
       // Reload user data when returning from edit screen
       if (result == true) {
-        _loadUserData();
+        await _loadUserData();
+
+        // Also notify any listening providers that user data has changed
+        final userProvider = Provider.of<UserProvider>(context, listen: false);
+        await userProvider.loadUser(userId);
+
+        _showSuccess('Profile updated successfully!');
       }
     } catch (e) {
       _showError('Error: ${e.toString()}');
@@ -271,17 +273,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       // Create updated user model
       final updatedUser = UserModel(
-          id: currentUser.id,
-          fullName: currentUser.fullName,
-          email: currentUser.email,
-          contact: currentUser.contact,
-          nextOfKin: currentUser.nextOfKin,
-          nextOfKinContact: currentUser.nextOfKinContact,
-          role: currentUser.role,
-          gender: currentUser.gender,
-          regionId: currentUser.regionId,
-          regionalID: currentUser.regionalID,
-          overalRegionName: currentUser.overalRegionName
+        id: currentUser.id,
+        fullName: currentUser.fullName,
+        email: currentUser.email,
+        contact: currentUser.contact,
+        nextOfKin: currentUser.nextOfKin,
+        nextOfKinContact: currentUser.nextOfKinContact,
+        role: currentUser.role,
+        gender: currentUser.gender,
+        regionId: currentUser.regionId,
+        regionalID: currentUser.regionalID,
+        overalRegionName: currentUser.overalRegionName,
       );
 
       // Update user profile
@@ -314,98 +316,95 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: CustomAppBar(
-        title: 'Profile',
-        showBackButton: true,
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
-          ? _buildErrorView()
-          : _user == null
-          ? _buildNoUserView()
-          : SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                const SizedBox(height: 20),
+      appBar: CustomAppBar(title: 'Profile', showBackButton: true),
+      body:
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _errorMessage != null
+              ? _buildErrorView()
+              : _user == null
+              ? _buildNoUserView()
+              : SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        const SizedBox(height: 20),
 
-                // Profile Picture or Initials
-                _buildProfileAvatar(_user!.fullName),
+                        // Profile Picture or Initials
+                        _buildProfileAvatar(_user!.fullName),
 
-                const SizedBox(height: 24),
+                        const SizedBox(height: 24),
 
-                // User Name
-                Text(
-                  _user!.fullName,
-                  style: TextStyles.heading1.copyWith(
-                    color: Theme
-                        .of(context)
-                        .colorScheme
-                        .onBackground,
-                    fontWeight: FontWeight.bold,
+                        // User Name
+                        Text(
+                          _user!.fullName,
+                          style: TextStyles.heading1.copyWith(
+                            color: Theme.of(context).colorScheme.onBackground,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+
+                        const SizedBox(height: 8),
+
+                        // User Role and Group
+                        Text(
+                          _primaryGroup != null
+                              ? '${_user!.role} • ${_primaryGroup!.name}'
+                              : _user!.role,
+                          style: TextStyles.bodyText.copyWith(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onBackground.withOpacity(0.7),
+                            fontWeight: FontWeight.w500,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+
+                        const SizedBox(height: 32),
+
+                        // Edit Profile Button
+                        CustomButton(
+                          label: 'Edit Profile',
+                          onPressed: _navigateToEditProfile,
+                          icon: Icons.edit,
+                          color: AppColors.primaryColor,
+                          isPulsing: true,
+                          pulseEffect: PulseEffectType.glow,
+                          isFullWidth: false,
+                          horizontalPadding: 32,
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        // Logout Button
+                        CustomButton(
+                          label: 'Logout',
+                          onPressed: () => _logout(context),
+                          icon: Icons.logout,
+                          color: AppColors.errorColor,
+                          isFullWidth: false,
+                          horizontalPadding: 32,
+                        ),
+
+                        const SizedBox(height: 40),
+
+                        // User Information Card
+                        _buildUserInfoCard(_user!),
+
+                        const SizedBox(height: 24),
+
+                        // Emergency Contact Card
+                        _buildEmergencyContactCard(_user!),
+                      ],
+                    ),
                   ),
-                  textAlign: TextAlign.center,
                 ),
-
-                const SizedBox(height: 8),
-
-                // User Role and Group
-                Text(
-                  _primaryGroup != null
-                      ? '${_user!.role} • ${_primaryGroup!.name}'
-                      : _user!.role,
-                  style: TextStyles.bodyText.copyWith(
-                    color: AppColors.secondaryColor,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-
-                const SizedBox(height: 32),
-
-                // Edit Profile Button
-                CustomButton(
-                  label: 'Edit Profile',
-                  onPressed: _navigateToEditProfile,
-                  icon: Icons.edit,
-                  color: AppColors.primaryColor,
-                  isPulsing: true,
-                  pulseEffect: PulseEffectType.glow,
-                  isFullWidth: false,
-                  horizontalPadding: 32,
-                ),
-
-                const SizedBox(height: 16),
-
-                // Logout Button
-                CustomButton(
-                  label: 'Logout',
-                  onPressed: () => _logout(context),
-                  icon: Icons.logout,
-                  color: AppColors.errorColor,
-                  isFullWidth: false,
-                  horizontalPadding: 32,
-                ),
-
-                const SizedBox(height: 40),
-
-                // User Information Card
-                _buildUserInfoCard(_user!),
-
-                const SizedBox(height: 24),
-
-                // Emergency Contact Card
-                _buildEmergencyContactCard(_user!),
-              ],
-            ),
-          ),
-        ),
-      ),
+              ),
     );
   }
 
@@ -424,9 +423,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(height: 16),
             Text(
               'Error Loading Profile',
-              style: TextStyles.heading2.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyles.heading2.copyWith(fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
@@ -455,17 +452,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
+            Icon(
               Icons.person_off,
-              color: AppColors.secondaryColor,
+              color: Theme.of(
+                context,
+              ).colorScheme.onBackground.withOpacity(0.7),
               size: 64,
             ),
             const SizedBox(height: 16),
             Text(
               'User Not Found',
-              style: TextStyles.heading2.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyles.heading2.copyWith(fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
@@ -500,10 +497,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  AppColors.primaryColor,
-                  AppColors.secondaryColor,
-                ],
+                colors: [AppColors.primaryColor, AppColors.secondaryColor],
               ),
               boxShadow: [
                 BoxShadow(
@@ -513,44 +507,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ],
             ),
-            child: _profileImageBytes != null
-                ? ClipOval(
-              child: Image.memory(
-                _profileImageBytes!,
-                fit: BoxFit.cover,
-                width: 120,
-                height: 120,
-              ),
-            )
-                : _profileImageUrl != null
-                ? ClipOval(
-              child: Image.network(
-                _profileImageUrl!,
-                fit: BoxFit.cover,
-                width: 120,
-                height: 120,
-                errorBuilder: (context, error, stackTrace) {
-                  return Center(
-                    child: Text(
-                      _getInitials(fullName),
-                      style: TextStyles.heading1.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
+            child:
+                _profileImageBytes != null
+                    ? ClipOval(
+                      child: Image.memory(
+                        _profileImageBytes!,
+                        fit: BoxFit.cover,
+                        width: 120,
+                        height: 120,
+                      ),
+                    )
+                    : _profileImageUrl != null
+                    ? ClipOval(
+                      child: Image.network(
+                        _profileImageUrl!,
+                        fit: BoxFit.cover,
+                        width: 120,
+                        height: 120,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Center(
+                            child: Text(
+                              _getInitials(fullName),
+                              style: TextStyles.heading1.copyWith(
+                                color: Theme.of(context).colorScheme.background,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    )
+                    : Center(
+                      child: Text(
+                        _getInitials(fullName),
+                        style: TextStyles.heading1.copyWith(
+                          color: Theme.of(context).colorScheme.background,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                  );
-                },
-              ),
-            )
-                : Center(
-              child: Text(
-                _getInitials(fullName),
-                style: TextStyles.heading1.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
           ),
         ),
         Positioned(
@@ -563,15 +558,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
               color: AppColors.primaryColor,
               shape: BoxShape.circle,
               border: Border.all(
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.background,
                 width: 2,
               ),
             ),
             child: IconButton(
-              icon: const Icon(
+              icon: Icon(
                 Icons.camera_alt,
                 size: 20,
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.background,
               ),
               onPressed: _isUploadingImage ? null : _pickProfileImage,
             ),
@@ -592,34 +587,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   TextButton.icon(
                     onPressed: _isUploadingImage ? null : _uploadProfileImage,
-                    icon: const Icon(
-                        Icons.upload, color: Colors.white, size: 16),
-                    label:  Text(
-                      'Upload',
-                      style: TextStyles.bodyText,
+                    icon: Icon(
+                      Icons.upload,
+                      color: Theme.of(context).colorScheme.background,
+                      size: 16,
                     ),
+                    label: Text('Upload', style: TextStyles.bodyText),
                   ),
                   const SizedBox(width: 4),
                   IconButton(
-                    icon: const Icon(
-                        Icons.cancel, color: Colors.white, size: 16),
-                    onPressed: _isUploadingImage
-                        ? null
-                        : () {
-                      setState(() {
-                        _profileImageBytes = null;
-                      });
-                    },
+                    icon: Icon(
+                      Icons.cancel,
+                      color: Theme.of(context).colorScheme.background,
+                      size: 16,
+                    ),
+                    onPressed:
+                        _isUploadingImage
+                            ? null
+                            : () {
+                              setState(() {
+                                _profileImageBytes = null;
+                              });
+                            },
                   ),
                 ],
               ),
             ),
           ),
         if (_isUploadingImage)
-          const Positioned.fill(
+          Positioned.fill(
             child: Center(
               child: CircularProgressIndicator(
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.background,
                 strokeWidth: 2,
               ),
             ),
@@ -631,9 +630,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildUserInfoCard(UserModel user) {
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      color: Theme.of(context).colorScheme.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -664,23 +662,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _buildInfoRow(Icons.person, 'Gender', user.gender),
             const Divider(),
             _buildInfoRow(
-              Icons.location_on, 'Safari Group', user.regionName ?? 'Not Assigned',
+              Icons.location_on,
+              'Safari Group',
+              user.regionName ?? 'Not Assigned',
             ),
             const Divider(),
-            _buildInfoRow(Icons.place_outlined, "Region", user.overalRegionName ?? 'Not Assigned'),
+            _buildInfoRow(
+              Icons.place_outlined,
+              "Region",
+              user.overalRegionName ?? 'Not Assigned',
+            ),
           ],
         ),
       ),
     );
   }
 
-
   Widget _buildEmergencyContactCard(UserModel user) {
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      color: Theme.of(context).colorScheme.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -703,17 +705,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String label, String value, [Color? iconColor]) {
-
+  Widget _buildInfoRow(
+    IconData icon,
+    String label,
+    String value, [
+    Color? iconColor,
+  ]) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
         children: [
-          Icon(
-            icon,
-            color: iconColor ?? AppColors.secondaryColor,
-            size: 24,
-          ),
+          Icon(icon, color: iconColor ?? AppColors.secondaryColor, size: 24),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -722,11 +724,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Text(
                   label,
                   style: TextStyles.bodyText.copyWith(
-                    color: Theme
-                        .of(context)
-                        .colorScheme
-                        .onBackground
-                        .withOpacity(0.6),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onBackground.withOpacity(0.6),
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -734,10 +734,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   value,
                   style: TextStyles.bodyText.copyWith(
                     fontWeight: FontWeight.w500,
-                    color: Theme
-                        .of(context)
-                        .colorScheme
-                        .onBackground,
+                    color: Theme.of(context).colorScheme.onBackground,
                   ),
                 ),
               ],

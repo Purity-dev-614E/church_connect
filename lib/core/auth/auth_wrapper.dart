@@ -242,6 +242,7 @@ class _RoleBasedNavigator extends StatelessWidget {
     
     switch (user.role.toLowerCase()) {
       case 'super_admin':
+      case 'root':
         log('Navigating to SuperAdminDashboard');
         return const SuperAdminDashboard();
 

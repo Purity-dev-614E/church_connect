@@ -9,6 +9,7 @@ import 'package:group_management_church_app/data/providers/analytics_providers/a
 import 'package:group_management_church_app/data/providers/analytics_providers/super_admin_analytics_provider.dart';
 import 'package:group_management_church_app/features/admin/screens/analytics_screen.dart';
 import 'package:group_management_church_app/features/events/overall_event_details.dart';
+import 'package:group_management_church_app/features/events/event_details_screen.dart';
 import 'package:group_management_church_app/features/member/member_attendance_screen.dart';
 import 'package:group_management_church_app/features/member/member_profile_screen.dart';
 import 'package:group_management_church_app/features/profile_screen.dart';
@@ -20,11 +21,16 @@ import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:group_management_church_app/data/providers/event_provider.dart';
 import 'package:group_management_church_app/data/providers/attendance_provider.dart';
+import 'package:group_management_church_app/data/providers/auth_provider.dart';
 import 'package:group_management_church_app/data/providers/group_provider.dart';
 import 'package:group_management_church_app/data/providers/user_provider.dart';
 import 'package:intl/intl.dart';
 
 import '../../data/models/attendance_model.dart';
+import '../../data/models/removed_member_model.dart';
+import '../../widgets/remove_member_dialog.dart';
+import '../../widgets/removed_members_list.dart';
+import '../../data/services/member_removal_service.dart';
 
 class AdminDashboard extends StatefulWidget {
   final String groupId;
@@ -72,6 +78,7 @@ class _AdminDashboardState extends State<AdminDashboard>
   };
   List<UserModel> _groupMembers = [];
   List<EventModel> _groupEvents = [];
+  List<RemovedMemberModel> _removedMembers = [];
 
   // Date and time selection
   DateTime _selectedDate = DateTime.now();
@@ -105,10 +112,10 @@ class _AdminDashboardState extends State<AdminDashboard>
   final Duration _cacheDuration = const Duration(minutes: 5);
 
   Future<List<List<AttendanceModel>>> _fetchAttendancesBatched(
-      List<EventModel> events,
-      AttendanceProvider attendanceProvider, {
-        int batchSize = 20,
-      }) async {
+    List<EventModel> events,
+    AttendanceProvider attendanceProvider, {
+    int batchSize = 20,
+  }) async {
     final results = <List<AttendanceModel>>[];
 
     for (var i = 0; i < events.length; i += batchSize) {
@@ -116,8 +123,9 @@ class _AdminDashboardState extends State<AdminDashboard>
         i,
         (i + batchSize > events.length) ? events.length : i + batchSize,
       );
-      final batchFutures =
-      batch.map((event) => attendanceProvider.fetchEventAttendance(event.id));
+      final batchFutures = batch.map(
+        (event) => attendanceProvider.fetchEventAttendance(event.id),
+      );
       final batchResults = await Future.wait(batchFutures);
       results.addAll(batchResults);
     }
@@ -125,15 +133,24 @@ class _AdminDashboardState extends State<AdminDashboard>
     return results;
   }
 
-
   // Getter for group events
   List<EventModel> get groupEvents => _groupEvents;
   List<EventModel> get _upcomingEvents {
     final now = DateTime.now();
-    final upcoming = _groupEvents
-        .where((event) => event.dateTime.toLocal().isAfter(now))
-        .toList()
-      ..sort((a, b) => a.dateTime.toLocal().compareTo(b.dateTime.toLocal())); // soonest first
+    final upcoming =
+        _groupEvents
+            .where((event) => event.dateTime.toLocal().isAfter(now))
+            .toList()
+          ..sort((a, b) {
+            // First sort by tag (leadership first)
+            final tagComparison = (b.tag == 'leadership' ? 1 : 0).compareTo(
+              a.tag == 'leadership' ? 1 : 0,
+            );
+            if (tagComparison != 0) return tagComparison;
+
+            // Then sort by date (soonest first)
+            return a.dateTime.toLocal().compareTo(b.dateTime.toLocal());
+          });
 
     // Debug classification output (limited to first few events)
     try {
@@ -141,7 +158,9 @@ class _AdminDashboardState extends State<AdminDashboard>
       debugPrint('[EventsDebug] now(local)=${now.toIso8601String()}');
       for (final e in sample) {
         final local = e.dateTime.toLocal();
-        debugPrint('[EventsDebug] ${e.title}: ${local.toIso8601String()} => upcoming=${local.isAfter(now)}');
+        debugPrint(
+          '[EventsDebug] ${e.title}: ${local.toIso8601String()} => upcoming=${local.isAfter(now)}',
+        );
       }
     } catch (_) {}
 
@@ -151,11 +170,22 @@ class _AdminDashboardState extends State<AdminDashboard>
   List<EventModel> get _pastEvents {
     final now = DateTime.now();
     return _groupEvents
-        .where((event) =>
-            event.dateTime.toLocal().isBefore(now) ||
-            event.dateTime.toLocal().isAtSameMomentAs(now))
+        .where(
+          (event) =>
+              event.dateTime.toLocal().isBefore(now) ||
+              event.dateTime.toLocal().isAtSameMomentAs(now),
+        )
         .toList()
-      ..sort((a, b) => b.dateTime.toLocal().compareTo(a.dateTime.toLocal())); // latest first
+      ..sort((a, b) {
+        // First sort by tag (leadership first)
+        final tagComparison = (b.tag == 'leadership' ? 1 : 0).compareTo(
+          a.tag == 'leadership' ? 1 : 0,
+        );
+        if (tagComparison != 0) return tagComparison;
+
+        // Then sort by date (latest first)
+        return b.dateTime.toLocal().compareTo(a.dateTime.toLocal());
+      });
   }
 
   @override
@@ -175,8 +205,14 @@ class _AdminDashboardState extends State<AdminDashboard>
       duration: const Duration(milliseconds: 1000),
     );
 
-    _analyticsProvider = Provider.of<AdminAnalyticsProvider>(context, listen: false);
-    _superAdminAnalyticsProvider = Provider.of<SuperAdminAnalyticsProvider>(context, listen: false);
+    _analyticsProvider = Provider.of<AdminAnalyticsProvider>(
+      context,
+      listen: false,
+    );
+    _superAdminAnalyticsProvider = Provider.of<SuperAdminAnalyticsProvider>(
+      context,
+      listen: false,
+    );
 
     _loadSettings();
     _loadInitialLists();
@@ -198,12 +234,12 @@ class _AdminDashboardState extends State<AdminDashboard>
     });
   }
 
-
   void refreshStatistics() {
     setState(() {
       _statisticsFuture = _getDirectStatistics(); // ignores cache if expired
     });
   }
+
   void _loadInitialLists() {
     // Make copies of the original lists for filtering
     setState(() {
@@ -248,8 +284,6 @@ class _AdminDashboardState extends State<AdminDashboard>
     });
   }
 
-
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -264,7 +298,6 @@ class _AdminDashboardState extends State<AdminDashboard>
       }
     });
   }
-
 
   Future<void> _loadSettings() async {
     setState(() {
@@ -295,6 +328,7 @@ class _AdminDashboardState extends State<AdminDashboard>
     try {
       await _loadAnalyticsData();
       await _loadGroupMembers();
+      await _loadRemovedMembers();
       await _loadGroupEvents();
 
       if (_notificationsEnabled) {
@@ -325,6 +359,7 @@ class _AdminDashboardState extends State<AdminDashboard>
       await Future.wait([
         _loadAnalyticsData(),
         _loadGroupMembers(),
+        _loadRemovedMembers(),
         _loadGroupEvents(),
       ]);
 
@@ -494,13 +529,59 @@ class _AdminDashboardState extends State<AdminDashboard>
     }
   }
 
+  Future<void> _loadRemovedMembers() async {
+    try {
+      if (!mounted) return;
+      final groupProvider = Provider.of<GroupProvider>(context, listen: false);
+      final list = await groupProvider.getRemovedMembers(widget.groupId);
+      if (!mounted) return;
+      setState(() => _removedMembers = list);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _removedMembers = []);
+    }
+  }
+
   Future<void> _loadGroupEvents() async {
+    debugPrint('[EventsDebug] _loadGroupEvents() called for admin');
     try {
       if (!mounted) return;
 
-      // Load events directly
+      // Load events like regular users do, then add leadership events
       final _eventProvider = Provider.of<EventProvider>(context, listen: false);
-      final events = await _eventProvider.getGroupEvents(widget.groupId);
+
+      List<EventModel> groupEvents = [];
+      List<EventModel> leadershipEvents = [];
+
+      try {
+        // First load group events like regular users
+        await _eventProvider.fetchEventsByGroup(widget.groupId);
+        groupEvents = _eventProvider.events;
+        debugPrint(
+          '[EventsDebug] fetchEventsByGroup succeeded, got ${groupEvents.length} group events',
+        );
+
+        // Then add leadership events
+        leadershipEvents = await _eventProvider.fetchLeadershipEvents();
+        debugPrint(
+          '[EventsDebug] fetched ${leadershipEvents.length} leadership events',
+        );
+      } catch (e) {
+        debugPrint('[EventsDebug] Event loading failed: $e');
+        // Fallback to leadership events only
+        leadershipEvents = await _eventProvider.fetchLeadershipEvents();
+      }
+
+      // Manually combine both types of events
+      final allEvents = [...groupEvents, ...leadershipEvents];
+
+      final events =
+          allEvents
+              .where(
+                (event) =>
+                    event.groupId == widget.groupId || event.isLeadershipEvent,
+              )
+              .toList();
 
       if (!mounted) return;
 
@@ -511,11 +592,28 @@ class _AdminDashboardState extends State<AdminDashboard>
       // Debug: print counts for classification sanity
       try {
         final now = DateTime.now();
-        final upcomingCount = _groupEvents
-            .where((e) => e.dateTime.toLocal().isAfter(now))
-            .length;
+        final upcomingCount =
+            _groupEvents.where((e) => e.dateTime.toLocal().isAfter(now)).length;
         final pastCount = _groupEvents.length - upcomingCount;
-        debugPrint('[EventsDebug] loaded total=${_groupEvents.length} upcoming=$upcomingCount past=$pastCount');
+        final leadershipCount =
+            _groupEvents.where((e) => e.isLeadershipEvent).length;
+        final groupEventsCount =
+            _groupEvents.where((e) => e.groupId == widget.groupId).length;
+
+        debugPrint(
+          '[EventsDebug] loaded total=${_groupEvents.length} upcoming=$upcomingCount past=$pastCount',
+        );
+        debugPrint(
+          '[EventsDebug] leadership=$leadershipCount groupEvents=$groupEventsCount adminGroupId=${widget.groupId}',
+        );
+
+        // Print first few events for debugging
+        for (int i = 0; i < _groupEvents.length && i < 3; i++) {
+          final event = _groupEvents[i];
+          debugPrint(
+            '[EventsDebug] Event $i: ${event.title} | groupId=${event.groupId} | isLeadership=${event.isLeadershipEvent}',
+          );
+        }
       } catch (_) {}
     } catch (e) {
       print('Error loading group events: $e');
@@ -842,6 +940,15 @@ class _AdminDashboardState extends State<AdminDashboard>
     // Use local copies of date and time
     DateTime selectedDate = _selectedDate;
     TimeOfDay selectedTime = _selectedTime;
+    String selectedTag = 'org';
+
+    // Get current user role
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final userRole = authProvider.currentUser?.role ?? 'user';
+    final canCreateLeadershipEvent =
+        userRole == 'root' ||
+        userRole == 'super admin' ||
+        userRole == 'regional manager';
 
     showDialog(
       context: context,
@@ -1118,13 +1225,44 @@ class _AdminDashboardState extends State<AdminDashboard>
   }
 
   void _showRemoveMemberConfirmation(UserModel member) {
+    final reasonController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
     showDialog(
       context: context,
       builder:
           (context) => AlertDialog(
             title: const Text('Remove Member'),
-            content: Text(
-              'Are you sure you want to remove ${member.fullName} from this group?',
+            content: Form(
+              key: formKey,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Remove ${member.fullName} from this group? You must provide a reason.',
+                      style: TextStyles.bodyText,
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: reasonController,
+                      decoration: const InputDecoration(
+                        labelText: 'Reason for removal *',
+                        hintText: 'e.g. Relocated, requested removal...',
+                        border: OutlineInputBorder(),
+                      ),
+                      maxLines: 3,
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) {
+                          return 'Please enter a reason for removal';
+                        }
+                        return null;
+                      },
+                    ),
+                  ],
+                ),
+              ),
             ),
             actions: [
               TextButton(
@@ -1132,29 +1270,37 @@ class _AdminDashboardState extends State<AdminDashboard>
                 child: const Text('Cancel'),
               ),
               TextButton(
-                onPressed: () {
-                  // Remove member using provider
+                onPressed: () async {
+                  if (!formKey.currentState!.validate()) return;
+                  final reason = reasonController.text.trim();
+                  Navigator.pop(context);
+
                   final groupProvider = Provider.of<GroupProvider>(
                     context,
                     listen: false,
                   );
-                  groupProvider
-                      .removeMemberFromGroup(widget.groupId, member.id)
-                      .then((success) {
-                        if (success) {
-                          _showSuccess(
-                            '${member.fullName} has been removed from the group',
-                          );
-                          // Refresh UI
-                          setState(() {});
-                        } else {
-                          _showError(
-                            'Failed to remove ${member.fullName} from the group',
-                          );
-                        }
+                  final success = await groupProvider
+                      .removeMemberFromGroupWithReason(
+                        widget.groupId,
+                        member.id,
+                        reason,
+                      );
+                  if (mounted) {
+                    if (success) {
+                      _showSuccess(
+                        '${member.fullName} has been removed from the group',
+                      );
+                      await _loadGroupMembers();
+                      await _loadRemovedMembers();
+                      setState(() {
+                        _filteredMembers = List.from(_groupMembers);
                       });
-
-                  Navigator.pop(context);
+                    } else {
+                      _showError(
+                        'Failed to remove ${member.fullName} from the group',
+                      );
+                    }
+                  }
                 },
                 child: const Text(
                   'Remove',
@@ -1189,35 +1335,67 @@ class _AdminDashboardState extends State<AdminDashboard>
                   ),
                   onTap: () {
                     Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder:
-                            (context) => OverallEventDetailsScreen(
-                              eventId: event.id,
-                              eventTitle: event.title,
-                            ),
+                    // For leadership events, navigate to read-only event details
+                    // For regular events, navigate to overall event details where admin can mark attendance
+                    if (event.isLeadershipEvent) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder:
+                              (context) => EventDetailsScreen(
+                                event: event,
+                                groupId: widget.groupId,
+                              ),
+                        ),
+                      );
+                    } else {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder:
+                              (context) => OverallEventDetailsScreen(
+                                eventId: event.id,
+                                eventTitle: event.title,
+                              ),
+                        ),
+                      );
+                    }
+                  },
+                ),
+                if (event.isAttendanceLocked)
+                  ListTile(
+                    leading: Icon(
+                      Icons.lock_clock,
+                      color: Colors.orange.shade700,
+                    ),
+                    title: Text(
+                      'Editing and deletion are locked (24 hours after event start)',
+                      style: TextStyles.bodyText.copyWith(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onBackground.withOpacity(0.7),
+                        fontSize: 13,
                       ),
-                    );
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.edit),
-                  title: const Text('Edit Event'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _showEditEventDialog(event);
-                  },
-                ),
-
-                ListTile(
-                  leading: const Icon(Icons.delete, color: Colors.red),
-                  title: const Text('Delete Event'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _showDeleteEventConfirmation(event);
-                  },
-                ),
+                    ),
+                  )
+                else ...[
+                  ListTile(
+                    leading: const Icon(Icons.edit),
+                    title: const Text('Edit Event'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showEditEventDialog(event);
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.delete, color: Colors.red),
+                    title: const Text('Delete Event'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showDeleteEventConfirmation(event);
+                    },
+                  ),
+                ],
               ],
             ),
             actions: [
@@ -1456,21 +1634,22 @@ class _AdminDashboardState extends State<AdminDashboard>
                           context,
                           listen: false,
                         );
-                        final updatedEvent = await eventProvider
-                            .updateEvent(
-                              eventId: event.id,
-                              title: titleController.text,
-                              description: descriptionController.text,
-                              dateTime: eventDateTime,
-                              location: locationController.text,
-                              groupId: widget.groupId,
-                            );
+                        final updatedEvent = await eventProvider.updateEvent(
+                          eventId: event.id,
+                          title: titleController.text,
+                          description: descriptionController.text,
+                          dateTime: eventDateTime,
+                          location: locationController.text,
+                          groupId: widget.groupId,
+                        );
 
                         if (updatedEvent != null) {
                           // Refresh events and filtered lists
                           await _loadGroupEvents();
                           setState(() {
-                            _filteredUpcomingEvents = List.from(_upcomingEvents);
+                            _filteredUpcomingEvents = List.from(
+                              _upcomingEvents,
+                            );
                             _filteredPastEvents = List.from(_pastEvents);
                           });
 
@@ -1607,6 +1786,7 @@ class _AdminDashboardState extends State<AdminDashboard>
             children: [
               _buildDashboardTab(),
               _buildMembersTab(),
+              _buildRemovedMembersTab(),
               _buildEventsTab(),
               _buildAnalyticsTab(),
               _buildSettingsTab(),
@@ -1622,6 +1802,10 @@ class _AdminDashboardState extends State<AdminDashboard>
             label: 'Dashboard',
           ),
           BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Members'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_off),
+            label: 'Removed',
+          ),
           BottomNavigationBarItem(icon: Icon(Icons.event), label: 'Events'),
           BottomNavigationBarItem(
             icon: Icon(Icons.analytics),
@@ -1673,12 +1857,10 @@ class _AdminDashboardState extends State<AdminDashboard>
           _buildMembersList(showLimit: true, members: _filteredMembers),
           const SizedBox(height: 24),
           _buildSectionHeader('Upcoming Events', Icons.event, () {
-            _onItemTapped(2); // Navigate to Events tab
+            _onItemTapped(3); // Navigate to Events tab
           }),
           const SizedBox(height: 16),
-          _buildUpcomingEventsList(
-            showLimit: false,
-          ),
+          _buildUpcomingEventsList(showLimit: false),
           const SizedBox(height: 32),
         ],
       ),
@@ -1744,7 +1926,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                   'Create Event',
                   Icons.event_available,
                   () {
-                    _onItemTapped(2);
+                    _onItemTapped(3);
                     Future.delayed(const Duration(milliseconds: 500), () {
                       _showCreateEventDialog();
                     });
@@ -1753,7 +1935,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                 _createQuickActionButton(
                   'Analytics',
                   Icons.analytics,
-                  () => _onItemTapped(3),
+                  () => _onItemTapped(4),
                 ),
               ],
             ),
@@ -1806,11 +1988,7 @@ class _AdminDashboardState extends State<AdminDashboard>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
-                  Icons.error_outline,
-                  color: Colors.red,
-                  size: 48,
-                ),
+                const Icon(Icons.error_outline, color: Colors.red, size: 48),
                 const SizedBox(height: 16),
                 Text(
                   'Error loading statistics: ${snapshot.error}',
@@ -1867,8 +2045,10 @@ class _AdminDashboardState extends State<AdminDashboard>
     try {
       final groupProvider = Provider.of<GroupProvider>(context, listen: false);
       final eventProvider = Provider.of<EventProvider>(context, listen: false);
-      final attendanceProvider =
-      Provider.of<AttendanceProvider>(context, listen: false);
+      final attendanceProvider = Provider.of<AttendanceProvider>(
+        context,
+        listen: false,
+      );
 
       final now = DateTime.now();
       final firstDayOfMonth = DateTime(now.year, now.month, 1);
@@ -1881,13 +2061,20 @@ class _AdminDashboardState extends State<AdminDashboard>
       // Past events in last 30 days
       final thirtyDaysAgo = now.subtract(const Duration(days: 30));
       final pastEvents = await eventProvider.fetchPastEvents(widget.groupId);
-      final recentEvents = pastEvents
-          .where((e) => e.dateTime.isAfter(thirtyDaysAgo) && e.dateTime.isBefore(now))
-          .toList();
+      final recentEvents =
+          pastEvents
+              .where(
+                (e) =>
+                    e.dateTime.isAfter(thirtyDaysAgo) &&
+                    e.dateTime.isBefore(now),
+              )
+              .toList();
 
       // Fetch attendance in batches
-      final attendanceResults =
-      await _fetchAttendancesBatched(recentEvents, attendanceProvider);
+      final attendanceResults = await _fetchAttendancesBatched(
+        recentEvents,
+        attendanceProvider,
+      );
 
       final activeUserIds = <String>{};
       for (var attendanceList in attendanceResults) {
@@ -1900,12 +2087,19 @@ class _AdminDashboardState extends State<AdminDashboard>
       // Events this month
       final upcomingEvents = eventProvider.upcomingEvents;
       final allEvents = [...pastEvents, ...upcomingEvents];
-      final eventsThisMonth = allEvents
-          .where((e) =>
-      e.dateTime.isAfter(firstDayOfMonth.subtract(const Duration(days: 1))) &&
-          e.dateTime.isBefore(lastDayOfMonth.add(const Duration(days: 1))))
-          .length
-          .toDouble();
+      final eventsThisMonth =
+          allEvents
+              .where(
+                (e) =>
+                    e.dateTime.isAfter(
+                      firstDayOfMonth.subtract(const Duration(days: 1)),
+                    ) &&
+                    e.dateTime.isBefore(
+                      lastDayOfMonth.add(const Duration(days: 1)),
+                    ),
+              )
+              .length
+              .toDouble();
 
       final result = {
         'totalMembers': totalMembers,
@@ -1927,7 +2121,6 @@ class _AdminDashboardState extends State<AdminDashboard>
       };
     }
   }
-
 
   Widget _buildStatCard(
     String title,
@@ -2064,6 +2257,15 @@ class _AdminDashboardState extends State<AdminDashboard>
     );
   }
 
+  Widget _buildRemovedMembersTab() {
+    return RemovedMembersList(
+      groupId: widget.groupId,
+      userRole: 'admin',
+      showRestoreButton: true,
+      showStats: true,
+    );
+  }
+
   Widget _buildMembersList({
     required bool showLimit,
     required List<UserModel> members,
@@ -2151,9 +2353,7 @@ class _AdminDashboardState extends State<AdminDashboard>
           Expanded(
             child: TabBarView(
               children: [
-                _buildUpcomingEventsList(
-                  showLimit: false,
-                ),
+                _buildUpcomingEventsList(showLimit: false),
                 _buildPastEventsList(
                   showLimit: false,
                   events: _filteredPastEvents,
@@ -2183,9 +2383,21 @@ class _AdminDashboardState extends State<AdminDashboard>
 
     // Debug: show what we're about to render
     try {
-      debugPrint('[EventsDebug] render Upcoming count=${displayEvents.length} (filtered from ${events.length})');
+      final leadershipCount =
+          displayEvents.where((e) => e.isLeadershipEvent).length;
+      final groupEventsCount =
+          displayEvents.where((e) => e.groupId == widget.groupId).length;
+
+      debugPrint(
+        '[EventsDebug] render Upcoming count=${displayEvents.length} (filtered from ${events.length})',
+      );
+      debugPrint(
+        '[EventsDebug] RENDER - leadership=$leadershipCount groupEvents=$groupEventsCount adminGroupId=${widget.groupId}',
+      );
       for (final e in displayEvents.take(5)) {
-        debugPrint('[EventsDebug] Upcoming item: ${e.title} @ ${e.dateTime.toLocal().toIso8601String()}');
+        debugPrint(
+          '[EventsDebug] Upcoming item: ${e.title} | groupId=${e.groupId} | isLeadership=${e.isLeadershipEvent} @ ${e.dateTime.toLocal().toIso8601String()}',
+        );
       }
     } catch (_) {}
 
@@ -2197,19 +2409,17 @@ class _AdminDashboardState extends State<AdminDashboard>
             Icon(
               Icons.event_busy,
               size: 64,
-              color: Theme.of(context)
-                  .colorScheme
-                  .onBackground
-                  .withOpacity(0.5),
+              color: Theme.of(
+                context,
+              ).colorScheme.onBackground.withOpacity(0.5),
             ),
             const SizedBox(height: 16),
             Text(
               'No upcoming events',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context)
-                    .colorScheme
-                    .onBackground
-                    .withOpacity(0.7),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onBackground.withOpacity(0.7),
               ),
             ),
             const SizedBox(height: 24),
@@ -2230,9 +2440,10 @@ class _AdminDashboardState extends State<AdminDashboard>
       padding: const EdgeInsets.all(16),
       itemCount: displayEvents.length,
       shrinkWrap: true,
-      physics: showLimit
-          ? const NeverScrollableScrollPhysics()
-          : const AlwaysScrollableScrollPhysics(),
+      physics:
+          showLimit
+              ? const NeverScrollableScrollPhysics()
+              : const AlwaysScrollableScrollPhysics(),
       itemBuilder: (context, index) {
         final event = displayEvents[index];
         return Padding(
@@ -2243,6 +2454,7 @@ class _AdminDashboardState extends State<AdminDashboard>
               eventTitle: event.title,
               eventDate: _formatEventDate(event.dateTime),
               eventLocation: event.location,
+              tag: event.tag,
               onTap: () => _showEventOptionsDialog(event),
             ),
           ),
@@ -2258,7 +2470,6 @@ class _AdminDashboardState extends State<AdminDashboard>
     final filtered = _filterEventsByQuery(events);
     final displayEvents =
         showLimit && filtered.length > 2 ? filtered.sublist(0, 2) : filtered;
-
 
     if (displayEvents.isEmpty) {
       return Center(
@@ -2299,6 +2510,7 @@ class _AdminDashboardState extends State<AdminDashboard>
               eventTitle: event.title,
               eventDate: _formatEventDate(event.dateTime),
               eventLocation: event.location,
+              tag: event.tag,
               onTap: () => _showEventOptionsDialog(event),
             ),
           ),

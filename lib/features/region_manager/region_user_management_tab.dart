@@ -5,17 +5,17 @@ import 'package:group_management_church_app/data/models/user_model.dart';
 import 'package:group_management_church_app/data/providers/user_provider.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
 import 'package:provider/provider.dart';
+import 'package:group_management_church_app/widgets/change_user_group_dialog.dart';
+import 'package:group_management_church_app/core/utils/role_utils.dart';
 
 class RegionUserManagementTab extends StatefulWidget {
   final String regionId;
 
-  const RegionUserManagementTab({
-    super.key,
-    required this.regionId,
-  });
+  const RegionUserManagementTab({super.key, required this.regionId});
 
   @override
-  State<RegionUserManagementTab> createState() => _RegionUserManagementTabState();
+  State<RegionUserManagementTab> createState() =>
+      _RegionUserManagementTabState();
 }
 
 class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
@@ -23,34 +23,34 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
   String? _errorMessage;
   List<UserModel> _users = [];
   List<UserModel> _filteredUsers = [];
-  
+
   // State for search and filtering
   final TextEditingController _searchController = TextEditingController();
   String _selectedRole = 'All';
-  
+
   @override
   void initState() {
     super.initState();
     _loadUsers();
   }
-  
+
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
   }
-  
+
   Future<void> _loadUsers() async {
     if (_isLoading) return; // Prevent multiple simultaneous loads
-    
+
     setState(() {
       _isLoading = true;
     });
-    
+
     try {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       final users = await userProvider.getUsersByRegion(widget.regionId);
-      
+
       if (mounted) {
         setState(() {
           _users = List<UserModel>.from(users);
@@ -68,27 +68,32 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
       }
     }
   }
-  
+
   void _filterUsers() {
     final query = _searchController.text.toLowerCase();
-    
+
     setState(() {
-      _filteredUsers = _users.where((user) {
-        // Filter by search query
-        final matchesQuery = query.isEmpty || 
-            user.fullName.toLowerCase().contains(query) ||
-            user.email.toLowerCase().contains(query);
-            
-        // Filter by role
-        final matchesRole = _selectedRole == 'All' || 
-            (_selectedRole == 'Members' && user.role.toLowerCase() == 'user') ||
-            (_selectedRole == 'Group Leaders' && user.role.toLowerCase() == 'admin');
-            
-        return matchesQuery && matchesRole;
-      }).toList();
+      _filteredUsers =
+          _users.where((user) {
+            // Filter by search query
+            final matchesQuery =
+                query.isEmpty ||
+                user.fullName.toLowerCase().contains(query) ||
+                user.email.toLowerCase().contains(query);
+
+            // Filter by role
+            final matchesRole =
+                _selectedRole == 'All' ||
+                (_selectedRole == 'Members' &&
+                    user.role.toLowerCase() == 'user') ||
+                (_selectedRole == 'Group Leaders' &&
+                    user.role.toLowerCase() == 'admin');
+
+            return matchesQuery && matchesRole;
+          }).toList();
     });
   }
-  
+
   void _showError(String message) {
     CustomNotification.show(
       context: context,
@@ -112,13 +117,30 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
       type: NotificationType.info,
     );
   }
-  
+
+  // Check if current user can change the target user's group
+  bool _canChangeUserGroup(UserModel targetUser) {
+    final currentUser =
+        Provider.of<UserProvider>(context, listen: false).currentUser;
+    final currentUserRole = currentUser?.role?.toLowerCase() ?? '';
+
+    // Regional Manager cannot change groups of Super Admins, Root, or other Regional Managers
+    if (RoleUtils.isRoot(targetUser.role) ||
+        RoleUtils.isSuperAdmin(targetUser.role) ||
+        RoleUtils.isRegionalLeadership(targetUser.role)) {
+      return false;
+    }
+
+    // Regional Manager can change groups of regular users and admins in their region
+    return currentUserRole == 'regional manager';
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
-    
+
     if (_errorMessage != null) {
       return Center(
         child: Column(
@@ -149,7 +171,7 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
         ),
       );
     }
-    
+
     return Column(
       children: [
         Padding(
@@ -180,7 +202,10 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
                 items: const [
                   DropdownMenuItem(value: 'All', child: Text('All')),
                   DropdownMenuItem(value: 'Members', child: Text('Members')),
-                  DropdownMenuItem(value: 'Group Leaders', child: Text('Group Leaders')),
+                  DropdownMenuItem(
+                    value: 'Group Leaders',
+                    child: Text('Group Leaders'),
+                  ),
                 ],
                 onChanged: (newValue) {
                   if (newValue != null) {
@@ -195,34 +220,39 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
           ),
         ),
         Expanded(
-          child: _filteredUsers.isEmpty
-              ? const Center(
-                  child: Text('No users found matching the criteria'),
-                )
-              : RefreshIndicator(
-                  onRefresh: _loadUsers,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _filteredUsers.length,
-                    itemBuilder: (context, index) {
-                      final user = _filteredUsers[index];
-                      return _buildUserListItem(user);
-                    },
+          child:
+              _filteredUsers.isEmpty
+                  ? const Center(
+                    child: Text('No users found matching the criteria'),
+                  )
+                  : RefreshIndicator(
+                    onRefresh: _loadUsers,
+                    child: ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _filteredUsers.length,
+                      itemBuilder: (context, index) {
+                        final user = _filteredUsers[index];
+                        return _buildUserListItem(user);
+                      },
+                    ),
                   ),
-                ),
         ),
       ],
     );
   }
-  
+
   Widget _buildUserListItem(UserModel user) {
     // Get role display name
     String roleDisplay = 'Unknown';
     Color roleColor = Colors.grey;
-    
+
     switch (user.role.toLowerCase()) {
       case 'super_admin':
         roleDisplay = 'Super Admin';
+        roleColor = AppColors.primaryColor;
+        break;
+      case 'root':
+        roleDisplay = 'Root';
         roleColor = AppColors.primaryColor;
         break;
       case 'regional manager':
@@ -238,29 +268,22 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
         roleColor = AppColors.accentColor;
         break;
     }
-    
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
         contentPadding: const EdgeInsets.all(16),
         leading: CircleAvatar(
           backgroundColor: roleColor.withOpacity(0.2),
           child: Text(
             user.fullName.isNotEmpty ? user.fullName[0].toUpperCase() : '?',
-            style: TextStyle(
-              color: roleColor,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(color: roleColor, fontWeight: FontWeight.bold),
           ),
         ),
         title: Text(
           user.fullName,
-          style: TextStyles.heading2.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyles.heading2.copyWith(fontWeight: FontWeight.bold),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -269,7 +292,9 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
             Text(
               user.email,
               style: TextStyles.bodyText.copyWith(
-                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onBackground.withOpacity(0.7),
               ),
             ),
             const SizedBox(height: 8),
@@ -288,24 +313,47 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
                 ),
               ),
             ),
+            if (user.regionName != null && user.regionName!.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Group: ${user.regionName}',
+                style: TextStyles.bodyText.copyWith(
+                  color: Colors.grey[600],
+                  fontSize: 12,
+                ),
+              ),
+            ],
           ],
         ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Group change button
+            if (_canChangeUserGroup(user))
+              IconButton(
+                icon: const Icon(Icons.groups, color: AppColors.primaryColor),
+                onPressed: () => _showChangeGroupDialog(user),
+                tooltip: 'Change Group',
+              ),
+            // Edit role button
             IconButton(
               icon: const Icon(Icons.edit, color: AppColors.secondaryColor),
               onPressed: () {
                 final role = user.role.toLowerCase();
                 // Only Super Admin should assign or manage Regional Managers.
-                // Prevent Region Managers from changing roles for Super Admins or Regional leaders.
-                if (role == 'super_admin' || role == 'regional manager') {
-                  _showInfo('You cannot change this user\'s role. Please contact a Super Admin.');
+                // Prevent Region Managers from changing roles for Root, Super Admins or Regional leaders.
+                if (role == 'root' ||
+                    role == 'super_admin' ||
+                    role == 'regional manager') {
+                  _showInfo(
+                    'You cannot change this user\'s role. Please contact a Super Admin.',
+                  );
                   return;
                 }
                 _showEditUserDialog(user);
               },
             ),
+            // Delete button
             IconButton(
               icon: const Icon(Icons.delete, color: Colors.red),
               onPressed: () => _showDeleteUserDialog(user),
@@ -315,173 +363,210 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
       ),
     );
   }
-  
+
+  void _showChangeGroupDialog(UserModel user) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => ChangeUserGroupDialog(
+            user: user,
+            currentRegionId:
+                widget.regionId, // Restrict to regional manager's region
+          ),
+    ).then((result) {
+      if (result == true) {
+        // Refresh the user list if group was changed successfully
+        _loadUsers();
+      }
+    });
+  }
+
   void _showEditUserDialog(UserModel user) {
     // Only allow editing between 'user' and 'admin' from the Region Manager screen.
     String selectedRole = user.role.toLowerCase();
     if (selectedRole != 'admin' && selectedRole != 'user') {
       selectedRole = 'user';
     }
-    
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            const Icon(Icons.edit, color: AppColors.primaryColor),
-            const SizedBox(width: 8),
-            Text('Change Role for ${user.fullName}'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Current Role:',
-              style: TextStyles.bodyText.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+      builder:
+          (context) => AlertDialog(
+            title: Row(
+              children: [
+                const Icon(Icons.edit, color: AppColors.primaryColor),
+                const SizedBox(width: 8),
+                Text('Change Role for ${user.fullName}'),
+              ],
             ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: _getRoleColor(user.role).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: _getRoleColor(user.role).withOpacity(0.3)),
-              ),
-              child: Text(
-                _getRoleDisplayName(user.role),
-                style: TextStyles.bodyText.copyWith(
-                  color: _getRoleColor(user.role),
-                  fontWeight: FontWeight.w500,
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Current Role:',
+                  style: TextStyles.bodyText.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Select New Role:',
-              style: TextStyles.bodyText.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              value: selectedRole,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _getRoleColor(user.role).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: _getRoleColor(user.role).withOpacity(0.3),
+                    ),
+                  ),
+                  child: Text(
+                    _getRoleDisplayName(user.role),
+                    style: TextStyles.bodyText.copyWith(
+                      color: _getRoleColor(user.role),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              ),
-              // Region managers should NOT be able to assign Regional Manager roles.
-              // Only Super Admin can promote someone to a regional leadership role.
-              items: const [
-                DropdownMenuItem(
-                  value: 'user',
-                  child: Text('Member'),
+                const SizedBox(height: 24),
+                Text(
+                  'Select New Role:',
+                  style: TextStyles.bodyText.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-                DropdownMenuItem(
-                  value: 'admin',
-                  child: Text('Group Leader'),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: selectedRole,
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                  ),
+                  // Region managers should NOT be able to assign Regional Manager roles.
+                  // Only Super Admin can promote someone to a regional leadership role.
+                  items: const [
+                    DropdownMenuItem(value: 'user', child: Text('Member')),
+                    DropdownMenuItem(
+                      value: 'admin',
+                      child: Text('Group Leader'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      selectedRole = value;
+                    }
+                  },
                 ),
               ],
-              onChanged: (value) {
-                if (value != null) {
-                  selectedRole = value;
-                }
-              },
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.grey[600],
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              try {
-                final updatedUser = UserModel(
-                  id: user.id,
-                  fullName: user.fullName,
-                  email: user.email,
-                  contact: user.contact,
-                  nextOfKin: user.nextOfKin,
-                  nextOfKinContact: user.nextOfKinContact,
-                  role: selectedRole,
-                  gender: user.gender,
-                  regionId: user.regionId,
-                  regionalID: user.regionalID,
-                );
-
-                final userProvider = Provider.of<UserProvider>(context, listen: false);
-                await userProvider.updateUser(updatedUser);
-                
-                _showSuccess('User role updated successfully');
-                Navigator.pop(context);
-                _loadUsers(); // Refresh the user list
-              } catch (e) {
-                _showError('Failed to update user role: ${e.toString()}');
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryColor,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+                style: TextButton.styleFrom(foregroundColor: Colors.grey[600]),
               ),
-            ),
-            child: const Text('Update Role'),
+              ElevatedButton(
+                onPressed: () async {
+                  try {
+                    final updatedUser = UserModel(
+                      id: user.id,
+                      fullName: user.fullName,
+                      email: user.email,
+                      contact: user.contact,
+                      nextOfKin: user.nextOfKin,
+                      nextOfKinContact: user.nextOfKinContact,
+                      role: selectedRole,
+                      gender: user.gender,
+                      regionId: user.regionId,
+                      regionalID: user.regionalID,
+                    );
+
+                    final userProvider = Provider.of<UserProvider>(
+                      context,
+                      listen: false,
+                    );
+                    await userProvider.updateUser(updatedUser);
+
+                    _showSuccess('User role updated successfully');
+                    Navigator.pop(context);
+                    _loadUsers(); // Refresh the user list
+                  } catch (e) {
+                    _showError('Failed to update user role: ${e.toString()}');
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryColor,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text('Update Role'),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
-  
+
   void _showDeleteUserDialog(UserModel user) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Remove User'),
-        content: Text('Are you sure you want to remove ${user.fullName} from this region?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Remove User'),
+            content: Text(
+              'Are you sure you want to remove ${user.fullName} from this region?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  try {
+                    final userProvider = Provider.of<UserProvider>(
+                      context,
+                      listen: false,
+                    );
+                    final success = await userProvider.removeUserFromRegion(
+                      user.id,
+                      widget.regionId,
+                    );
+
+                    if (success) {
+                      _showSuccess('User removed from region successfully');
+                      Navigator.pop(context);
+                      _loadUsers(); // Refresh the user list
+                    } else {
+                      _showError('Failed to remove user from region');
+                    }
+                  } catch (e) {
+                    _showError('Failed to remove user: ${e.toString()}');
+                  }
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                child: const Text('Remove'),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () async {
-              try {
-                final userProvider = Provider.of<UserProvider>(context, listen: false);
-                final success = await userProvider.removeUserFromRegion(user.id, widget.regionId);
-                
-                if (success) {
-                  _showSuccess('User removed from region successfully');
-                  Navigator.pop(context);
-                  _loadUsers(); // Refresh the user list
-                } else {
-                  _showError('Failed to remove user from region');
-                }
-              } catch (e) {
-                _showError('Failed to remove user: ${e.toString()}');
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
     );
   }
 
   Color _getRoleColor(String role) {
     switch (role.toLowerCase()) {
       case 'super_admin':
+      case 'root':
         return AppColors.primaryColor;
       case 'regional manager':
         return AppColors.buttonColor;
@@ -498,6 +583,8 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
     switch (role.toLowerCase()) {
       case 'super_admin':
         return 'Super Admin';
+      case 'root':
+        return 'Root';
       case 'regional manager':
         return 'Regional Manager';
       case 'admin':

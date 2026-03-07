@@ -6,6 +6,7 @@ import 'package:group_management_church_app/data/providers/auth_provider.dart';
 import 'package:group_management_church_app/data/providers/event_provider.dart';
 import 'package:group_management_church_app/widgets/custom_app_bar.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
+import 'package:group_management_church_app/data/services/member_activity_service.dart';
 import 'package:provider/provider.dart';
 
 class EventDetailsScreen extends StatefulWidget {
@@ -92,6 +93,12 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
   
   // Submit attendance
   Future<void> _submitAttendance() async {
+    if (widget.event.isAttendanceLocked) {
+      _showError(
+          'Attendance cannot be changed after 24 hours from the event start time.');
+      return;
+    }
+
     // Validate form based on attendance choice
     bool isValid = _isAttending 
         ? _attendedFormKey.currentState!.validate()
@@ -137,6 +144,10 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
             ? 'Attendance marked successfully!' 
             : 'Absence recorded successfully!');
         }
+        // Check inactivity rules after marking
+        MemberActivityService()
+            .checkAndMarkInactiveAfterAttendance(widget.groupId)
+            .ignore();
       } else {
         if (mounted) {
           _showError('Failed to mark attendance. Please try again.');
