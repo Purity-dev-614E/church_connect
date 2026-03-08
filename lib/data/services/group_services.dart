@@ -30,30 +30,38 @@ class GroupServices {
       }
 
       // Check if user has permission to create a group (root bypasses RBAC)
-      if (!RoleUtils.isRoot(userRole) && userRole != 'super_admin' && userRole != 'super admin' && userRole != 'admin') {
+      final normalizedRole = RoleUtils.normalize(userRole);
+      if (!RoleUtils.isRoot(normalizedRole) &&
+          !RoleUtils.isSuperAdmin(normalizedRole) &&
+          !RoleUtils.isRegionalLeadership(normalizedRole) &&
+          normalizedRole != 'admin') {
         throw Exception('User does not have permission to create a group');
       }
 
       final response = await _httpClient.post(
         ApiEndpoints.groups,
-        body: {
-          'name': name,
-          'group_admin_id': userId,
-        },
+        body: {'name': name, 'group_admin_id': userId},
       );
 
       if (response.statusCode == 201 || response.statusCode == 200) {
         return GroupModel.fromJson(jsonDecode(response.body));
       } else {
-        throw Exception('Failed to create group: HTTP status ${response.statusCode}');
+        throw Exception(
+          'Failed to create group: HTTP status ${response.statusCode}',
+        );
       }
     } catch (e) {
       throw Exception('Failed to create group: $e');
     }
   }
-  
+
   // Create group with region
-  Future<bool> createGroupWithRegion(String name, String description, String adminId, String regionId) async {
+  Future<bool> createGroupWithRegion(
+    String name,
+    String description,
+    String adminId,
+    String regionId,
+  ) async {
     try {
       final response = await _httpClient.post(
         ApiEndpoints.groups,
@@ -80,7 +88,9 @@ class GroupServices {
         final List<dynamic> data = jsonDecode(response.body);
         return data.map((group) => GroupModel.fromJson(group)).toList();
       } else {
-        throw Exception("Failed to fetch groups: HTTP status ${response.statusCode}");
+        throw Exception(
+          "Failed to fetch groups: HTTP status ${response.statusCode}",
+        );
       }
     } catch (e) {
       throw Exception("Failed to fetch groups: $e");
@@ -98,7 +108,9 @@ class GroupServices {
       if (response.statusCode == 200) {
         return GroupModel.fromJson(jsonDecode(response.body));
       } else {
-        throw Exception("Failed to fetch group: HTTP status ${response.statusCode}");
+        throw Exception(
+          "Failed to fetch group: HTTP status ${response.statusCode}",
+        );
       }
     } catch (e) {
       throw Exception("Failed to fetch group: $e");
@@ -108,31 +120,39 @@ class GroupServices {
   // Fetch group members
   Future<List<dynamic>> fetchGroupMembers(String groupId) async {
     try {
-      final response = await _httpClient.get(ApiEndpoints.getGroupMembers(groupId));
+      final response = await _httpClient.get(
+        ApiEndpoints.getGroupMembers(groupId),
+      );
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         return data; // Return raw data as members might not be GroupModel objects
       } else {
-        throw Exception("Failed to fetch group members: HTTP status ${response.statusCode}");
+        throw Exception(
+          "Failed to fetch group members: HTTP status ${response.statusCode}",
+        );
       }
     } catch (e) {
       throw Exception("Failed to fetch group members: $e");
     }
     return [];
   }
-  
+
   // Get user's groups
   Future<List<GroupModel>> getUserGroups(String userId) async {
     try {
       // Make a GET request to the new endpoint for fetching user groups by user ID
-      final response = await _httpClient.get(ApiEndpoints.getmemberGroups(userId));
+      final response = await _httpClient.get(
+        ApiEndpoints.getmemberGroups(userId),
+      );
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         return data.map((group) => GroupModel.fromJson(group)).toList();
       } else {
-        throw Exception("Failed to fetch user's groups: HTTP status ${response.statusCode}");
+        throw Exception(
+          "Failed to fetch user's groups: HTTP status ${response.statusCode}",
+        );
       }
     } catch (e) {
       throw Exception("Failed to fetch user's groups: $e");
@@ -144,23 +164,29 @@ class GroupServices {
     try {
       final response = await _httpClient.put(
         ApiEndpoints.updateGroup(id),
-        body: {
-          'name': name,
-        },
+        body: {'name': name},
       );
 
       if (response.statusCode == 200) {
         return GroupModel.fromJson(jsonDecode(response.body));
       } else {
-        throw Exception("Failed to update group: HTTP status ${response.statusCode}");
+        throw Exception(
+          "Failed to update group: HTTP status ${response.statusCode}",
+        );
       }
     } catch (e) {
       throw Exception("Failed to update group: $e");
     }
   }
-  
+
   // Update group with region
-  Future<bool> updateGroupWithRegion(String id, String name, String description, String adminId, String regionId) async {
+  Future<bool> updateGroupWithRegion(
+    String id,
+    String name,
+    String description,
+    String adminId,
+    String regionId,
+  ) async {
     try {
       final response = await _httpClient.put(
         ApiEndpoints.updateGroup(id),
@@ -186,7 +212,9 @@ class GroupServices {
       if (response.statusCode == 200) {
         return true;
       } else {
-        throw Exception("Failed to delete group: HTTP status ${response.statusCode}");
+        throw Exception(
+          "Failed to delete group: HTTP status ${response.statusCode}",
+        );
       }
     } catch (e) {
       throw Exception("Failed to delete group: $e");
@@ -203,21 +231,26 @@ class GroupServices {
 
       if (userRole == null) {
         throw Exception('User role is null');
-      } else if (!RoleUtils.isRoot(userRole) && userRole != 'super_admin' && userRole != 'region_manager') {
-        throw Exception('User is not authorized to assign admin');
+      } else {
+        final normalizedRole = RoleUtils.normalize(userRole);
+        if (!RoleUtils.isRoot(normalizedRole) &&
+            !RoleUtils.isSuperAdmin(normalizedRole) &&
+            !RoleUtils.isRegionalLeadership(normalizedRole)) {
+          throw Exception('User is not authorized to assign admin');
+        }
       }
 
       final response = await _httpClient.put(
         ApiEndpoints.updateGroup(groupId),
-        body: {
-          'group_admin_id': userId,
-        },
+        body: {'group_admin_id': userId},
       );
 
       if (response.statusCode == 200) {
         return true;
       } else {
-        throw Exception("Failed to assign admin to group: HTTP status ${response.statusCode}");
+        throw Exception(
+          "Failed to assign admin to group: HTTP status ${response.statusCode}",
+        );
       }
     } catch (e) {
       throw Exception("Failed to assign admin to group: $e");
@@ -231,13 +264,12 @@ class GroupServices {
       print("GroupServices: Adding member to group");
       print("GroupServices: Endpoint: $endpoint");
       print("GroupServices: GroupId: $groupId, UserId: $userId");
-      
-      final response = await _httpClient.post(endpoint,
-          body: jsonEncode({
-            'userId': userId,
-          })
+
+      final response = await _httpClient.post(
+        endpoint,
+        body: jsonEncode({'userId': userId}),
       );
-      
+
       print("GroupServices: Response status: ${response.statusCode}");
       print("GroupServices: Response body: ${response.body}");
 
@@ -245,8 +277,12 @@ class GroupServices {
         print("GroupServices: Successfully added member to group");
         return true;
       } else {
-        print("GroupServices: Failed to add member - HTTP ${response.statusCode}");
-        throw Exception("Failed to add member to group: HTTP status ${response.statusCode}, Body: ${response.body}");
+        print(
+          "GroupServices: Failed to add member - HTTP ${response.statusCode}",
+        );
+        throw Exception(
+          "Failed to add member to group: HTTP status ${response.statusCode}, Body: ${response.body}",
+        );
       }
     } catch (e) {
       print("GroupServices: Exception adding member to group: $e");
@@ -257,12 +293,16 @@ class GroupServices {
   // Remove member from group (legacy, no reason)
   Future<bool> removeMemberFromGroup(String groupId, String userId) async {
     try {
-      final response = await _httpClient.delete(ApiEndpoints.removeGroupMember(groupId, userId));
+      final response = await _httpClient.delete(
+        ApiEndpoints.removeGroupMember(groupId, userId),
+      );
 
       if (response.statusCode == 200) {
         return true;
       } else {
-        throw Exception("Failed to remove member from group: HTTP status ${response.statusCode}");
+        throw Exception(
+          "Failed to remove member from group: HTTP status ${response.statusCode}",
+        );
       }
     } catch (e) {
       throw Exception("Failed to remove member from group: $e");
@@ -289,7 +329,8 @@ class GroupServices {
         return removeMemberFromGroup(groupId, userId);
       }
       throw Exception(
-          "Failed to remove member: HTTP status ${response.statusCode}");
+        "Failed to remove member: HTTP status ${response.statusCode}",
+      );
     } catch (e) {
       try {
         return await removeMemberFromGroup(groupId, userId);
@@ -302,8 +343,9 @@ class GroupServices {
   /// Fetch list of removed members for a group (with removal reasons).
   Future<List<RemovedMemberModel>> getRemovedMembers(String groupId) async {
     try {
-      final response =
-          await _httpClient.get(ApiEndpoints.getRemovedMembers(groupId));
+      final response = await _httpClient.get(
+        ApiEndpoints.getRemovedMembers(groupId),
+      );
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
@@ -323,13 +365,17 @@ class GroupServices {
   // Get groups by admin
   Future<List<GroupModel>> getGroupsByAdmin(String adminId) async {
     try {
-      final response = await _httpClient.get(ApiEndpoints.getGroupsByAdmin(adminId));
+      final response = await _httpClient.get(
+        ApiEndpoints.getGroupsByAdmin(adminId),
+      );
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         return data.map((group) => GroupModel.fromJson(group)).toList();
       } else {
-        throw Exception("Failed to fetch admin's groups: HTTP status ${response.statusCode}");
+        throw Exception(
+          "Failed to fetch admin's groups: HTTP status ${response.statusCode}",
+        );
       }
     } catch (e) {
       throw Exception("Failed to fetch admin's groups: $e");
@@ -340,18 +386,22 @@ class GroupServices {
   // Get group demographics
   Future<Map<String, dynamic>> getGroupDemographics(String groupId) async {
     try {
-      final response = await _httpClient.get(ApiEndpoints.getGroupDemographics(groupId));
+      final response = await _httpClient.get(
+        ApiEndpoints.getGroupDemographics(groupId),
+      );
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else {
-        throw Exception("Failed to fetch group demographics: HTTP status ${response.statusCode}");
+        throw Exception(
+          "Failed to fetch group demographics: HTTP status ${response.statusCode}",
+        );
       }
     } catch (e) {
       throw Exception("Failed to fetch group demographics: $e");
     }
   }
-  
+
   // Get user's groups (alternative implementation)
   Future<List<GroupModel>> getUserGroups1(String userId) async {
     try {
@@ -359,16 +409,17 @@ class GroupServices {
       // we'll fetch all groups and filter for those where the user is a member
       final allGroups = await fetchAllGroups();
       List<GroupModel> userGroups = [];
-      
+
       for (var group in allGroups) {
         try {
           final members = await fetchGroupMembers(group.id);
-          final isMember = members.any((member) => 
-            member is Map<String, dynamic> && 
-            member.containsKey('user_id') && 
-            member['user_id'] == userId
+          final isMember = members.any(
+            (member) =>
+                member is Map<String, dynamic> &&
+                member.containsKey('user_id') &&
+                member['user_id'] == userId,
           );
-          
+
           if (isMember) {
             userGroups.add(group);
           }
@@ -377,20 +428,22 @@ class GroupServices {
           continue;
         }
       }
-      
+
       return userGroups;
     } catch (e) {
       throw Exception("Failed to fetch user's groups: $e");
     }
   }
-  
+
   // Region-specific methods
-  
+
   // Get groups by region
   Future<List<GroupModel>> getGroupsByRegion(String regionId) async {
     try {
-      final response = await _httpClient.get(ApiEndpoints.getGroupsByRegion(regionId));
-      
+      final response = await _httpClient.get(
+        ApiEndpoints.getGroupsByRegion(regionId),
+      );
+
       if (response.statusCode == 200) {
         final jsonResponse = jsonDecode(response.body);
         final List<dynamic> groupsData = jsonResponse['data'] ?? [];
@@ -410,57 +463,61 @@ class GroupServices {
       }
     }
   }
-  
+
   // Assign group to region
   Future<bool> assignGroupToRegion(String groupId, String regionId) async {
     try {
       // First get the current group
       final group = await fetchGroupById(groupId);
-      
+
       // Update the group with the new region ID
       final response = await _httpClient.put(
         ApiEndpoints.updateGroup(groupId),
         body: jsonEncode({
           'name': group.name,
           'description': group.description,
-          'group_admin_id': group.group_admin!.isNotEmpty ? group.group_admin : null,
+          'group_admin_id':
+              group.group_admin!.isNotEmpty ? group.group_admin : null,
           'region_id': regionId,
         }),
       );
-      
+
       return response.statusCode == 200;
     } catch (e) {
       throw Exception("Failed to assign group to region: $e");
     }
   }
-  
+
   // Remove group from region
   Future<bool> removeGroupFromRegion(String groupId) async {
     try {
       // First get the current group
       final group = await fetchGroupById(groupId);
-      
+
       // Update the group with null region ID
       final response = await _httpClient.put(
         ApiEndpoints.updateGroup(groupId),
         body: jsonEncode({
           'name': group.name,
           'description': group.description,
-          'group_admin_id': group.group_admin!.isNotEmpty ? group.group_admin : null,
+          'group_admin_id':
+              group.group_admin!.isNotEmpty ? group.group_admin : null,
           'region_id': null, // Remove region ID
         }),
       );
-      
+
       return response.statusCode == 200;
     } catch (e) {
       throw Exception("Failed to remove group from region: $e");
     }
-}
+  }
 
-  Future<Map<String, dynamic>> fetchGroupAttendancePercentage(String groupId) async {
+  Future<Map<String, dynamic>> fetchGroupAttendancePercentage(
+    String groupId,
+  ) async {
     try {
       final response = await _httpClient.get(
-        ApiEndpoints.getGroupAttendancePercentage(groupId)
+        ApiEndpoints.getGroupAttendancePercentage(groupId),
       );
 
       if (response.statusCode == 200) {

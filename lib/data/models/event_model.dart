@@ -2,6 +2,9 @@ class EventModel {
   /// After this duration from [dateTime], attendance and event changes are locked.
   static const Duration attendanceLockDuration = Duration(hours: 24);
 
+  /// Leadership events have a longer locking period (7 days) or can be unlocked
+  static const Duration leadershipAttendanceLockDuration = Duration(days: 7);
+
   String id;
   String title;
   String description;
@@ -28,11 +31,15 @@ class EventModel {
     this.invitedCount,
   });
 
-  /// True if more than 24 hours have passed since the event start; attendance and edits are then locked.
+  /// True if more than 24 hours have passed since the event start for regular events.
+  /// Leadership events are never locked for attendance marking.
   bool get isAttendanceLocked {
-    return DateTime.now().isAfter(
-      dateTime.add(EventModel.attendanceLockDuration),
-    );
+    // Leadership events are never locked for attendance marking
+    if (isLeadershipEvent) {
+      return false;
+    }
+
+    return DateTime.now().isAfter(dateTime.add(attendanceLockDuration));
   }
 
   bool get isLeadershipEvent => tag == 'leadership';

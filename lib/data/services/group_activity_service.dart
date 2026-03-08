@@ -9,20 +9,41 @@ class GroupActivityService {
   /// Duration without an event before a group is considered inactive.
   static const Duration inactivityThreshold = Duration(days: 45);
 
+  /// Cache duration - activity status is cached for 1 hour
+  static const Duration _cacheDuration = Duration(hours: 1);
+
   final EventServices _eventServices = EventServices();
+  final Map<String, _CachedResult> _cache = {};
 
   /// Returns true if the group is inactive: no event in the last 1.5 months from the most recent event.
   /// Groups with no events at all are also considered inactive.
+  /// Results are cached for 1 hour to improve performance.
   Future<bool> isGroupInactive(String groupId) async {
+    // Check cache first
+    final cached = _cache[groupId];
+    if (cached != null &&
+        DateTime.now().difference(cached.timestamp) < _cacheDuration) {
+      return cached.isInactive;
+    }
+
+    // Calculate fresh result
     final pastEvents = await _eventServices.getPastEvents(groupId);
-    if (pastEvents.isEmpty) return true;
+    if (pastEvents.isEmpty) {
+      _cache[groupId] = _CachedResult(true, DateTime.now());
+      return true;
+    }
 
     pastEvents.sort((a, b) => b.dateTime.compareTo(a.dateTime));
     final lastEvent = pastEvents.first;
     final now = DateTime.now();
     final daysSinceLastEvent = now.difference(lastEvent.dateTime).inDays;
 
-    return daysSinceLastEvent > inactivityThreshold.inDays;
+    final isInactive = daysSinceLastEvent > inactivityThreshold.inDays;
+
+    // Cache the result
+    _cache[groupId] = _CachedResult(isInactive, DateTime.now());
+
+    return isInactive;
   }
 
   /// Returns the last event date for the group, or null if no events.
@@ -44,4 +65,17 @@ class GroupActivityService {
       'lastEventDate': lastEvent,
     };
   }
+
+  /// Clear the cache - useful for testing or when fresh data is needed
+  void clearCache() {
+    _cache.clear();
+  }
+}
+
+/// Internal class to cache activity check results
+class _CachedResult {
+  final bool isInactive;
+  final DateTime timestamp;
+
+  _CachedResult(this.isInactive, this.timestamp);
 }

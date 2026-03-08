@@ -12,6 +12,7 @@ import 'package:group_management_church_app/features/super_admin/screens/analyti
 import 'package:group_management_church_app/features/super_admin/user_management_tab.dart';
 import 'package:group_management_church_app/features/region_manager/region_details_screen.dart';
 import 'package:group_management_church_app/widgets/custom_app_bar.dart';
+import 'package:group_management_church_app/widgets/more_options_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
@@ -29,6 +30,7 @@ import '../../data/providers/analytics_providers/super_admin_analytics_provider.
 import 'package:flutter/foundation.dart';
 import '../../widgets/removed_members_list.dart';
 import '../../data/services/member_removal_service.dart';
+import '../../data/services/group_activity_service.dart';
 
 import 'event_management_screen.dart';
 import 'recent_events_screen.dart';
@@ -207,6 +209,18 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   }
 
   void _onItemTapped(int index) {
+    if (index == 4) {
+      // More tab
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder:
+              (context) => const MoreOptionsScreen(userRole: 'super_admin'),
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _selectedIndex = index;
     });
@@ -238,10 +252,6 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           _buildUserManagementTab(),
           _buildGroupAdministrationTab(),
           _buildEventsTab(),
-          _buildRegionManagerTab(),
-          _buildRemovedMembersTab(),
-          _buildAnalyticsTab(),
-          _buildSettingsTab(),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
@@ -254,19 +264,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Users'),
           BottomNavigationBarItem(icon: Icon(Icons.groups), label: 'Groups'),
           BottomNavigationBarItem(icon: Icon(Icons.event), label: "Events"),
-          BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Regions'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_remove),
-            label: 'Removed Members',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.analytics),
-            label: 'Analytics',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings),
-            label: 'Settings',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.more_horiz), label: 'More'),
         ],
         currentIndex: _selectedIndex,
         selectedItemColor: AppColors.primaryColor,
@@ -338,7 +336,24 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
             children: [
               _buildWelcomeCard(),
               const SizedBox(height: 24),
-              _buildStatisticsGrid(),
+              FutureBuilder<Widget>(
+                future: _buildStatisticsGrid(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  } else if (snapshot.hasError) {
+                    return Center(
+                      child: Text(
+                        'Error loading statistics: ${snapshot.error}',
+                      ),
+                    );
+                  } else if (snapshot.hasData) {
+                    return snapshot.data!;
+                  } else {
+                    return const SizedBox.shrink();
+                  }
+                },
+              ),
               const SizedBox(height: 24),
               _buildOverallAttendanceCard(),
               const SizedBox(height: 24),
@@ -798,11 +813,14 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     );
   }
 
-  Widget _buildStatisticsGrid() {
+  Future<Widget> _buildStatisticsGrid() async {
     String totalUsers = '0';
     String totalGroups = '0';
     String totalEvents = '0';
     String recentEventsCount = '0';
+    String overallAttendance = '0%';
+    String activeGroups = '0';
+    String inactiveGroups = '0';
 
     try {
       totalUsers = _dashboardSummary['totalUsers']?.toString() ?? '0';
@@ -877,6 +895,57 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         recentEventsCount = recentEvents.length.toString();
       }
 
+      // OVERALL ATTENDANCE
+      if (_overallAttendance > 0) {
+        overallAttendance = '${_overallAttendance.toStringAsFixed(1)}%';
+      }
+
+      // ACTIVE/INACTIVE GROUPS - Using real data from GroupActivityService
+      if (totalGroups != '0') {
+        try {
+          final groupProvider = Provider.of<GroupProvider>(
+            context,
+            listen: false,
+          );
+          final groups = groupProvider.groups;
+
+          if (groups.isNotEmpty) {
+            final groupActivityService = GroupActivityService();
+            int activeCount = 0;
+            int inactiveCount = 0;
+
+            // Check activity status for all groups
+            for (final group in groups) {
+              try {
+                final isInactive = await groupActivityService.isGroupInactive(
+                  group.id,
+                );
+                if (isInactive) {
+                  inactiveCount++;
+                } else {
+                  activeCount++;
+                }
+              } catch (e) {
+                // Default to inactive if there's an error
+                inactiveCount++;
+              }
+            }
+
+            activeGroups = activeCount.toString();
+            inactiveGroups = inactiveCount.toString();
+          } else {
+            // No groups available - show zeros instead of placeholder values
+            activeGroups = '0';
+            inactiveGroups = '0';
+          }
+        } catch (e) {
+          // Error occurred - show zeros instead of placeholder values
+          activeGroups = '0';
+          inactiveGroups = '0';
+          print('Error calculating group activity: $e');
+        }
+      }
+
       print(
         'Statistics values: Users=$totalUsers, Groups=$totalGroups, Events=$totalEvents, RecentEvents=$recentEventsCount',
       );
@@ -931,23 +1000,24 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
             );
           },
         ),
-        // _buildStatCard(
-        //   'Recent Events',
-        //   recentEventsCount,
-        //   Icons.history,
-        //   AppColors.buttonColor,
-        //   onTap: () {
-        //     final recentEvents = _dashboardSummary['recentEvents'] as List<dynamic>? ?? [];
-        //     Navigator.push(
-        //       context,
-        //       MaterialPageRoute(
-        //         builder: (context) => RecentEventsScreen(
-        //           recentEvents: recentEvents,
-        //         ),
-        //       ),
-        //     );
-        //   },
-        // ),
+        _buildStatCard(
+          'Overall Attendance',
+          overallAttendance,
+          Icons.trending_up,
+          Colors.green,
+        ),
+        _buildStatCard(
+          'Active Groups',
+          activeGroups,
+          Icons.group_work,
+          Colors.blue,
+        ),
+        _buildStatCard(
+          'Inactive Groups',
+          inactiveGroups,
+          Icons.group_off,
+          Colors.red,
+        ),
       ],
     );
   }

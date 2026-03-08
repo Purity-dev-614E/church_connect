@@ -1,6 +1,6 @@
 class ApiEndpoints {
   //   [ PRODUCTION FLAG]
-  static const bool _isProduction = true;
+  static const bool _isProduction = false;
 
   static const String _serverBaseUrl =
       'https://safari-backend-fgl3.onrender.com';

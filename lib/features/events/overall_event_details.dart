@@ -30,7 +30,8 @@ class OverallEventDetailsScreen extends StatefulWidget {
       _OverallEventDetailsScreenState();
 }
 
-class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
+class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen>
+    with SingleTickerProviderStateMixin {
   late Future<Map<String, dynamic>> _eventDataFuture;
   final TextEditingController _searchController = TextEditingController();
   List<UserModel> _searchResults = [];
@@ -41,19 +42,26 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
   EventModel? _event;
   List<Map<String, dynamic>> _attendees = [];
   List<Map<String, dynamic>> _nonAttendees = [];
+  List<Map<String, dynamic>> _nonAttendeesWithApology = [];
+  List<Map<String, dynamic>> _nonAttendeesWithoutApology = [];
   List<UserModel> _groupMembers = [];
   bool _isLoading = true;
   String? _error;
 
+  // Tab controller for absentees
+  late TabController _absenteesTabController;
+
   @override
   void initState() {
     super.initState();
+    _absenteesTabController = TabController(length: 2, vsync: this);
     _loadEventData();
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _absenteesTabController.dispose();
     super.dispose();
   }
 
@@ -75,6 +83,21 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
             (data['nonAttendees'] as List<dynamic>)
                 .map((e) => e as Map<String, dynamic>)
                 .toList();
+
+        // Split non-attendees by apology status
+        _nonAttendeesWithApology =
+            _nonAttendees.where((record) {
+              final attendance = record['attendance'] as AttendanceModel;
+              return attendance.apology != null &&
+                  attendance.apology!.isNotEmpty;
+            }).toList();
+
+        _nonAttendeesWithoutApology =
+            _nonAttendees.where((record) {
+              final attendance = record['attendance'] as AttendanceModel;
+              return attendance.apology == null || attendance.apology!.isEmpty;
+            }).toList();
+
         _groupMembers =
             (data['groupMembers'] as List<dynamic>)
                 .map((e) => e as UserModel)
@@ -431,6 +454,19 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
         _attendees.add({'user': user, 'attendance': attendance});
       } else {
         _nonAttendees.add({'user': user, 'attendance': attendance});
+
+        // Also update the split lists
+        if (apology != null && apology.isNotEmpty) {
+          _nonAttendeesWithApology.add({
+            'user': user,
+            'attendance': attendance,
+          });
+        } else {
+          _nonAttendeesWithoutApology.add({
+            'user': user,
+            'attendance': attendance,
+          });
+        }
       }
     });
   }
@@ -539,7 +575,7 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
                         Padding(
                           padding: const EdgeInsets.only(bottom: 8.0),
                           child: Text(
-                            'Attendance cannot be changed after 24 hours from the event start.',
+                            'Attendance cannot be changed after 24 hours from the event start.\nNote: Leadership events can always be updated.',
                             style: TextStyles.bodyText.copyWith(
                               color: Theme.of(
                                 context,
@@ -566,7 +602,75 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
                       'Non-Attendees (${_nonAttendees.length})',
                       Icons.cancel,
                     ),
-                    _buildUserList(_nonAttendees, isAttendee: false),
+                    if (_nonAttendees.isNotEmpty) ...[
+                      Container(
+                        height: 400,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surface,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          children: [
+                            Container(
+                              height: 50,
+                              decoration: BoxDecoration(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.primaryContainer.withOpacity(0.1),
+                                borderRadius: const BorderRadius.only(
+                                  topLeft: Radius.circular(12),
+                                  topRight: Radius.circular(12),
+                                ),
+                              ),
+                              child: TabBar(
+                                controller: _absenteesTabController,
+                                labelColor:
+                                    Theme.of(context).colorScheme.onSurface,
+                                unselectedLabelColor: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withOpacity(0.6),
+                                indicator: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  borderRadius: const BorderRadius.only(
+                                    topLeft: Radius.circular(10),
+                                    topRight: Radius.circular(10),
+                                  ),
+                                ),
+                                tabs: const [
+                                  Tab(
+                                    text: 'With Apology',
+                                    icon: Icon(Icons.note_alt, size: 16),
+                                  ),
+                                  Tab(
+                                    text: 'No Apology',
+                                    icon: Icon(Icons.person_off, size: 16),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Expanded(
+                              child: TabBarView(
+                                controller: _absenteesTabController,
+                                children: [
+                                  // Tab 1: With Apology
+                                  _buildUserList(
+                                    _nonAttendeesWithApology,
+                                    isAttendee: false,
+                                    showApology: true,
+                                  ),
+                                  // Tab 2: Without Apology
+                                  _buildUserList(
+                                    _nonAttendeesWithoutApology,
+                                    isAttendee: false,
+                                    showApology: false,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -588,7 +692,7 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'Attendance and changes are locked 24 hours after the event start time.',
+              'Attendance and changes are locked 24 hours after the event start time.\nNote: Leadership events can always be updated.',
               style: TextStyles.bodyText.copyWith(
                 color: Colors.orange.shade900,
                 fontWeight: FontWeight.w500,
@@ -760,6 +864,7 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
   Widget _buildUserList(
     List<Map<String, dynamic>> users, {
     required bool isAttendee,
+    bool showApology = false,
   }) {
     if (users.isEmpty) {
       return Card(
@@ -892,10 +997,11 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen> {
                             ),
                           ]
                           : [
-                            _buildDetailItem(
-                              'Apology',
-                              attendance.apology ?? 'No apology provided',
-                            ),
+                            if (showApology)
+                              _buildDetailItem(
+                                'Apology',
+                                attendance.apology ?? 'No apology provided',
+                              ),
                           ],
                 ),
               ),

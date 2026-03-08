@@ -3,6 +3,7 @@ import 'package:group_management_church_app/data/services/group_creation_service
 import 'package:group_management_church_app/data/models/region_model.dart';
 import 'package:group_management_church_app/core/constants/colors.dart';
 import 'package:group_management_church_app/core/constants/text_styles.dart';
+import 'package:group_management_church_app/core/utils/role_utils.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
 
 class CreateGroupDialog extends StatefulWidget {
@@ -64,11 +65,16 @@ class _CreateGroupDialogState extends State<CreateGroupDialog> {
     }
   }
 
-  bool get _needsRegionSelection =>
-      ['super admin', 'root'].contains(widget.userRole.toLowerCase());
+  bool get _needsRegionSelection {
+    final normalizedRole = RoleUtils.normalize(widget.userRole);
+    return RoleUtils.isSuperAdmin(normalizedRole) ||
+        RoleUtils.isRoot(normalizedRole);
+  }
 
-  bool get _isRegionalManager =>
-      widget.userRole.toLowerCase() == 'regional manager';
+  bool get _isRegionalManager {
+    final normalizedRole = RoleUtils.normalize(widget.userRole);
+    return RoleUtils.isRegionalLeadership(normalizedRole);
+  }
 
   void _showError(String message) {
     CustomNotification.show(

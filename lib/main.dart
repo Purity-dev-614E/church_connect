@@ -23,6 +23,7 @@ import 'package:group_management_church_app/core/constants/app_flags.dart';
 import 'package:group_management_church_app/features/maintenance/maintenance_screen.dart';
 
 import 'features/auth/SignupFlowWrapper.dart';
+import 'features/auth/password_reset_handler.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -117,6 +118,7 @@ class MyApp extends StatelessWidget {
           '/login': (context) => const LoginScreen(),
           '/signup': (context) => const SignUpFlowWrapper(),
           '/reset-password': (context) => const ResetPasswordScreen(),
+          '/reset-password-handler': (context) => const PasswordResetHandler(),
           '/new-password': (context) {
             // Extract tokens from URL if coming from email link
             final uri = Uri.base;

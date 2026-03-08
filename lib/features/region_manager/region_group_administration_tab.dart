@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:group_management_church_app/data/providers/user_provider.dart';
 import 'package:group_management_church_app/data/providers/group_provider.dart';
+import 'package:group_management_church_app/data/providers/event_provider.dart';
 import 'package:group_management_church_app/data/models/group_model.dart';
 import 'package:group_management_church_app/data/models/user_model.dart';
 import 'package:group_management_church_app/core/constants/colors.dart';
@@ -440,9 +441,21 @@ class _RegionGroupAdministrationTabState
                         }
 
                         final data = snapshot.data!;
+                        final status = data['status'] ?? 'N/A';
                         final percentage =
                             data['percentage']?.toStringAsFixed(1) ?? '0.0';
-                        final status = data['status'] ?? 'N/A';
+
+                        // Handle leadership-only events differently
+                        if (status == 'Leadership Only') {
+                          return _buildGroupStat(
+                            'Leadership',
+                            'Notify Only',
+                            Icons.notifications,
+                            onTap: () {
+                              // Optional: Navigate to leadership event details
+                            },
+                          );
+                        }
 
                         return _buildGroupStat(
                           'Attendance',
@@ -536,6 +549,30 @@ class _RegionGroupAdministrationTabState
 
   Future<Map<String, dynamic>> _getGroupAttendance(String groupId) async {
     try {
+      // Get all events for the group including leadership events
+      final eventProvider = Provider.of<EventProvider>(context, listen: false);
+      final groupEvents = await eventProvider.fetchEventsByGroup(groupId);
+      final leadershipEvents = await eventProvider.fetchLeadershipEvents();
+      final allEvents = [...groupEvents, ...leadershipEvents];
+
+      // Filter out leadership events from attendance calculation
+      final regularEvents =
+          allEvents.where((event) => !event.isLeadershipEvent).toList();
+
+      if (regularEvents.isEmpty) {
+        // Check if there are only leadership events
+        if (allEvents.isNotEmpty &&
+            allEvents.every((event) => event.isLeadershipEvent)) {
+          return {
+            'status': 'Leadership Only',
+            'percentage': 0.0,
+            'message': 'Leadership meetings notify participants only',
+          };
+        }
+        return {'status': 'No Events', 'percentage': 0.0};
+      }
+
+      // Calculate attendance for regular events only
       final data = await GroupServices().fetchGroupAttendancePercentage(
         groupId,
       );

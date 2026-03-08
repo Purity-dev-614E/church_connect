@@ -4,6 +4,7 @@ import 'package:group_management_church_app/data/services/auth_services.dart';
 import 'package:group_management_church_app/data/services/user_services.dart';
 import 'package:group_management_church_app/data/providers/region_provider.dart';
 import 'package:group_management_church_app/data/models/region_model.dart';
+import 'package:group_management_church_app/core/utils/role_utils.dart';
 import 'package:flutter/material.dart';
 
 class GroupCreationService {
@@ -32,7 +33,8 @@ class GroupCreationService {
       }
 
       // Validate role permissions
-      if (!_canCreateGroup(userRole)) {
+      final normalizedRole = RoleUtils.normalize(userRole);
+      if (!_canCreateGroup(normalizedRole)) {
         throw Exception('User does not have permission to create groups');
       }
 
@@ -44,7 +46,8 @@ class GroupCreationService {
       };
 
       // Handle region_id based on user role
-      if (['super admin', 'root'].contains(userRole.toLowerCase())) {
+      if (RoleUtils.isSuperAdmin(normalizedRole) ||
+          RoleUtils.isRoot(normalizedRole)) {
         // Super admin & root must specify region_id
         if (regionId == null || regionId.isEmpty) {
           throw Exception(
@@ -52,7 +55,7 @@ class GroupCreationService {
           );
         }
         body['region_id'] = regionId;
-      } else if (userRole.toLowerCase() == 'regional manager') {
+      } else if (RoleUtils.isRegionalLeadership(normalizedRole)) {
         // Regional manager gets auto-assigned region
         final userRegionId = await _getUserRegionId();
         if (userRegionId == null) {
@@ -102,9 +105,9 @@ class GroupCreationService {
   }
 
   /// Check if user role can create groups
-  bool _canCreateGroup(String userRole) {
-    final allowedRoles = ['regional manager', 'super admin', 'root', 'admin'];
-    return allowedRoles.contains(userRole.toLowerCase());
+  bool _canCreateGroup(String normalizedRole) {
+    final allowedRoles = ['regional manager', 'super_admin', 'root'];
+    return allowedRoles.contains(normalizedRole);
   }
 
   /// Get the current user's region ID (for regional managers)
@@ -162,7 +165,8 @@ class GroupCreationService {
         'canCreateGroup': userRole != null ? _canCreateGroup(userRole) : false,
         'needsRegionSelection':
             userRole != null
-                ? ['super admin', 'root'].contains(userRole.toLowerCase())
+                ? RoleUtils.isSuperAdmin(RoleUtils.normalize(userRole)) ||
+                    RoleUtils.isRoot(RoleUtils.normalize(userRole))
                 : false,
       };
     } catch (e) {

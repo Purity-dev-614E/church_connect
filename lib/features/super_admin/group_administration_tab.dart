@@ -610,8 +610,18 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
                           );
                         }
 
-                        final percentage =
-                            snapshot.data!['percentage'] as double? ?? 0.0;
+                        final data = snapshot.data!;
+                        final status = data['status'] as String? ?? 'No Data';
+                        final percentage = data['percentage'] as double? ?? 0.0;
+
+                        // Handle leadership-only events differently
+                        if (status == 'Leadership Only') {
+                          return _buildGroupStat(
+                            'Leadership',
+                            'Notify Only',
+                            Icons.notifications,
+                          );
+                        }
 
                         return _buildGroupStat(
                           'Attendance',
@@ -827,6 +837,30 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
 
   Future<Map<String, dynamic>> _getGroupAttendance(String groupId) async {
     try {
+      // Get all events for the group including leadership events
+      final eventProvider = Provider.of<EventProvider>(context, listen: false);
+      final groupEvents = await eventProvider.fetchEventsByGroup(groupId);
+      final leadershipEvents = await eventProvider.fetchLeadershipEvents();
+      final allEvents = [...groupEvents, ...leadershipEvents];
+
+      // Filter out leadership events from attendance calculation
+      final regularEvents =
+          allEvents.where((event) => !event.isLeadershipEvent).toList();
+
+      if (regularEvents.isEmpty) {
+        // Check if there are only leadership events
+        if (allEvents.isNotEmpty &&
+            allEvents.every((event) => event.isLeadershipEvent)) {
+          return {
+            'status': 'Leadership Only',
+            'percentage': 0.0,
+            'message': 'Leadership meetings notify participants only',
+          };
+        }
+        return {'status': 'No Events', 'percentage': 0.0};
+      }
+
+      // Calculate attendance for regular events only
       final data = await GroupServices().fetchGroupAttendancePercentage(
         groupId,
       );
