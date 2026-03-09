@@ -37,9 +37,6 @@ class _RegionManagerAnalyticsScreenState
   Map<String, double> _activityStatusData = {};
   int? _touchedGroupIndex;
 
-
-
-
   @override
   void initState() {
     super.initState();
@@ -148,13 +145,12 @@ class _RegionManagerAnalyticsScreenState
       final attendanceStats = await _analyticsProvider
           .getAttendanceByPeriodForRegion(periodForApi, widget.regionId);
 
-      final dailyStats = List.of(attendanceStats.dailyStats)
-        ..sort((a, b) {
-          final aDate = DateTime.tryParse(a.date);
-          final bDate = DateTime.tryParse(b.date);
-          if (aDate == null || bDate == null) return 0;
-          return aDate.compareTo(bDate);
-        });
+      final dailyStats = List.of(attendanceStats.dailyStats)..sort((a, b) {
+        final aDate = DateTime.tryParse(a.date);
+        final bDate = DateTime.tryParse(b.date);
+        if (aDate == null || bDate == null) return 0;
+        return aDate.compareTo(bDate);
+      });
 
       List<double> timeline =
           dailyStats.map((stat) => stat.attendanceRate).toList();
@@ -333,8 +329,9 @@ class _RegionManagerAnalyticsScreenState
                     final service = attendance_services.AttendanceService(
                       ApiEndpoints.baseUrl,
                     );
-                    final provider =
-                        attendance_overview.AttendanceProvider(service);
+                    final provider = attendance_overview.AttendanceProvider(
+                      service,
+                    );
                     // Load initial data for this region scope
                     provider.loadData(
                       scope: 'region',
@@ -343,23 +340,24 @@ class _RegionManagerAnalyticsScreenState
                     return provider;
                   },
                   child: Builder(
-                    builder: (innerContext) => SingleChildScrollView(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          buildScopedAttendanceChart(
-                            context: innerContext,
-                            scope: 'region',
-                            regionId: widget.regionId,
+                    builder:
+                        (innerContext) => SingleChildScrollView(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              buildScopedAttendanceChart(
+                                context: innerContext,
+                                scope: 'region',
+                                regionId: widget.regionId,
+                              ),
+                              const SizedBox(height: 16),
+                              _buildGroupAttendanceChart(_groupAttendanceData),
+                              const SizedBox(height: 16),
+                              _buildActivityStatusChart(_activityStatusData),
+                            ],
                           ),
-                          const SizedBox(height: 16),
-                          _buildGroupAttendanceChart(_groupAttendanceData),
-                          const SizedBox(height: 16),
-                          _buildActivityStatusChart(_activityStatusData),
-                        ],
-                      ),
-                    ),
+                        ),
                   ),
                 ),
               ],
@@ -372,6 +370,12 @@ class _RegionManagerAnalyticsScreenState
 
   Widget _buildQuickStatsCard(Set<Object> quickStats) {
     final stats = quickStats.toList();
+
+    // Ensure we have at least 4 elements, pad with zeros if needed
+    while (stats.length < 4) {
+      stats.add(0);
+    }
+
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -423,16 +427,6 @@ class _RegionManagerAnalyticsScreenState
             const SizedBox(height: 16),
             Row(
               children: [
-                Expanded(
-                  child: _buildStatCard(
-                    'Total Members',
-                    stats[2].toString(),
-                    Icons.people,
-                    AppColors.accentColor,
-                    'Active members',
-                  ),
-                ),
-                const SizedBox(width: 16),
                 Expanded(
                   child: _buildStatCard(
                     'Attendance Rate',
@@ -616,17 +610,17 @@ class _RegionManagerAnalyticsScreenState
           labels: attendanceProvider.chartLabels,
           values: attendanceProvider.chartRates,
           isLoading: attendanceProvider.loading,
-          onPeriodChange: (p) => attendanceProvider.changePeriod(
-            p!,
-            scope: scope,
-            regionId: regionId,
-            groupId: groupId,
-          ),
+          onPeriodChange:
+              (p) => attendanceProvider.changePeriod(
+                p!,
+                scope: scope,
+                regionId: regionId,
+                groupId: groupId,
+              ),
         ),
       ],
     );
   }
-
 
   Widget _buildPeriodSelector() {
     return Card(
@@ -644,7 +638,10 @@ class _RegionManagerAnalyticsScreenState
               items: const [
                 DropdownMenuItem(value: 'week', child: Text('Weekly')),
                 DropdownMenuItem(value: 'month', child: Text('Monthly')),
-                DropdownMenuItem(value: 'quarter', child: Text('Quarterly')), // ✅ new
+                DropdownMenuItem(
+                  value: 'quarter',
+                  child: Text('Quarterly'),
+                ), // ✅ new
                 DropdownMenuItem(value: 'year', child: Text('Yearly')),
               ],
               onChanged: (value) {
@@ -652,8 +649,7 @@ class _RegionManagerAnalyticsScreenState
                 setState(() => _selectedPeriod = value);
                 _loadAnalytics();
               },
-            )
-
+            ),
           ],
         ),
       ),
@@ -752,7 +748,9 @@ class _RegionManagerAnalyticsScreenState
                       BarChartData(
                         alignment: BarChartAlignment.start,
                         maxY: 100,
-                        gridData: const FlGridData(show: false), // no grid lines
+                        gridData: const FlGridData(
+                          show: false,
+                        ), // no grid lines
                         borderData: FlBorderData(
                           show: true,
                           border: const Border(
@@ -821,8 +819,11 @@ class _RegionManagerAnalyticsScreenState
                               );
                             },
                           ),
-// update touched index on touch events
-                          touchCallback: (FlTouchEvent event, BarTouchResponse? response) {
+                          // update touched index on touch events
+                          touchCallback: (
+                            FlTouchEvent event,
+                            BarTouchResponse? response,
+                          ) {
                             if (response == null || response.spot == null) {
                               if (_touchedGroupIndex != null) {
                                 setState(() {
@@ -831,7 +832,8 @@ class _RegionManagerAnalyticsScreenState
                               }
                               return;
                             }
-                            final touchedIndex = response.spot!.touchedBarGroupIndex;
+                            final touchedIndex =
+                                response.spot!.touchedBarGroupIndex;
                             if (_touchedGroupIndex != touchedIndex) {
                               setState(() {
                                 _touchedGroupIndex = touchedIndex;
@@ -839,30 +841,38 @@ class _RegionManagerAnalyticsScreenState
                             }
                           },
                         ),
-                        barGroups: entries.asMap().entries.map((e) {
-                          final int index = e.key;
-                          final MapEntry<String, double> entry = e.value;
-                          final bool isTouched = _touchedGroupIndex != null && _touchedGroupIndex == index;
-                          final double barWidth = isTouched ? baseBarWidth + 8 : baseBarWidth;
-                          final Color color = isTouched ? AppColors.primaryColor : AppColors.secondaryColor;
-                          return BarChartGroupData(
-                            x: index,
-                            barsSpace: spacing / 2,
-                            barRods: [
-                              BarChartRodData(
-                                toY: entry.value,
-                                width: barWidth,
-                                color: color,
-                                borderRadius: BorderRadius.circular(6),
-                                backDrawRodData: BackgroundBarChartRodData(
-                                  show: true,
-                                  toY: 100,
-                                  color: AppColors.secondaryColor.withOpacity(0.06),
-                                ),
-                              ),
-                            ],
-                          );
-                        }).toList(),
+                        barGroups:
+                            entries.asMap().entries.map((e) {
+                              final int index = e.key;
+                              final MapEntry<String, double> entry = e.value;
+                              final bool isTouched =
+                                  _touchedGroupIndex != null &&
+                                  _touchedGroupIndex == index;
+                              final double barWidth =
+                                  isTouched ? baseBarWidth + 8 : baseBarWidth;
+                              final Color color =
+                                  isTouched
+                                      ? AppColors.primaryColor
+                                      : AppColors.secondaryColor;
+                              return BarChartGroupData(
+                                x: index,
+                                barsSpace: spacing / 2,
+                                barRods: [
+                                  BarChartRodData(
+                                    toY: entry.value,
+                                    width: barWidth,
+                                    color: color,
+                                    borderRadius: BorderRadius.circular(6),
+                                    backDrawRodData: BackgroundBarChartRodData(
+                                      show: true,
+                                      toY: 100,
+                                      color: AppColors.secondaryColor
+                                          .withOpacity(0.06),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }).toList(),
                       ),
                       swapAnimationDuration: const Duration(milliseconds: 400),
                     ),
@@ -875,7 +885,6 @@ class _RegionManagerAnalyticsScreenState
       ),
     );
   }
-
 
   Widget _buildActivityStatusChart(Map<String, double> activityStatus) {
     return Card(

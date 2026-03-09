@@ -5,8 +5,9 @@ import 'package:group_management_church_app/features/super_admin/dashboard_clean
 import 'package:group_management_church_app/features/region_manager/region_dashboard.dart';
 import 'package:group_management_church_app/features/super_admin/screens/analytics_screen.dart';
 import 'package:group_management_church_app/features/region_manager/screens/analytics_screen.dart';
-import 'package:group_management_church_app/widgets/removed_members_list.dart';
 import 'package:group_management_church_app/widgets/region_removed_members_list.dart';
+import 'package:group_management_church_app/widgets/removed_members_list.dart';
+// import 'package:group_management_church_app/features/super_admin/screens/removed_events_screen.dart';
 
 class MoreOptionsScreen extends StatelessWidget {
   final String userRole;
@@ -52,9 +53,7 @@ class MoreOptionsScreen extends StatelessWidget {
           'Main dashboard overview',
           () => Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (_) => const SuperAdminDashboard(),
-            ),
+            MaterialPageRoute(builder: (_) => const SuperAdminDashboard()),
           ),
         ),
         const SizedBox(height: 12),
@@ -65,12 +64,11 @@ class MoreOptionsScreen extends StatelessWidget {
           'Manage regions and regional managers',
           () {
             // Navigate to Super Admin Dashboard and switch to Regions tab
-            Navigator.pushAndRemoveUntil(
+            Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => const SuperAdminDashboard(),
+                builder: (_) => const SuperAdminDashboard(initialTabIndex: 2),
               ),
-              (route) => false,
             );
           },
         ),
@@ -81,16 +79,40 @@ class MoreOptionsScreen extends StatelessWidget {
           Icons.person_remove,
           'View and manage removed members',
           () {
-            // Navigate to Super Admin Dashboard and switch to Removed Members tab
-            Navigator.pushAndRemoveUntil(
+            Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => const SuperAdminDashboard(),
+                builder:
+                    (_) => Scaffold(
+                      appBar: AppBar(
+                        title: const Text('Removed Members'),
+                        backgroundColor: AppColors.primaryColor,
+                        foregroundColor: Colors.white,
+                      ),
+                      body: const RemovedMembersList(
+                        groupId: '', // Super admin sees all removed members
+                        userRole: 'super_admin',
+                        showRestoreButton: true,
+                        showStats: true,
+                      ),
+                    ),
               ),
-              (route) => false,
             );
           },
         ),
+        const SizedBox(height: 12),
+        // _buildOptionCard(
+        //   context,
+        //   'Removed Events',
+        //   Icons.event_busy,
+        //   'View removed events information',
+        //   () {
+        //     Navigator.push(
+        //       context,
+        //       MaterialPageRoute(builder: (_) => const RemovedEventsScreen()),
+        //     );
+        //   },
+        // ),
         const SizedBox(height: 12),
         _buildOptionCard(
           context,
@@ -98,13 +120,12 @@ class MoreOptionsScreen extends StatelessWidget {
           Icons.analytics,
           'View detailed analytics and reports',
           () {
-            // Navigate to Super Admin Dashboard and switch to Analytics tab
-            Navigator.pushAndRemoveUntil(
+            // Navigate to Analytics screen directly
+            Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => const SuperAdminDashboard(),
+                builder: (_) => const SuperAdminAnalyticsScreen(),
               ),
-              (route) => false,
             );
           },
         ),
@@ -115,13 +136,12 @@ class MoreOptionsScreen extends StatelessWidget {
           Icons.settings,
           'App settings and preferences',
           () {
-            // Navigate to Super Admin Dashboard and switch to Settings tab
-            Navigator.pushAndRemoveUntil(
+            // Navigate to Super Admin Dashboard and switch to Events tab
+            Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => const SuperAdminDashboard(),
+                builder: (_) => const SuperAdminDashboard(initialTabIndex: 3),
               ),
-              (route) => false,
             );
           },
         ),
@@ -140,10 +160,11 @@ class MoreOptionsScreen extends StatelessWidget {
           () => Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => RegionDashboard(
-                regionId: regionId!,
-                actingAsSuperAdmin: actingAsSuperAdmin,
-              ),
+              builder:
+                  (_) => RegionDashboard(
+                    regionId: regionId!,
+                    actingAsSuperAdmin: actingAsSuperAdmin,
+                  ),
             ),
           ),
         ),
@@ -154,16 +175,25 @@ class MoreOptionsScreen extends StatelessWidget {
           Icons.person_remove,
           'View and manage removed members',
           () {
-            // Navigate to Region Dashboard and switch to Removed Members tab
-            Navigator.pushAndRemoveUntil(
+            Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => RegionDashboard(
-                  regionId: regionId!,
-                  actingAsSuperAdmin: actingAsSuperAdmin,
-                ),
+                builder:
+                    (_) => Scaffold(
+                      appBar: AppBar(
+                        title: const Text('Removed Members'),
+                        backgroundColor: AppColors.primaryColor,
+                        foregroundColor: Colors.white,
+                      ),
+                      body: RegionRemovedMembersList(
+                        regionId:
+                            regionId!, // Regional manager sees removed members from their region
+                        userRole: 'regional_manager',
+                        showRestoreButton: true,
+                        showStats: true,
+                      ),
+                    ),
               ),
-              (route) => false,
             );
           },
         ),
@@ -174,16 +204,13 @@ class MoreOptionsScreen extends StatelessWidget {
           Icons.analytics,
           'View detailed analytics and reports',
           () {
-            // Navigate to Region Dashboard and switch to Analytics tab
-            Navigator.pushAndRemoveUntil(
+            // Navigate to Regional Manager Analytics screen directly
+            Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => RegionDashboard(
-                  regionId: regionId!,
-                  actingAsSuperAdmin: actingAsSuperAdmin,
-                ),
+                builder:
+                    (_) => RegionManagerAnalyticsScreen(regionId: regionId!),
               ),
-              (route) => false,
             );
           },
         ),
@@ -194,16 +221,17 @@ class MoreOptionsScreen extends StatelessWidget {
           Icons.settings,
           'App settings and preferences',
           () {
-            // Navigate to Region Dashboard and switch to Settings tab
-            Navigator.pushAndRemoveUntil(
+            // Navigate to Region Dashboard and switch to Events tab
+            Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => RegionDashboard(
-                  regionId: regionId!,
-                  actingAsSuperAdmin: actingAsSuperAdmin,
-                ),
+                builder:
+                    (_) => RegionDashboard(
+                      regionId: regionId!,
+                      actingAsSuperAdmin: actingAsSuperAdmin,
+                      initialTabIndex: 3,
+                    ),
               ),
-              (route) => false,
             );
           },
         ),
@@ -220,9 +248,7 @@ class MoreOptionsScreen extends StatelessWidget {
   ) {
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
@@ -236,11 +262,7 @@ class MoreOptionsScreen extends StatelessWidget {
                   color: AppColors.primaryColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(
-                  icon,
-                  color: AppColors.primaryColor,
-                  size: 24,
-                ),
+                child: Icon(icon, color: AppColors.primaryColor, size: 24),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -263,10 +285,7 @@ class MoreOptionsScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(
-                Icons.chevron_right,
-                color: Colors.grey,
-              ),
+              const Icon(Icons.chevron_right, color: Colors.grey),
             ],
           ),
         ),

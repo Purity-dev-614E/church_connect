@@ -243,19 +243,45 @@ class GroupProvider extends ChangeNotifier {
     String regionId,
   ) async {
     try {
+      print('Fetching removed members for region: $regionId');
+
       // Get all groups in the region
       final regionGroups = await getGroupsByRegion(regionId);
+      print('Found ${regionGroups.length} groups in region');
+
+      if (regionGroups.isEmpty) {
+        print('No groups found in region, returning empty list');
+        return [];
+      }
+
       List<RemovedMemberModel> regionRemovedMembers = [];
 
       // Get removed members for each group in the region
       for (final group in regionGroups) {
-        final groupRemovedMembers = await getRemovedMembers(group.id);
-        regionRemovedMembers.addAll(groupRemovedMembers);
+        try {
+          print(
+            'Fetching removed members for group: ${group.id} (${group.name})',
+          );
+          final groupRemovedMembers = await getRemovedMembers(group.id);
+          print(
+            'Found ${groupRemovedMembers.length} removed members for group ${group.name}',
+          );
+          regionRemovedMembers.addAll(groupRemovedMembers);
+        } catch (groupError) {
+          print(
+            'Error fetching removed members for group ${group.id}: $groupError',
+          );
+          // Continue with other groups even if one fails
+          continue;
+        }
       }
 
+      print('Total removed members for region: ${regionRemovedMembers.length}');
       return regionRemovedMembers;
     } catch (error) {
+      print('Error fetching removed members for region $regionId: $error');
       _handleError('fetching removed members for region', error);
+      // Return empty list instead of throwing to prevent UI crashes
       return [];
     }
   }

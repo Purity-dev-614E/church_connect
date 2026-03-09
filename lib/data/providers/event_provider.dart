@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:group_management_church_app/core/constants/app_endpoints.dart';
 import 'package:group_management_church_app/data/models/event_model.dart';
 import 'package:group_management_church_app/data/models/participant_model.dart';
 import 'package:group_management_church_app/data/models/user_model.dart';
@@ -20,9 +21,11 @@ class EventProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
   String? _currentGroupId;
+  bool _isFetchingAll = false; // Flag to prevent multiple fetches
 
   // Getters
   List<EventModel> get events => _events;
+
   List<EventModel> get upcomingEvents => _upcomingEvents;
   List<EventModel> get pastEvents => _pastEvents;
   List<EventModel> get leadershipEvents => _leadershipEvents;
@@ -62,10 +65,13 @@ class EventProvider extends ChangeNotifier {
   Future<List<EventModel>> fetchOverallEvents() async {
     _setLoading(true);
     try {
-      _events = await _eventServices.getOverallEvents();
+      debugPrint('Fetching overall events from: ${ApiEndpoints.events}');
+      final events = await _eventServices.getOverallEvents();
       _errorMessage = null;
-      return _events;
+      debugPrint('Successfully fetched ${events.length} overall events');
+      return events;
     } catch (error) {
+      debugPrint('Error fetching overall events: $error');
       _handleError('fetching all events', error);
       return [];
     } finally {
@@ -459,9 +465,10 @@ class EventProvider extends ChangeNotifier {
   Future<List<EventModel>> fetchLeadershipEvents() async {
     _setLoading(true);
     try {
-      _leadershipEvents = await _eventServices.getLeadershipEvents();
+      final leadershipEvents = await _eventServices.getLeadershipEvents();
+      _leadershipEvents = leadershipEvents;
       _errorMessage = null;
-      return _leadershipEvents;
+      return leadershipEvents;
     } catch (error) {
       _handleError('fetching leadership events', error);
       return [];
@@ -518,11 +525,24 @@ class EventProvider extends ChangeNotifier {
 
   /// Get all events (both regular and leadership)
   Future<List<EventModel>> fetchAllEvents() async {
+    debugPrint('fetchAllEvents called - _isFetchingAll: $_isFetchingAll');
+
+    if (_isFetchingAll) {
+      debugPrint('Already fetching all events, skipping...');
+      return _events;
+    }
+
+    _isFetchingAll = true;
     _setLoading(true);
     try {
+      debugPrint('Starting to fetch all events...');
+
       // Load both regular and leadership events
       final regularEvents = await fetchOverallEvents();
+      debugPrint('Fetched ${regularEvents.length} regular events');
+
       final leadershipEvents = await fetchLeadershipEvents();
+      debugPrint('Fetched ${leadershipEvents.length} leadership events');
 
       // Combine and sort by date
       final allEvents = [...regularEvents, ...leadershipEvents];
@@ -530,12 +550,15 @@ class EventProvider extends ChangeNotifier {
 
       _events = allEvents;
       _errorMessage = null;
+      debugPrint('Successfully loaded ${allEvents.length} total events');
       return allEvents;
     } catch (error) {
+      debugPrint('Error in fetchAllEvents: $error');
       _handleError('fetching all events', error);
       return [];
     } finally {
       _setLoading(false);
+      _isFetchingAll = false;
     }
   }
 }

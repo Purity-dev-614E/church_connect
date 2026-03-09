@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:core';
 import 'package:group_management_church_app/core/constants/colors.dart';
 import 'package:group_management_church_app/core/constants/text_styles.dart';
 import 'package:group_management_church_app/data/models/group_model.dart';
@@ -20,9 +21,6 @@ import 'package:provider/provider.dart';
 import 'package:group_management_church_app/features/super_admin/dashboard_cleaned.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:share_plus/share_plus.dart';
 import '../../data/models/event_model.dart';
 import '../../data/providers/event_provider.dart';
 import '../../data/providers/group_provider.dart';
@@ -30,23 +28,20 @@ import '../../data/providers/user_provider.dart';
 import '../../data/providers/region_provider.dart';
 import '../../data/services/event_services.dart';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
 import 'package:group_management_church_app/data/services/auth_services.dart';
-import 'package:intl/intl.dart';
-import '../../widgets/region_removed_members_list.dart';
-import '../../data/services/member_removal_service.dart';
 import '../../data/services/group_activity_service.dart';
 import '../../data/providers/analytics_providers/regional_manager_analytics_provider.dart';
 
 class RegionDashboard extends StatefulWidget {
   final String regionId;
   final bool actingAsSuperAdmin;
+  final int initialTabIndex;
 
   const RegionDashboard({
     super.key,
     required this.regionId,
     this.actingAsSuperAdmin = false,
+    this.initialTabIndex = 0,
   });
 
   @override
@@ -55,7 +50,6 @@ class RegionDashboard extends StatefulWidget {
 
 class _RegionDashboardState extends State<RegionDashboard> {
   int _selectedIndex = 0;
-  final PageController _pageController = PageController();
 
   // Data from providers
   late RegionAnalyticsService _analyticsServices;
@@ -94,6 +88,7 @@ class _RegionDashboardState extends State<RegionDashboard> {
   @override
   void initState() {
     super.initState();
+    _selectedIndex = widget.initialTabIndex;
     try {
       _analyticsServices = RegionAnalyticsService(
         baseUrl: 'https://safari-backend-fgl3.onrender.com/api',
@@ -185,34 +180,6 @@ class _RegionDashboardState extends State<RegionDashboard> {
     ]);
   }
 
-  Future<void> _loadTabData(int tabIndex) async {
-    if (_loadedTabs.contains(tabIndex)) return;
-
-    try {
-      switch (tabIndex) {
-        case 1: // Users tab
-          await _loadRegionUsers();
-          break;
-        case 2: // Groups tab
-          await _loadRegionGroups();
-          break;
-        case 3: // Events tab
-          await _loadRegionEvents();
-          break;
-        case 4: // Removed Members tab
-          await _loadRemovedMembers();
-          break;
-        case 5: // Analytics tab
-          // Analytics data already loaded on app start, no need to reload
-          break;
-      }
-      _loadedTabs.add(tabIndex);
-    } catch (e) {
-      // Handle tab-specific loading errors silently or show notification
-      print('Error loading tab $tabIndex: $e');
-    }
-  }
-
   Future<void> _loadRegionUsers() async {
     try {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
@@ -295,7 +262,6 @@ class _RegionDashboardState extends State<RegionDashboard> {
 
   @override
   void dispose() {
-    _pageController.dispose();
     super.dispose();
   }
 
@@ -319,11 +285,6 @@ class _RegionDashboardState extends State<RegionDashboard> {
     setState(() {
       _selectedIndex = index;
     });
-    _pageController.animateToPage(
-      index,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
   }
 
   void _navigateToProfile() {
@@ -388,15 +349,8 @@ class _RegionDashboardState extends State<RegionDashboard> {
                 ]
                 : null,
       ),
-      body: PageView(
-        controller: _pageController,
-        onPageChanged: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-          // Load data for the selected tab if not already loaded
-          _loadTabData(index);
-        },
+      body: IndexedStack(
+        index: _selectedIndex,
         children: [
           _buildDashboardTab(),
           RegionUserManagementTab(regionId: widget.regionId),
@@ -623,135 +577,64 @@ class _RegionDashboardState extends State<RegionDashboard> {
     String formattedAttendance =
         '${(attendanceRate / 100).toStringAsFixed(1)}%';
 
-    // Calculate active/inactive groups using real data from analytics provider
-    String activeGroups = '0';
-    String inactiveGroups = '0';
+    // Use calculated values if available, otherwise use defaults and trigger calculation
+    String activeGroups = _calculatedActiveGroups ?? '0';
+    String inactiveGroups = _calculatedInactiveGroups ?? '0';
 
-    // Use FutureBuilder to handle async operations
-    return FutureBuilder<void>(
-      future: _calculateGroupActivityStats(totalGroups),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          // Show loading state while calculating
-          activeGroups = '...';
-          inactiveGroups = '...';
-        } else if (snapshot.hasError) {
-          // Show zeros on error instead of placeholder values
-          activeGroups = '0';
-          inactiveGroups = '0';
-        }
-
-        // Get the calculated values from state or use defaults
-        activeGroups = _calculatedActiveGroups ?? activeGroups;
-        inactiveGroups = _calculatedInactiveGroups ?? inactiveGroups;
-
-        return GridView.count(
-          crossAxisCount: 3,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          children: [
-            _buildStatCard(
-              'Total Users',
-              totalUsers,
-              Icons.people,
-              AppColors.primaryColor,
-            ),
-            _buildStatCard(
-              'Total Groups',
-              totalGroups,
-              Icons.groups,
-              AppColors.secondaryColor,
-            ),
-            _buildStatCard(
-              'Active Events',
-              activeEvents,
-              Icons.event,
-              AppColors.accentColor,
-            ),
-            _buildStatCard(
-              'Attendance',
-              formattedAttendance,
-              Icons.trending_up,
-              Colors.green,
-            ),
-            _buildStatCard(
-              'Active Groups',
-              activeGroups,
-              Icons.group_work,
-              Colors.blue,
-            ),
-            _buildStatCard(
-              'Inactive Groups',
-              inactiveGroups,
-              Icons.group_off,
-              Colors.red,
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // Store calculated values
-  String? _calculatedActiveGroups;
-  String? _calculatedInactiveGroups;
-
-  Future<void> _calculateGroupActivityStats(String totalGroups) async {
-    try {
-      // Get member activity status from analytics provider
-      final analyticsProvider = Provider.of<RegionalManagerAnalyticsProvider>(
-        context,
-        listen: false,
-      );
-      final activityStatus = await analyticsProvider.getActivityStatus(
-        widget.regionId,
-      );
-
-      if (activityStatus?.statusSummary != null) {
-        _calculatedActiveGroups =
-            activityStatus!.statusSummary!.active.toString();
-        _calculatedInactiveGroups =
-            activityStatus.statusSummary!.inactive.toString();
-      } else {
-        // Fallback to GroupActivityService if analytics data is not available
-        if (_regionGroups.isNotEmpty) {
-          final groupActivityService = GroupActivityService();
-          int activeCount = 0;
-          int inactiveCount = 0;
-
-          // Check activity status for all groups in this region
-          for (final group in _regionGroups) {
-            try {
-              final isInactive = await groupActivityService.isGroupInactive(
-                group.id,
-              );
-              if (isInactive) {
-                inactiveCount++;
-              } else {
-                activeCount++;
-              }
-            } catch (e) {
-              // Default to inactive if there's an error
-              inactiveCount++;
-            }
-          }
-
-          _calculatedActiveGroups = activeCount.toString();
-          _calculatedInactiveGroups = inactiveCount.toString();
-        } else {
-          // No groups available for this region
-          _calculatedActiveGroups = '0';
-          _calculatedInactiveGroups = '0';
-        }
-      }
-    } catch (e) {
-      // Error occurred - show zeros instead of placeholder values
-      _calculatedActiveGroups = '0';
-      _calculatedInactiveGroups = '0';
-      print('Error calculating group activity for region: $e');
+    // Trigger calculation on first build if not already calculated
+    if (_calculatedActiveGroups == null &&
+        _calculatedInactiveGroups == null &&
+        !_isCalculatingActivity) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _calculateGroupActivityStats();
+      });
     }
+
+    return GridView.count(
+      crossAxisCount: 3,
+      crossAxisSpacing: 16,
+      mainAxisSpacing: 16,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      children: [
+        _buildStatCard(
+          'Total Users',
+          totalUsers,
+          Icons.people,
+          AppColors.primaryColor,
+        ),
+        _buildStatCard(
+          'Total Groups',
+          totalGroups,
+          Icons.groups,
+          AppColors.secondaryColor,
+        ),
+        _buildStatCard(
+          'Active Events',
+          activeEvents,
+          Icons.event,
+          AppColors.accentColor,
+        ),
+        _buildStatCard(
+          'Attendance',
+          formattedAttendance,
+          Icons.trending_up,
+          Colors.green,
+        ),
+        _buildStatCard(
+          'Active Groups',
+          activeGroups,
+          Icons.group_work,
+          Colors.blue,
+        ),
+        _buildStatCard(
+          'Inactive Groups',
+          inactiveGroups,
+          Icons.group_off,
+          Colors.red,
+        ),
+      ],
+    );
   }
 
   Widget _buildStatCard(
@@ -791,6 +674,69 @@ class _RegionDashboardState extends State<RegionDashboard> {
         ),
       ),
     );
+  }
+
+  // Store calculated values
+  String? _calculatedActiveGroups;
+  String? _calculatedInactiveGroups;
+  bool _isCalculatingActivity = false;
+
+  Future<void> _calculateGroupActivityStats() async {
+    if (_isCalculatingActivity) return;
+
+    _isCalculatingActivity = true;
+
+    try {
+      // Use the same approach as super admin - check each group individually
+      if (_regionGroups.isNotEmpty) {
+        final groupActivityService = GroupActivityService();
+        int activeCount = 0;
+        int inactiveCount = 0;
+
+        // Check activity status for all groups in this region
+        for (final group in _regionGroups) {
+          try {
+            final isInactive = await groupActivityService.isGroupInactive(
+              group.id,
+            );
+            if (isInactive) {
+              inactiveCount++;
+            } else {
+              activeCount++;
+            }
+          } catch (e) {
+            // Default to inactive if there's an error
+            inactiveCount++;
+          }
+        }
+
+        if (mounted) {
+          setState(() {
+            _calculatedActiveGroups = activeCount.toString();
+            _calculatedInactiveGroups = inactiveCount.toString();
+          });
+        }
+      } else {
+        // No groups available for this region
+        if (mounted) {
+          setState(() {
+            _calculatedActiveGroups = '0';
+            _calculatedInactiveGroups = '0';
+          });
+        }
+      }
+    } catch (e) {
+      // Error occurred - show zeros instead of placeholder values
+      if (mounted) {
+        setState(() {
+          _calculatedActiveGroups = '0';
+          _calculatedInactiveGroups = '0';
+        });
+      }
+      print('Error calculating group activity for region: $e');
+    } finally {
+      _isCalculatingActivity = false;
+    }
   }
 
   Widget _buildSectionHeader(
@@ -1057,16 +1003,6 @@ class _RegionDashboardState extends State<RegionDashboard> {
           ],
         );
       },
-    );
-  }
-
-  // REMOVED MEMBERS TAB
-  Widget _buildRemovedMembersTab() {
-    return RegionRemovedMembersList(
-      regionId: widget.regionId,
-      userRole: 'regional_manager',
-      showRestoreButton: true,
-      showStats: true,
     );
   }
 

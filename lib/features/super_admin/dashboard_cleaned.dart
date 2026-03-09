@@ -1,42 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:group_management_church_app/core/constants/colors.dart';
 import 'package:group_management_church_app/core/constants/text_styles.dart';
-import 'package:group_management_church_app/data/models/group_model.dart';
-import 'package:group_management_church_app/data/models/user_model.dart';
-import 'package:group_management_church_app/data/models/region_model.dart';
 import 'package:group_management_church_app/data/models/removed_member_model.dart';
 import 'package:group_management_church_app/features/profile_screen.dart';
 import 'package:group_management_church_app/features/super_admin/group_administration_tab.dart';
 import 'package:group_management_church_app/features/super_admin/region_management_tab.dart';
 import 'package:group_management_church_app/features/super_admin/screens/analytics_screen.dart';
 import 'package:group_management_church_app/features/super_admin/user_management_tab.dart';
-import 'package:group_management_church_app/features/region_manager/region_details_screen.dart';
 import 'package:group_management_church_app/widgets/custom_app_bar.dart';
 import 'package:group_management_church_app/widgets/more_options_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
-import 'package:intl/intl.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:share_plus/share_plus.dart';
-import '../../data/models/event_model.dart';
 import '../../data/providers/event_provider.dart';
 import '../../data/providers/group_provider.dart';
 import '../../data/providers/user_provider.dart';
-import '../../data/providers/region_provider.dart';
-import '../../data/services/event_services.dart';
 import '../../data/providers/auth_provider.dart';
 import '../../data/providers/analytics_providers/super_admin_analytics_provider.dart';
 import 'package:flutter/foundation.dart';
 import '../../widgets/removed_members_list.dart';
-import '../../data/services/member_removal_service.dart';
 import '../../data/services/group_activity_service.dart';
 
 import 'event_management_screen.dart';
-import 'recent_events_screen.dart';
 
 class SuperAdminDashboard extends StatefulWidget {
-  const SuperAdminDashboard({super.key});
+  final int initialTabIndex;
+
+  const SuperAdminDashboard({super.key, this.initialTabIndex = 0});
 
   @override
   State<SuperAdminDashboard> createState() => _SuperAdminDashboardState();
@@ -46,7 +37,6 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   _SuperAdminDashboardState();
 
   int _selectedIndex = 0;
-  final PageController _pageController = PageController();
 
   // Data from providers
   late SuperAdminAnalyticsProvider _analyticsProvider;
@@ -74,6 +64,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   @override
   void initState() {
     super.initState();
+    _selectedIndex = widget.initialTabIndex;
     // Get the event services
     _dashboardSummary = {
       'totalUsers': 0,
@@ -116,11 +107,13 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
       return;
     }
 
-    Future.delayed(const Duration(seconds: 15), () {
+    // Increased timeout to 30 seconds for slower networks
+    Future.delayed(const Duration(seconds: 30), () {
       if (mounted && _isLoading) {
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Loading timed out. Please try again.';
+          _errorMessage =
+              'Loading timed out. Please check your connection and try again.';
         });
       }
     });
@@ -155,12 +148,23 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
       }
 
       print('Fetching dashboard summary...');
-      // Now try to get the dashboard summary with the refreshed token
-      await _analyticsProvider.getDashboardSummary();
-      // Also load overall attendance trend for the last month (same logic as analytics screen)
-      final overall = await _analyticsProvider.getOverallAttendanceByPeriod(
-        'month',
-      );
+      // Load dashboard summary and attendance data in parallel with timeout
+      final results = await Future.wait([
+        _analyticsProvider.getDashboardSummary().timeout(
+          const Duration(seconds: 25),
+          onTimeout: () => throw Exception('Dashboard data fetch timed out'),
+        ),
+        _analyticsProvider
+            .getOverallAttendanceByPeriod('month')
+            .timeout(
+              const Duration(seconds: 25),
+              onTimeout:
+                  () => throw Exception('Attendance data fetch timed out'),
+            ),
+      ]);
+
+      // Process attendance data
+      final overall = results[1] as dynamic;
       if (overall.overallStats.attendanceRate != null) {
         final rate = overall.overallStats.attendanceRate;
         _overallAttendance = rate;
@@ -204,31 +208,13 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
 
   @override
   void dispose() {
-    _pageController.dispose();
     super.dispose();
   }
 
   void _onItemTapped(int index) {
-    if (index == 4) {
-      // More tab
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder:
-              (context) => const MoreOptionsScreen(userRole: 'super_admin'),
-        ),
-      );
-      return;
-    }
-
     setState(() {
       _selectedIndex = index;
     });
-    _pageController.animateToPage(
-      index,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
   }
 
   @override
@@ -240,18 +226,15 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         showProfileAvatar: true,
         onProfileTap: _navigateToProfile,
       ),
-      body: PageView(
-        controller: _pageController,
-        onPageChanged: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
+      body: IndexedStack(
+        index: _selectedIndex,
         children: [
           _buildDashboardTab(),
           _buildUserManagementTab(),
+          _buildRegionManagementTab(),
           _buildGroupAdministrationTab(),
           _buildEventsTab(),
+          _buildMoreTab(),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
@@ -262,6 +245,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
             label: 'Dashboard',
           ),
           BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Users'),
+          BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Regions'),
           BottomNavigationBarItem(icon: Icon(Icons.groups), label: 'Groups'),
           BottomNavigationBarItem(icon: Icon(Icons.event), label: "Events"),
           BottomNavigationBarItem(icon: Icon(Icons.more_horiz), label: 'More'),
@@ -490,6 +474,11 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     return UserManagementTab();
   }
 
+  // REGION MANAGEMENT TAB
+  Widget _buildRegionManagementTab() {
+    return RegionManagementTab();
+  }
+
   // GROUP ADMINISTRATION TAB
   Widget _buildGroupAdministrationTab() {
     return GroupAdministrationTab();
@@ -543,6 +532,11 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
 
   Widget _buildEventsTab() {
     return const EventManagementScreen();
+  }
+
+  // MORE TAB
+  Widget _buildMoreTab() {
+    return const MoreOptionsScreen(userRole: 'super_admin');
   }
 
   // SETTINGS TAB
@@ -914,20 +908,26 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
             int activeCount = 0;
             int inactiveCount = 0;
 
-            // Check activity status for all groups
-            for (final group in groups) {
-              try {
-                final isInactive = await groupActivityService.isGroupInactive(
-                  group.id,
-                );
-                if (isInactive) {
-                  inactiveCount++;
-                } else {
-                  activeCount++;
-                }
-              } catch (e) {
-                // Default to inactive if there's an error
+            // Check activity status for all groups in parallel for better performance
+            final futures =
+                groups.map((group) async {
+                  try {
+                    final isInactive = await groupActivityService
+                        .isGroupInactive(group.id);
+                    return isInactive ? 'inactive' : 'active';
+                  } catch (e) {
+                    // Default to inactive if there's an error
+                    return 'inactive';
+                  }
+                }).toList();
+
+            final results = await Future.wait(futures);
+
+            for (final result in results) {
+              if (result == 'inactive') {
                 inactiveCount++;
+              } else {
+                activeCount++;
               }
             }
 

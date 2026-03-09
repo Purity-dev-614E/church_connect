@@ -29,19 +29,163 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
   bool _isLoadingRegions = false;
   final UserServices _userServices = UserServices();
   String? _userRole;
+  bool _initialized = false; // Flag to prevent multiple initializations
+
+  // Local state for events (like region manager)
+  List<EventModel> _events = [];
+  List<EventModel> _filteredEvents = [];
+  bool _isLoading = false;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
+    if (_initialized) return;
+    _initialized = true;
+
     _loadUserRole();
 
-    // Safe: Schedule provider fetch after the first frame
-    Future.microtask(() {
-      final eventProvider = Provider.of<EventProvider>(context, listen: false);
-      eventProvider
-          .fetchAllEvents(); // Use new method that gets both regular and leadership events
-      _loadRegions();
+    // Add listener to search controller
+    _searchController.addListener(() {
+      if (mounted) {
+        _filterEvents();
+      }
     });
+
+    // Load data
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    if (_isLoading) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // Load regions first, then events
+      await _loadRegions();
+      await _loadEvents();
+
+      if (mounted) {
+        _filterEvents();
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadEvents() async {
+    print('=== _loadEvents called for super admin ===');
+    try {
+      final eventProvider = Provider.of<EventProvider>(context, listen: false);
+      print('Calling fetchAllEvents...');
+      await eventProvider.fetchAllEvents();
+
+      final allEvents = eventProvider.events;
+      print('📊 Total events fetched: ${allEvents.length}');
+
+      // Debug: Print event details
+      for (int i = 0; i < allEvents.length; i++) {
+        final event = allEvents[i];
+        print(
+          'Event $i: ${event.title} | Leadership: ${event.isLeadershipEvent} | Group: ${event.groupId} | Region: ${event.regionId}',
+        );
+      }
+
+      // Store in local state (like region manager)
+      if (mounted) {
+        setState(() {
+          _events = allEvents;
+        });
+      }
+    } catch (e) {
+      print('Error loading events: $e');
+      throw e;
+    }
+  }
+
+  void _filterEvents() {
+    if (!mounted) return;
+
+    final query = _searchController.text.toLowerCase();
+    final now = DateTime.now();
+
+    print('🔍 Filtering ${_events.length} events...');
+    print('📝 Search query: "$query"');
+    print('⏰ Time filter: "$selectedFilter"');
+    print('🌍 Region filter: "$selectedRegion"');
+
+    int filteredCount = 0;
+    final filteredEvents =
+        _events.where((event) {
+          // Search filter
+          final matchesQuery =
+              query.isEmpty ||
+              event.title.toLowerCase().contains(query) ||
+              event.description.toLowerCase().contains(query) ||
+              event.location.toLowerCase().contains(query);
+
+          // Time filter
+          bool matchesTimeFilter;
+          switch (selectedFilter) {
+            case 'Upcoming':
+              matchesTimeFilter = event.dateTime.isAfter(now);
+              break;
+            case 'Past':
+              matchesTimeFilter = event.dateTime.isBefore(now);
+              break;
+            case 'Ongoing':
+              final start = event.dateTime;
+              final end = start.add(const Duration(hours: 2));
+              matchesTimeFilter = now.isAfter(start) && now.isBefore(end);
+              break;
+            default:
+              matchesTimeFilter = true;
+          }
+
+          // Region filter (simplified for now)
+          bool matchesRegionFilter = true;
+          if (selectedRegion != 'All' && _regions.isNotEmpty) {
+            if (event.isLeadershipEvent) {
+              matchesRegionFilter = event.regionId == selectedRegion;
+            } else {
+              // For regular events, include all for now (can be enhanced later)
+              matchesRegionFilter = true;
+            }
+          }
+
+          final passesAllFilters =
+              matchesQuery && matchesTimeFilter && matchesRegionFilter;
+
+          if (!passesAllFilters) {
+            print(
+              '❌ Filtered out: ${event.title} | Search: $matchesQuery | Time: $matchesTimeFilter | Region: $matchesRegionFilter',
+            );
+          } else {
+            filteredCount++;
+          }
+
+          return passesAllFilters;
+        }).toList();
+
+    print('✅ Passed all filters: $filteredCount events');
+
+    if (mounted) {
+      setState(() {
+        _filteredEvents = filteredEvents;
+      });
+    }
   }
 
   Future<void> _loadUserRole() async {
@@ -68,6 +212,8 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
   }
 
   Future<void> _loadRegions() async {
+    if (_isLoadingRegions) return; // Prevent multiple simultaneous loads
+
     setState(() => _isLoadingRegions = true);
     try {
       final regionProvider = Provider.of<RegionProvider>(
@@ -84,29 +230,11 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
         print(
           'Loaded ${_regions.length} regions: ${_regions.map((r) => r.name).toList()}',
         );
-
-        // If no regions loaded, try again after a short delay
-        if (_regions.isEmpty) {
-          print('No regions loaded, retrying...');
-          Future.delayed(const Duration(seconds: 2), () {
-            if (mounted) {
-              _loadRegions();
-            }
-          });
-        }
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoadingRegions = false);
         print('Error loading regions: $e');
-
-        // Retry once after error
-        Future.delayed(const Duration(seconds: 3), () {
-          if (mounted) {
-            print('Retrying region load after error...');
-            _loadRegions();
-          }
-        });
       }
     }
   }
@@ -160,74 +288,22 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
     }
   }
 
-  // Filter events by region
-  Future<List<EventModel>> _filterEventsByRegion(
-    List<EventModel> events,
-  ) async {
-    if (selectedRegion == 'All') {
-      return events;
-    }
-
-    final filteredEvents = <EventModel>[];
-
-    for (final event in events) {
-      try {
-        final belongsToRegion = await _eventBelongsToRegion(
-          event,
-          selectedRegion,
-        );
-        if (belongsToRegion) {
-          filteredEvents.add(event);
-        }
-      } catch (e) {
-        print('Error filtering event ${event.id} by region: $e');
-        // Include the event if we can't determine its region
-        filteredEvents.add(event);
-      }
-    }
-
-    return filteredEvents;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final eventProvider = Provider.of<EventProvider>(context);
+    print('🚀 NEW EventManagementScreen build() called ===');
+    print('Local events count: ${_events.length}');
+    print('Local filtered events count: ${_filteredEvents.length}');
+    print('Is loading: $_isLoading');
 
-    final allEvents = eventProvider.events;
+    // Show loading state
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-    // 🔹 Apply search filter
-    final searchQuery = _searchController.text.toLowerCase();
-    final filteredBySearch =
-        searchQuery.isEmpty
-            ? allEvents
-            : allEvents.where((event) {
-              return event.title.toLowerCase().contains(searchQuery) ||
-                  event.description.toLowerCase().contains(searchQuery) ||
-                  event.location.toLowerCase().contains(searchQuery);
-            }).toList();
-
-    // 🔹 Apply time filter
-    final now = DateTime.now();
-    final filteredByTime =
-        filteredBySearch.where((event) {
-          switch (selectedFilter) {
-            case 'Upcoming':
-              return event.dateTime.isAfter(now);
-            case 'Past':
-              return event.dateTime.isBefore(now);
-            case 'Ongoing':
-              final start = event.dateTime;
-              final end = start.add(
-                const Duration(hours: 2),
-              ); // assume 2h duration
-              return now.isAfter(start) && now.isBefore(end);
-            default:
-              return true;
-          }
-        }).toList();
-
-    // Note: Region filtering will be handled in the UI with FutureBuilder
-    final filteredEvents = filteredByTime;
+    // Show error state
+    if (_errorMessage != null) {
+      return _buildErrorState(_errorMessage!);
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -236,56 +312,33 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
         foregroundColor: Colors.white,
         elevation: 4,
       ),
-      body:
-          eventProvider.isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : Column(
-                children: [
-                  const SizedBox(height: 8),
-                  _buildSearchBar(),
-                  _buildFilters(eventProvider),
-                  Expanded(
-                    child:
-                        filteredEvents.isEmpty
-                            ? _buildEmptyState()
-                            : FutureBuilder<List<EventModel>>(
-                              future: _filterEventsByRegion(filteredEvents),
-                              builder: (context, snapshot) {
-                                if (snapshot.connectionState ==
-                                    ConnectionState.waiting) {
-                                  return const Center(
-                                    child: CircularProgressIndicator(),
-                                  );
-                                }
-
-                                final events = snapshot.data ?? [];
-
-                                if (events.isEmpty) {
-                                  return _buildEmptyState();
-                                }
-
-                                return ListView.builder(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 8,
-                                  ),
-                                  itemCount: events.length,
-                                  itemBuilder: (context, index) {
-                                    final event = events[index];
-                                    return EventCard(
-                                      event: event,
-                                      onTap:
-                                          () => _navigateToEventDetails(event),
-                                      getRegionNameFromGroup:
-                                          _getRegionNameFromGroup,
-                                    );
-                                  },
-                                );
-                              },
-                            ),
-                  ),
-                ],
-              ),
+      body: Column(
+        children: [
+          const SizedBox(height: 8),
+          _buildSearchBar(),
+          _buildFilters(),
+          Expanded(
+            child:
+                _filteredEvents.isEmpty
+                    ? _buildEmptyState()
+                    : ListView.builder(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      itemCount: _filteredEvents.length,
+                      itemBuilder: (context, index) {
+                        final event = _filteredEvents[index];
+                        return EventCard(
+                          event: event,
+                          onTap: () => _navigateToEventDetails(event),
+                          getRegionNameFromGroup: _getRegionNameFromGroup,
+                        );
+                      },
+                    ),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showCreateEventDialog,
         backgroundColor: AppColors.primaryColor,
@@ -312,7 +365,9 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: TextField(
         controller: _searchController,
-        onChanged: (value) => setState(() {}),
+        onChanged: (value) {
+          // Don't call setState here - let the build method use the controller value directly
+        },
         decoration: InputDecoration(
           hintText: 'Search events...',
           prefixIcon: const Icon(Icons.search, color: AppColors.primaryColor),
@@ -325,7 +380,7 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
                     ),
                     onPressed: () {
                       _searchController.clear();
-                      setState(() {});
+                      // Don't call setState here - the text field will update automatically
                     },
                   )
                   : null,
@@ -343,6 +398,51 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
           filled: true,
           fillColor: Theme.of(context).colorScheme.surface,
         ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState(String errorMessage) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.error_outline,
+            size: 64,
+            color: Colors.red.withOpacity(0.5),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Error Loading Events',
+            style: TextStyles.heading2.copyWith(
+              color: Theme.of(
+                context,
+              ).colorScheme.onBackground.withOpacity(0.7),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            errorMessage,
+            textAlign: TextAlign.center,
+            style: TextStyles.bodyText.copyWith(
+              color: Theme.of(
+                context,
+              ).colorScheme.onBackground.withOpacity(0.5),
+            ),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: () {
+              final eventProvider = Provider.of<EventProvider>(
+                context,
+                listen: false,
+              );
+              eventProvider.fetchAllEvents();
+            },
+            child: const Text('Retry'),
+          ),
+        ],
       ),
     );
   }
@@ -375,13 +475,21 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
               ).colorScheme.onBackground.withOpacity(0.5),
             ),
           ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: () {
+              print('Retry button pressed - loading all events');
+              _loadData();
+            },
+            child: const Text('Refresh Events'),
+          ),
         ],
       ),
     );
   }
 
   // 🔸 Region + Filter Dropdowns
-  Widget _buildFilters(EventProvider eventProvider) {
+  Widget _buildFilters() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
@@ -427,7 +535,10 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
                                 ? null
                                 : (value) {
                                   print('Region selected: $value');
-                                  setState(() => selectedRegion = value!);
+                                  setState(() {
+                                    selectedRegion = value!;
+                                  });
+                                  _filterEvents();
                                 },
                       ),
                     ),
@@ -468,7 +579,10 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
                     DropdownMenuItem(value: 'Past', child: Text('Past')),
                   ],
                   onChanged: (value) {
-                    setState(() => selectedFilter = value!);
+                    setState(() {
+                      selectedFilter = value!;
+                    });
+                    _filterEvents();
                   },
                 ),
               ),
