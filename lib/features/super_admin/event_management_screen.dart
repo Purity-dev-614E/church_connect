@@ -13,6 +13,7 @@ import '../../data/providers/group_provider.dart';
 import '../../data/providers/region_provider.dart';
 import '../../data/services/user_services.dart';
 import '../events/overall_event_details.dart';
+import '../../widgets/event_card.dart';
 
 class EventManagementScreen extends StatefulWidget {
   const EventManagementScreen({super.key});
@@ -99,7 +100,7 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
       for (int i = 0; i < allEvents.length; i++) {
         final event = allEvents[i];
         print(
-          'Event $i: ${event.title} | Leadership: ${event.isLeadershipEvent} | Group: ${event.groupId} | Region: ${event.regionId}',
+          'Event $i: ${event.title} | Leadership: ${event.isLeadershipEvent} | Group: ${event.groupId} | Region: ${event.regionalId}',
         );
       }
 
@@ -158,7 +159,7 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
           bool matchesRegionFilter = true;
           if (selectedRegion != 'All' && _regions.isNotEmpty) {
             if (event.isLeadershipEvent) {
-              matchesRegionFilter = event.regionId == selectedRegion;
+              matchesRegionFilter = event.regionalId == selectedRegion;
             } else {
               // For regular events, include all for now (can be enhanced later)
               matchesRegionFilter = true;
@@ -271,7 +272,7 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
       // Leadership events don't belong to groups, handle them separately
       if (event.isLeadershipEvent) {
         // For leadership events, check if they have a regionId that matches
-        return event.regionId == regionId;
+        return event.regionalId == regionId;
       }
 
       // For regular events, check the group's region
@@ -593,7 +594,7 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
     );
   }
 
-  void _showCreateEventDialog() {
+  void _showCreateEventDialog() async {
     final TextEditingController titleController = TextEditingController();
     final TextEditingController descriptionController = TextEditingController();
     final TextEditingController locationController = TextEditingController();
@@ -812,83 +813,25 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
                                     contentPadding: EdgeInsets.zero,
                                   ),
                                 ),
-                                Expanded(
-                                  child: RadioListTile<String>(
-                                    title: Text('Specific RC'),
-                                    value: 'regional',
-                                    groupValue: selectedTarget,
-                                    onChanged: (value) {
-                                      if (value != null) {
-                                        setDialogState(() {
-                                          selectedTarget = value;
-                                        });
-                                      }
-                                    },
-                                    contentPadding: EdgeInsets.zero,
-                                  ),
-                                ),
                                 const Expanded(
                                   child: SizedBox(),
                                 ), // Empty space for alignment
                               ],
                             ),
-                            // Regional managers: only "Specific RC" option
+                            // Regional managers: simplified options
                           ] else ...[
                             Row(
                               children: [
                                 Expanded(
-                                  child: RadioListTile<String>(
-                                    title: Text('Specific RC'),
-                                    value: 'regional',
-                                    groupValue: selectedTarget,
-                                    onChanged: (value) {
-                                      if (value != null) {
-                                        setDialogState(() {
-                                          selectedTarget = value;
-                                        });
-                                      }
-                                    },
-                                    contentPadding: EdgeInsets.zero,
+                                  child: Text(
+                                    'Leadership events will be sent to all regional coordinators',
+                                    style: TextStyles.bodyText.copyWith(
+                                      color: AppColors.grey,
+                                      fontSize: 14,
+                                    ),
                                   ),
                                 ),
-                                const Expanded(
-                                  child: SizedBox(),
-                                ), // Empty space for alignment
                               ],
-                            ),
-                          ],
-                          if (selectedTarget == 'regional') ...[
-                            const SizedBox(height: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                border: Border.all(
-                                  color: AppColors.secondaryColor,
-                                ),
-                                borderRadius: BorderRadius.circular(8),
-                                color: Theme.of(context).colorScheme.surface,
-                              ),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<String>(
-                                  value: selectedRegionId,
-                                  isExpanded: true,
-                                  hint: const Text('Select Region'),
-                                  items:
-                                      _regions.map((region) {
-                                        return DropdownMenuItem(
-                                          value: region.id,
-                                          child: Text(region.name),
-                                        );
-                                      }).toList(),
-                                  onChanged: (value) {
-                                    setDialogState(() {
-                                      selectedRegionId = value;
-                                    });
-                                  },
-                                ),
-                              ),
                             ),
                           ],
                         ],
@@ -961,17 +904,13 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
                               color:
                                   selectedTarget == 'all'
                                       ? Colors.blue.withOpacity(0.1)
-                                      : selectedTarget == 'rc_only'
-                                      ? Colors.purple.withOpacity(0.1)
-                                      : Colors.amber.withOpacity(0.1),
+                                      : Colors.purple.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
                                 color:
                                     selectedTarget == 'all'
                                         ? Colors.blue.withOpacity(0.3)
-                                        : selectedTarget == 'rc_only'
-                                        ? Colors.purple.withOpacity(0.3)
-                                        : Colors.amber.withOpacity(0.3),
+                                        : Colors.purple.withOpacity(0.3),
                               ),
                             ),
                             child: Row(
@@ -979,15 +918,11 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
                                 Icon(
                                   selectedTarget == 'all'
                                       ? Icons.people
-                                      : selectedTarget == 'rc_only'
-                                      ? Icons.admin_panel_settings
-                                      : Icons.location_city,
+                                      : Icons.admin_panel_settings,
                                   color:
                                       selectedTarget == 'all'
                                           ? Colors.blue.shade700
-                                          : selectedTarget == 'rc_only'
-                                          ? Colors.purple.shade700
-                                          : Colors.amber.shade700,
+                                          : Colors.purple.shade700,
                                   size: 20,
                                 ),
                                 const SizedBox(width: 8),
@@ -995,16 +930,12 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
                                   child: Text(
                                     selectedTarget == 'all'
                                         ? 'This will be visible to all Regional Coordinators and their administrators'
-                                        : selectedTarget == 'rc_only'
-                                        ? 'This will be visible only to Super Admins and Regional Coordinators'
-                                        : 'This will be visible only to the selected Regional Coordinator and their administrators',
+                                        : 'This will be visible only to Super Admins and Regional Coordinators',
                                     style: TextStyles.bodyText.copyWith(
                                       color:
                                           selectedTarget == 'all'
                                               ? Colors.blue.shade700
-                                              : selectedTarget == 'rc_only'
-                                              ? Colors.purple.shade700
-                                              : Colors.amber.shade700,
+                                              : Colors.purple.shade700,
                                       fontSize: 12,
                                     ),
                                   ),
@@ -1055,19 +986,6 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
                           return;
                         }
 
-                        if (selectedTag == 'leadership' &&
-                            selectedTarget == 'regional' &&
-                            selectedRegionId == null) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Please select a region for regional targeting',
-                              ),
-                            ),
-                          );
-                          return;
-                        }
-
                         final DateTime eventDateTime = DateTime(
                           selectedDate.year,
                           selectedDate.month,
@@ -1098,6 +1016,7 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
                                       selectedTarget == 'regional'
                                           ? selectedRegionId
                                           : null,
+                                  targetAudience: selectedTarget,
                                 );
                           } else {
                             // Create regular group event - require group selection
@@ -1134,6 +1053,9 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
                                 ),
                               ),
                             );
+                            // Refresh the events list to show the newly created event
+                            await _loadEvents();
+                            _filterEvents();
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
@@ -1172,404 +1094,6 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
                   ],
                 ),
           ),
-    );
-  }
-}
-
-class EventCard extends StatelessWidget {
-  final EventModel event;
-  final VoidCallback? onTap;
-  final Future<String> Function(String groupId)? getRegionNameFromGroup;
-
-  const EventCard({
-    Key? key,
-    required this.event,
-    this.onTap,
-    this.getRegionNameFromGroup,
-  }) : super(key: key);
-
-  // Helper method for leadership events to get region name
-  Future<String> _getRegionNameForLeadershipEvent(
-    BuildContext context,
-    String? regionId,
-  ) async {
-    if (regionId == null || regionId.isEmpty) {
-      return 'All Regions';
-    }
-
-    try {
-      final regionProvider = Provider.of<RegionProvider>(
-        context,
-        listen: false,
-      );
-      final regions = regionProvider.regions;
-      final region = regions.firstWhere(
-        (r) => r.id == regionId,
-        orElse: () => RegionModel(id: regionId, name: 'Unknown Region'),
-      );
-      return region.name;
-    } catch (e) {
-      print('Error getting region name: $e');
-      return 'Unknown Region';
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final formattedDate = DateFormat(
-      'EEE, MMM d • h:mm a',
-    ).format(event.dateTime);
-    final formattedTime = DateFormat('h:mm a').format(event.dateTime);
-    final isUpcoming = event.dateTime.isAfter(DateTime.now());
-    final isPast = event.dateTime.isBefore(DateTime.now());
-
-    final groupProvider = Provider.of<GroupProvider>(context, listen: false);
-    final regionProvider = Provider.of<RegionProvider>(context, listen: false);
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color:
-              event.tag == 'leadership'
-                  ? Colors.amber.withOpacity(0.3)
-                  : Colors.transparent,
-          width: 1,
-        ),
-      ),
-      color: event.tag == 'leadership' ? Colors.amber.withOpacity(0.05) : null,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child:
-              event.isLeadershipEvent
-                  ? FutureBuilder<String>(
-                    future: _getRegionNameForLeadershipEvent(
-                      context,
-                      event.regionId,
-                    ),
-                    builder: (context, snapshot) {
-                      return _buildEventCardContent(
-                        context,
-                        event,
-                        formattedDate,
-                        isUpcoming,
-                        isPast,
-                        null, // Leadership events don't have groups
-                        snapshot.data ?? 'All Regions',
-                      );
-                    },
-                  )
-                  : FutureBuilder<GroupModel?>(
-                    future: groupProvider
-                        .getGroupById(event.groupId!)
-                        .timeout(
-                          const Duration(seconds: 10),
-                          onTimeout: () => null,
-                        ),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(20.0),
-                            child: CircularProgressIndicator(),
-                          ),
-                        );
-                      }
-
-                      if (snapshot.hasError) {
-                        print('Error loading group data: ${snapshot.error}');
-                        return _buildEventCardContent(
-                          context,
-                          event,
-                          formattedDate,
-                          isUpcoming,
-                          isPast,
-                          null,
-                          'Unknown Region',
-                        );
-                      }
-
-                      final group = snapshot.data;
-                      if (group != null) {
-                        return FutureBuilder<String>(
-                          future:
-                              getRegionNameFromGroup?.call(group!.region_id!) ??
-                              Future.value('Unknown Region'),
-                          builder: (context, regionSnapshot) {
-                            return _buildEventCardContent(
-                              context,
-                              event,
-                              formattedDate,
-                              isUpcoming,
-                              isPast,
-                              group,
-                              regionSnapshot.data ?? 'Unknown Region',
-                            );
-                          },
-                        );
-                      } else {
-                        return _buildEventCardContent(
-                          context,
-                          event,
-                          formattedDate,
-                          isUpcoming,
-                          isPast,
-                          null,
-                          'Unknown Region',
-                        );
-                      }
-                    },
-                  ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEventCardContent(
-    BuildContext context,
-    EventModel event,
-    String formattedDate,
-    bool isUpcoming,
-    bool isPast,
-    GroupModel? group,
-    String regionName,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Event title and status
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    event.title,
-                    style: TextStyles.heading2.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onBackground,
-                    ),
-                  ),
-                  if (event.tag == 'leadership') ...[
-                    const SizedBox(height: 4.0),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.push_pin,
-                          size: 14,
-                          color: Colors.amber.shade700,
-                        ),
-                        const SizedBox(width: 4.0),
-                        Text(
-                          'Leadership Meeting',
-                          style: TextStyles.bodyText.copyWith(
-                            color: Colors.amber.shade700,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color:
-                    isUpcoming
-                        ? Colors.green.withOpacity(0.1)
-                        : isPast
-                        ? Colors.grey.withOpacity(0.1)
-                        : Colors.orange.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color:
-                      isUpcoming
-                          ? Colors.green
-                          : isPast
-                          ? Colors.grey
-                          : Colors.orange,
-                  width: 1,
-                ),
-              ),
-              child: Text(
-                isUpcoming
-                    ? 'Upcoming'
-                    : isPast
-                    ? 'Past'
-                    : 'Ongoing',
-                style: TextStyles.bodyText.copyWith(
-                  color:
-                      isUpcoming
-                          ? Colors.green
-                          : isPast
-                          ? Colors.grey
-                          : Colors.orange,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-
-        // Event description
-        if (event.description.isNotEmpty) ...[
-          Text(
-            event.description,
-            style: TextStyles.bodyText.copyWith(
-              color: Theme.of(
-                context,
-              ).colorScheme.onBackground.withOpacity(0.7),
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 12),
-        ],
-
-        // Group and Region info
-        Row(
-          children: [
-            Expanded(
-              child: _buildInfoRow(
-                Icons.group,
-                'Group',
-                group?.name ?? 'Unknown Group',
-                context,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child:
-                  group != null &&
-                          group.region_id != null &&
-                          group.region_id!.isNotEmpty &&
-                          getRegionNameFromGroup != null
-                      ? FutureBuilder<String>(
-                        future: getRegionNameFromGroup!(group.id),
-                        builder: (context, snapshot) {
-                          return _buildInfoRow(
-                            Icons.location_on,
-                            'Region',
-                            snapshot.data ?? 'Loading...',
-                            context,
-                          );
-                        },
-                      )
-                      : _buildInfoRow(
-                        Icons.location_on,
-                        'Region',
-                        'Unknown Region',
-                        context,
-                      ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-
-        // Date and Location
-        Row(
-          children: [
-            Expanded(
-              child: _buildInfoRow(
-                Icons.calendar_today,
-                'Date',
-                formattedDate,
-                context,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _buildInfoRow(
-                Icons.place,
-                'Location',
-                event.location,
-                context,
-              ),
-            ),
-          ],
-        ),
-
-        // Participant count for leadership events
-        if (event.isLeadershipEvent &&
-            (event.invitedCount != null || event.participantCount != null)) ...[
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              if (event.invitedCount != null) ...[
-                Expanded(
-                  child: _buildInfoRow(
-                    Icons.people,
-                    'Invited',
-                    '${event.invitedCount}',
-                    context,
-                  ),
-                ),
-                const SizedBox(width: 16),
-              ],
-              if (event.participantCount != null) ...[
-                Expanded(
-                  child: _buildInfoRow(
-                    Icons.check_circle,
-                    'Participants',
-                    '${event.participantCount}',
-                    context,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildInfoRow(
-    IconData icon,
-    String label,
-    String value,
-    BuildContext context,
-  ) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: AppColors.primaryColor),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyles.bodyText.copyWith(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onBackground.withOpacity(0.6),
-                  fontSize: 12,
-                ),
-              ),
-              Text(
-                value,
-                style: TextStyles.bodyText.copyWith(
-                  color: Theme.of(context).colorScheme.onBackground,
-                  fontWeight: FontWeight.w600,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }

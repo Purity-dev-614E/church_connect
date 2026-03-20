@@ -630,10 +630,7 @@ class _UserDashboardState extends State<UserDashboard>
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 12.0),
                       child: EventCard(
-                        eventTitle: event.title,
-                        eventDate: _formatEventDate(event.dateTime),
-                        eventLocation: event.location,
-                        tag: event.tag,
+                        event: event,
                         onTap: () => _navigateToEventDetails(event),
                       ),
                     );
@@ -892,9 +889,7 @@ class _UserDashboardState extends State<UserDashboard>
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12.0),
                 child: EventCard(
-                  eventTitle: event.title,
-                  eventDate: _formatEventDate(event.dateTime),
-                  eventLocation: event.location,
+                  event: event,
                   onTap: () => _navigateToEventDetails(event),
                 ),
               );

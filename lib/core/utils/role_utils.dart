@@ -44,6 +44,17 @@ class RoleUtils {
         r == 'regional focal person';
   }
 
+  /// Returns true if the role is admin (group leader)
+  static bool isAdmin(String? role) {
+    return normalize(role) == 'admin';
+  }
+
+  /// Returns true if the role is admin or higher (admin, super admin, root)
+  static bool isAdminOrAbove(String? role) {
+    final r = normalize(role);
+    return isAdmin(r) || isSuperAdmin(r) || isRoot(r);
+  }
+
   /// Returns true if the role can create leadership events
   static bool canCreateLeadershipEvents(String? role) {
     final r = normalize(role);

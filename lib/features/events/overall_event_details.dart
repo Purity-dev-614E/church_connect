@@ -3,6 +3,7 @@ import 'package:group_management_church_app/data/providers/group_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:group_management_church_app/core/constants/colors.dart';
 import 'package:group_management_church_app/core/constants/text_styles.dart';
+import 'package:group_management_church_app/core/utils/role_utils.dart';
 import 'package:group_management_church_app/data/models/user_model.dart';
 import 'package:group_management_church_app/data/models/event_model.dart';
 import 'package:group_management_church_app/data/models/attendance_model.dart';
@@ -10,6 +11,7 @@ import 'package:group_management_church_app/data/providers/event_provider.dart';
 import 'package:group_management_church_app/data/providers/user_provider.dart';
 import 'package:group_management_church_app/data/providers/attendance_provider.dart';
 import 'package:group_management_church_app/data/services/member_activity_service.dart';
+import 'package:group_management_church_app/data/services/user_services.dart';
 import 'package:group_management_church_app/widgets/custom_button.dart';
 import 'package:intl/intl.dart';
 import 'package:group_management_church_app/widgets/custom_app_bar.dart';
@@ -51,11 +53,50 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen>
   // Tab controller for absentees
   late TabController _absenteesTabController;
 
+  // User role and permissions
+  String? _userRole;
+  String? _userRegionId;
+  String? _userGroupId; // Added to track user's group for admin permissions
+  bool _canManageAttendance = false;
+
   @override
   void initState() {
     super.initState();
     _absenteesTabController = TabController(length: 2, vsync: this);
-    _loadEventData();
+    _loadUserRole();
+  }
+
+  Future<void> _loadUserRole() async {
+    try {
+      final userServices = UserServices();
+      final role = await userServices.getUserRole();
+      final regionId = await userServices.getUserRegionId();
+
+      // Get current user details to find their group
+      final userId = await userServices.getUserId();
+      if (userId == null) {
+        throw Exception('User ID not found');
+      }
+      final currentUser = await userServices.fetchCurrentUser(userId);
+      final groupId =
+          currentUser
+              .citam_Assembly; // Using citam_Assembly as group ID for admins
+
+      if (mounted) {
+        setState(() {
+          _userRole = role;
+          _userRegionId = regionId;
+          _userGroupId = groupId;
+        });
+      }
+
+      // Load event data after getting user role
+      _loadEventData();
+    } catch (e) {
+      print('Error loading user role: $e');
+      // Still load event data even if role loading fails
+      _loadEventData();
+    }
   }
 
   @override
@@ -106,6 +147,10 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen>
             (data['unmarkedMembers'] as List<dynamic>)
                 .map((e) => e as UserModel)
                 .toList();
+
+        // Check attendance management permissions
+        _checkAttendancePermissions();
+
         _isLoading = false;
       });
     } catch (e) {
@@ -114,6 +159,88 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen>
         _isLoading = false;
       });
     }
+  }
+
+  void _checkAttendancePermissions() {
+    print('=== Attendance Permission Check ===');
+    print('User Role: $_userRole');
+    print('User Region ID: $_userRegionId');
+    print('Event ID: ${_event?.id}');
+    print('Event isLeadership: ${_event?.isLeadershipEvent}');
+    print('Event regionalId: ${_event?.regionalId}');
+    print('Event targetAudience: ${_event?.targetAudience}');
+
+    if (_event == null || _userRole == null) {
+      print('❌ Missing event or user role');
+      _canManageAttendance = false;
+      return;
+    }
+
+    // Admin (Group Leaders) can only manage attendance for their own group events
+    if (RoleUtils.isAdmin(_userRole)) {
+      if (_event!.isLeadershipEvent) {
+        // Admins cannot manage leadership events (only super admin and above)
+        print('❌ Admin cannot manage leadership events');
+        _canManageAttendance = false;
+      } else {
+        // For regular events, check if this event belongs to their group
+        _canManageAttendance =
+            _event!.groupId != null &&
+            _event!.groupId!.isNotEmpty &&
+            _event!.groupId == _userGroupId;
+        print('✅ Admin regular event permission: $_canManageAttendance');
+      }
+      return;
+    }
+
+    // Super admins and root users can manage all events
+    if (RoleUtils.isSuperAdmin(_userRole) || RoleUtils.isRoot(_userRole)) {
+      print('✅ Super admin/root has full permission');
+      _canManageAttendance = true;
+      return;
+    }
+
+    // Regional managers can manage:
+    // 1. Leadership events in their region
+    // 2. Regular events for groups in their region
+    if (RoleUtils.isRegionalLeadership(_userRole)) {
+      if (_event!.isLeadershipEvent) {
+        // For leadership events, check if event targets their region
+        final regionMatches = _event!.regionalId == _userRegionId;
+        final eventHasNoRegion =
+            _event!.regionalId == null || _event!.regionalId!.isEmpty;
+
+        print('Regional Manager - Leadership Event:');
+        print('  - Region matches: $regionMatches');
+        print('  - Event has no region: $eventHasNoRegion');
+        print('  - User region: $_userRegionId');
+        print('  - Event region: ${_event!.regionalId}');
+
+        // Allow regional managers to manage leadership events if:
+        // 1. Event targets their specific region, OR
+        // 2. Event is for all regions (null/empty regionalId), OR
+        // 3. Event target_audience is 'all' or 'rc_only'
+        final canManage =
+            regionMatches ||
+            eventHasNoRegion ||
+            _event!.targetAudience == 'all' ||
+            _event!.targetAudience == 'rc_only';
+
+        print('✅ Regional Manager leadership permission: $canManage');
+        _canManageAttendance = canManage;
+      } else {
+        // For regular events, they would need to check if the group is in their region
+        // This is more complex and would require additional group lookup
+        // For now, allow regional managers to manage regular events
+        print('✅ Regional Manager regular event permission: true');
+        _canManageAttendance = true;
+      }
+      return;
+    }
+
+    // Other roles cannot manage attendance
+    print('❌ Role $_userRole cannot manage attendance');
+    _canManageAttendance = false;
   }
 
   Future<Map<String, dynamic>> _fetchEventData() async {
@@ -134,35 +261,35 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen>
       List<UserModel> groupMembers = [];
 
       if (event.isLeadershipEvent) {
-        // For leadership events, get participants instead of group members
-        final participants = await eventProvider
-            .fetchLeadershipEventParticipants(widget.eventId);
-        groupMembers =
-            participants
-                .map(
-                  (p) => UserModel(
-                    id: p.id,
-                    fullName: p.fullName,
-                    email: p.email,
-                    contact: '', // Default empty for leadership events
-                    nextOfKin: '', // Default empty for leadership events
-                    nextOfKinContact: '', // Default empty for leadership events
-                    role: p.role,
-                    gender: 'Not Specified', // Default for leadership events
-                    regionId: p.regionId ?? '',
-                    regionalID: p.regionId ?? '', // Same as regionId
-                    // Optional fields
-                    regionName: null,
-                    createdAt: null,
-                    profileImageUrl: null,
-                    age: null,
-                    citam_Assembly: null,
-                    if_Not: null,
-                    overalRegionName: null,
-                    regionalTitle: null,
-                  ),
-                )
-                .toList();
+        // For leadership events, use the new endpoint that handles role-based filtering automatically
+        print('Loading leadership event attendees using new endpoint...');
+        print('  - Event ID: ${widget.eventId}');
+        print('  - User role: $_userRole');
+        print('  - User regionId: $_userRegionId');
+
+        // The backend will automatically apply the conditional logic based on:
+        // - User role (RM, admin, super admin)
+        // - Event target_audience ('all', 'rc_only', 'regional')
+        // - Event regional_id
+        // - User region_id
+        // - Optional user_tle filters
+
+        // Optionally, we can pass user_tle values if needed for filtering
+        // For now, we'll let the backend handle all the filtering logic
+        final attendees = await eventProvider.fetchLeadershipAttendees(
+          eventId: widget.eventId,
+          // userTle: ['admin', 'regional_manager'], // Optional: uncomment if needed
+        );
+
+        print('Leadership attendees loaded: ${attendees.length}');
+        for (int i = 0; i < attendees.length && i < 3; i++) {
+          final attendee = attendees[i];
+          print(
+            '  ${i + 1}. ${attendee.fullName} (${attendee.role}) - Region: ${attendee.regionId}',
+          );
+        }
+
+        groupMembers = attendees;
       } else {
         // For regular events, get group members
         if (event.groupId == null || event.groupId!.isEmpty) {
@@ -227,6 +354,7 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen>
           dateTime: DateTime.now(),
           location: 'Unknown',
           groupId: '',
+          createdAt: DateTime.now(),
         ),
         'attendees': <Map<String, dynamic>>[],
         'nonAttendees': <Map<String, dynamic>>[],
@@ -508,34 +636,44 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen>
                       icon: Icon(
                         Icons.check_circle,
                         color:
-                            _event?.isAttendanceLocked == true
+                            _event?.isAttendanceLocked == true ||
+                                    !_canManageAttendance
                                 ? Colors.grey
                                 : Colors.green,
                       ),
                       onPressed:
-                          _event?.isAttendanceLocked == true
+                          _event?.isAttendanceLocked == true ||
+                                  !_canManageAttendance
                               ? null
                               : () => _showAttendanceDetailsDialog(user, true),
                       tooltip:
-                          _event?.isAttendanceLocked == true
-                              ? 'Locked'
+                          _event?.isAttendanceLocked == true ||
+                                  !_canManageAttendance
+                              ? _event?.isAttendanceLocked == true
+                                  ? 'Locked'
+                                  : 'No Permission'
                               : 'Mark as present',
                     ),
                     IconButton(
                       icon: Icon(
                         Icons.cancel,
                         color:
-                            _event?.isAttendanceLocked == true
+                            _event?.isAttendanceLocked == true ||
+                                    !_canManageAttendance
                                 ? Colors.grey
                                 : Colors.red,
                       ),
                       onPressed:
-                          _event?.isAttendanceLocked == true
+                          _event?.isAttendanceLocked == true ||
+                                  !_canManageAttendance
                               ? null
                               : () => _showAttendanceDetailsDialog(user, false),
                       tooltip:
-                          _event?.isAttendanceLocked == true
-                              ? 'Locked'
+                          _event?.isAttendanceLocked == true ||
+                                  !_canManageAttendance
+                              ? _event?.isAttendanceLocked == true
+                                  ? 'Locked'
+                                  : 'No Permission'
                               : 'Mark as absent',
                     ),
                   ],

@@ -220,11 +220,11 @@ class _RegionRemovedMembersListState extends State<RegionRemovedMembersList> {
                           hintStyle: TextStyle(
                             color: Theme.of(
                               context,
-                            ).colorScheme.onSurface.withOpacity(0.6),
+                            ).colorScheme.onSurface.withValues(alpha: 0.6),
                           ),
                           prefixIconColor: Theme.of(
                             context,
-                          ).colorScheme.onSurface.withOpacity(0.6),
+                          ).colorScheme.onSurface.withValues(alpha: 0.6),
                         ),
                         style: TextStyle(
                           color: Theme.of(context).colorScheme.onSurface,
@@ -375,7 +375,7 @@ class _RegionRemovedMembersListState extends State<RegionRemovedMembersList> {
   //       borderRadius: BorderRadius.circular(12),
   //       boxShadow: [
   //         BoxShadow(
-  //           color: Colors.black.withOpacity(0.1),
+  //           color: Colors.black.withValues(alpha:1),
   //           blurRadius: 4,
   //           offset: const Offset(0, 2),
   //         ),
@@ -447,9 +447,9 @@ class _RegionRemovedMembersListState extends State<RegionRemovedMembersList> {
   //   return Container(
   //     padding: const EdgeInsets.all(8), // Reduced padding
   //     decoration: BoxDecoration(
-  //       color: color.withOpacity(0.1),
+  //       color: color.withValues(alpha:1),
   //       borderRadius: BorderRadius.circular(8),
-  //       border: Border.all(color: color.withOpacity(0.3)),
+  //       border: Border.all(color: color.withValues(alpha:3)),
   //     ),
   //     child: Column(
   //       mainAxisSize: MainAxisSize.min, // Prevent unnecessary expansion
@@ -492,11 +492,11 @@ class _RegionRemovedMembersListState extends State<RegionRemovedMembersList> {
           filled: true,
           fillColor: Theme.of(context).colorScheme.surface,
           hintStyle: TextStyle(
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 6),
           ),
           prefixIconColor: Theme.of(
             context,
-          ).colorScheme.onSurface.withOpacity(0.6),
+          ).colorScheme.onSurface.withValues(alpha: 6),
         ),
         style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
         onChanged: _onSearchChanged,
@@ -582,7 +582,7 @@ class _RegionRemovedMembersListState extends State<RegionRemovedMembersList> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 05),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -666,7 +666,7 @@ class _RegionRemovedMembersListState extends State<RegionRemovedMembersList> {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.successColor.withOpacity(0.1),
+                    color: AppColors.successColor.withValues(alpha: 1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(

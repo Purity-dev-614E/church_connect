@@ -37,7 +37,7 @@ class AuthServices {
       print('Attempting login with email: $email');
 
       final response = await http.post(
-        Uri.parse(ApiEndpoints.login),
+        Uri.parse(await ApiEndpoints.login),
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
@@ -170,7 +170,7 @@ class AuthServices {
       }
 
       final response = await http.post(
-        Uri.parse(ApiEndpoints.refreshToken),
+        Uri.parse(await ApiEndpoints.refreshToken),
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
@@ -388,7 +388,7 @@ class AuthServices {
       print("Attempting signup with email: $email");
 
       final response = await http.post(
-        Uri.parse(ApiEndpoints.signup),
+        Uri.parse(await ApiEndpoints.signup),
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
@@ -433,7 +433,7 @@ class AuthServices {
   Future<bool> resetPassword(String email) async {
     try {
       final response = await http.post(
-        Uri.parse(ApiEndpoints.forgotPassword),
+        Uri.parse(await ApiEndpoints.forgotPassword),
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
@@ -459,7 +459,7 @@ class AuthServices {
   Future<bool> updateProfile(UserModel user) async {
     try {
       final response = await _httpClient.put(
-        ApiEndpoints.updateUser(user.id),
+        await ApiEndpoints.updateUser(user.id),
         body: json.encode({
           "full_name": user.fullName,
           "phone_number": user.contact,

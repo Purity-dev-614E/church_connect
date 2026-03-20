@@ -8,6 +8,7 @@ import 'package:group_management_church_app/data/providers/group_provider.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import '../events/overall_event_details.dart';
 
 class RegionEventsTab extends StatefulWidget {
   final String regionId;
@@ -56,6 +57,7 @@ class _RegionEventsTabState extends State<RegionEventsTab> {
       await _loadEvents();
 
       if (mounted) {
+        // Filter events immediately after loading
         _filterEvents();
         setState(() {
           _isLoading = false;
@@ -75,67 +77,130 @@ class _RegionEventsTabState extends State<RegionEventsTab> {
     print('=== _loadEvents called for region ${widget.regionId} ===');
     try {
       final eventProvider = Provider.of<EventProvider>(context, listen: false);
-      print('Calling fetchAllEvents...');
-      await eventProvider.fetchAllEvents();
+      print('Calling fetchEventsByRegion...');
 
-      final allEvents = eventProvider.events;
-      print('Total events fetched: ${allEvents.length}');
-
-      // Debug: Check leadership events specifically
-      final leadershipEvents =
-          allEvents.where((e) => e.isLeadershipEvent).toList();
-      print('Leadership events found: ${leadershipEvents.length}');
-      for (var event in leadershipEvents) {
-        print(
-          'Leadership event: ${event.title}, regionId: ${event.regionId}, target region: ${widget.regionId}',
-        );
+      // Use dedicated function to fetch events for this region only
+      final regionEvents = await eventProvider.fetchEventsByRegion(
+        widget.regionId,
+      );
+      print('Region events fetched: ${regionEvents.length}');
+      if (regionEvents.isNotEmpty) {
+        print('Sample region events:');
+        for (int i = 0; i < regionEvents.length && i < 3; i++) {
+          final event = regionEvents[i];
+          print(
+            '  ${i + 1}. ${event.title} - ${event.dateTime} - leadership: ${event.isLeadershipEvent}',
+          );
+        }
       }
 
-      print('Region groups available: ${_regionGroups.length}');
+      // Also fetch leadership events (in case region endpoint doesn't return them)
+      List<EventModel> leadershipEvents = [];
+      try {
+        leadershipEvents = await eventProvider.fetchLeadershipEvents();
+        print('Leadership events fetched: ${leadershipEvents.length}');
+        // Filter leadership events for this region
+        leadershipEvents =
+            leadershipEvents
+                .where(
+                  (event) =>
+                      event.regionalId == widget.regionId ||
+                      event.regionalId == null ||
+                      event.regionalId!.isEmpty,
+                )
+                .toList();
+        print('Leadership events for this region: ${leadershipEvents.length}');
+      } catch (e) {
+        print('Error fetching leadership events: $e');
+      }
 
-      // Filter events for this region
-      final regionEvents =
-          allEvents.where((event) {
-            // Include regular events from groups in this region
-            if (event.groupId != null && event.groupId!.isNotEmpty) {
-              final matchesGroup = _regionGroups.any(
-                (group) => group.id == event.groupId,
-              );
-              if (matchesGroup) {
-                print('Event ${event.title} matches group ${event.groupId}');
-              }
-              return matchesGroup;
-            }
-            // Include leadership events targeting this region OR all leadership events if regionId is null/empty
-            if (event.isLeadershipEvent) {
-              final matchesRegion = event.regionId == widget.regionId;
-              final hasNoRegionId =
-                  event.regionId == null || event.regionId!.isEmpty;
-
-              if (matchesRegion) {
-                print(
-                  'Leadership event ${event.title} matches region ${widget.regionId}',
-                );
-                return true;
-              } else if (hasNoRegionId) {
-                print(
-                  'Leadership event ${event.title} has no regionId, including by default',
-                );
-                return true; // Include leadership events without regionId as fallback
-              } else {
-                print(
-                  'Leadership event ${event.title} region ${event.regionId} does not match target ${widget.regionId}',
-                );
-              }
-            }
-            return false;
+      // Fetch events for groups in parallel (much faster)
+      print(
+        'Fetching events for ${_regionGroups.length} groups in parallel...',
+      );
+      final List<Future<List<EventModel>>> groupEventFutures =
+          _regionGroups.map((group) {
+            return eventProvider.fetchEventsByGroup(group.id);
           }).toList();
 
-      print('Filtered region events: ${regionEvents.length}');
+      // Wait for all group events to complete
+      final List<List<EventModel>> groupEventResults = await Future.wait(
+        groupEventFutures,
+      );
+
+      List<EventModel> groupEvents = [];
+      for (int i = 0; i < groupEventResults.length; i++) {
+        final eventsForGroup = groupEventResults[i];
+        final group = _regionGroups[i];
+        print(
+          'Fetched ${eventsForGroup.length} events for group ${group.name} (${group.id})',
+        );
+        groupEvents.addAll(eventsForGroup);
+      }
+      print('Group events fetched: ${groupEvents.length}');
+
+      // Combine all events: region events + leadership events + group events, remove duplicates
+      final allRegionEvents = [
+        ...regionEvents,
+        ...leadershipEvents,
+        ...groupEvents,
+      ];
+      final Set<String> seenEventIds = {};
+      final uniqueEvents =
+          allRegionEvents.where((event) {
+            if (seenEventIds.contains(event.id)) {
+              return false; // Skip duplicate
+            }
+            seenEventIds.add(event.id);
+            return true;
+          }).toList();
+
+      print('Total unique events for region: ${uniqueEvents.length}');
+
+      // Use the combined events list instead of just region events
+      final eventsToSort = uniqueEvents;
+
+      // Sort events by priority: ongoing -> upcoming -> past, then by date within each category
+      final now = DateTime.now();
+      eventsToSort.sort((a, b) {
+        final bool aIsOngoing =
+            now.isAfter(a.dateTime) &&
+            now.isBefore(a.dateTime.add(const Duration(hours: 2)));
+        final bool bIsOngoing =
+            now.isAfter(b.dateTime) &&
+            now.isBefore(b.dateTime.add(const Duration(hours: 2)));
+        final bool aIsUpcoming = a.dateTime.isAfter(now);
+        final bool bIsUpcoming = b.dateTime.isAfter(now);
+
+        // Ongoing events come first
+        if (aIsOngoing && !bIsOngoing) return -1;
+        if (!aIsOngoing && bIsOngoing) return 1;
+
+        // If both are ongoing or neither is ongoing, check upcoming
+        if (aIsUpcoming && !bIsUpcoming) return -1;
+        if (!aIsUpcoming && bIsUpcoming) return 1;
+
+        // Within the same category, sort by date (closest first for ongoing/upcoming, most recent first for past)
+        if (aIsOngoing || aIsUpcoming) {
+          return a.dateTime.compareTo(b.dateTime); // Sooner events first
+        } else {
+          return b.dateTime.compareTo(
+            a.dateTime,
+          ); // More recent past events first
+        }
+      });
+
+      print(
+        'Events fetched for region ${widget.regionId}: ${eventsToSort.length}',
+      );
+
+      if (eventsToSort.isEmpty) {
+        print('No events found for this region.');
+      }
 
       if (mounted) {
         setState(() {
-          _events = regionEvents;
+          _events = eventsToSort;
         });
       }
     } catch (e) {
@@ -160,7 +225,7 @@ class _RegionEventsTabState extends State<RegionEventsTab> {
     }
   }
 
-  void _filterEvents() {
+  void _filterEvents({bool usePostFrameCallback = false}) {
     if (!mounted) return;
 
     final query = _searchController.text.toLowerCase();
@@ -209,14 +274,22 @@ class _RegionEventsTabState extends State<RegionEventsTab> {
           return matchesQuery && matchesTimeFilter && matchesTypeFilter;
         }).toList();
 
-    // Use post frame callback to avoid setState during build
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    // Use post frame callback only when called during build to avoid setState during build
+    if (usePostFrameCallback) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _filteredEvents = filteredEvents;
+          });
+        }
+      });
+    } else {
       if (mounted) {
         setState(() {
           _filteredEvents = filteredEvents;
         });
       }
-    });
+    }
   }
 
   void _showError(String message) {
@@ -377,7 +450,7 @@ class _RegionEventsTabState extends State<RegionEventsTab> {
                     contentPadding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                   onChanged: (value) {
-                    _filterEvents();
+                    _filterEvents(usePostFrameCallback: true);
                   },
                 ),
                 const SizedBox(height: 12),
@@ -416,7 +489,7 @@ class _RegionEventsTabState extends State<RegionEventsTab> {
                         onChanged: (value) {
                           if (value != null) {
                             _selectedFilter = value;
-                            _filterEvents();
+                            _filterEvents(usePostFrameCallback: true);
                           }
                         },
                       ),
@@ -452,7 +525,7 @@ class _RegionEventsTabState extends State<RegionEventsTab> {
                         onChanged: (value) {
                           if (value != null) {
                             _selectedTypeFilter = value;
-                            _filterEvents();
+                            _filterEvents(usePostFrameCallback: true);
                           }
                         },
                       ),
@@ -781,45 +854,58 @@ class _RegionEventsTabState extends State<RegionEventsTab> {
   }
 
   void _navigateToEventDetails(EventModel event) {
-    // For now, show a simple dialog with event details
-    // In the future, this could navigate to a detailed event screen
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Text(event.title),
-            content: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('Type: ${_getEventTypeName(event)}'),
-                  const SizedBox(height: 8),
-                  Text('Date: ${_formatEventDate(event.dateTime)}'),
-                  const SizedBox(height: 8),
-                  Text('Location: ${event.location}'),
-                  if (!event.isLeadershipEvent) ...[
+    if (event.isLeadershipEvent) {
+      // Leadership events should navigate to attendance marking
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder:
+              (context) => OverallEventDetailsScreen(
+                eventId: event.id,
+                eventTitle: event.title,
+              ),
+        ),
+      );
+    } else {
+      // Regular events show details popup
+      showDialog(
+        context: context,
+        builder:
+            (context) => AlertDialog(
+              title: Text(event.title),
+              content: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('Type: ${_getEventTypeName(event)}'),
                     const SizedBox(height: 8),
-                    Text('Group: ${_getGroupName(event.groupId)}'),
+                    Text('Date: ${_formatEventDate(event.dateTime)}'),
+                    const SizedBox(height: 8),
+                    Text('Location: ${event.location}'),
+                    if (!event.isLeadershipEvent) ...[
+                      const SizedBox(height: 8),
+                      Text('Group: ${_getGroupName(event.groupId)}'),
+                    ],
+                    const SizedBox(height: 8),
+                    const Text('Description:'),
+                    const SizedBox(height: 4),
+                    Text(event.description),
                   ],
-                  const SizedBox(height: 8),
-                  const Text('Description:'),
-                  const SizedBox(height: 4),
-                  Text(event.description),
-                ],
+                ),
               ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Close'),
+                ),
+              ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Close'),
-              ),
-            ],
-          ),
-    );
+      );
+    }
   }
 
-  void _showCreateEventDialog() {
+  void _showCreateEventDialog() async {
     final TextEditingController titleController = TextEditingController();
     final TextEditingController descriptionController = TextEditingController();
     final TextEditingController locationController = TextEditingController();
@@ -1032,6 +1118,19 @@ class _RegionEventsTabState extends State<RegionEventsTab> {
                           return;
                         }
 
+                        // Additional validation for leadership events
+                        if (selectedTag == 'leadership') {
+                          if (widget.regionId.isEmpty) {
+                            _showError(
+                              'Region ID is missing. Please refresh the page and try again.',
+                            );
+                            return;
+                          }
+                          print(
+                            'Region ID validation passed: ${widget.regionId}',
+                          );
+                        }
+
                         // Create event
                         try {
                           final eventProvider = Provider.of<EventProvider>(
@@ -1048,17 +1147,41 @@ class _RegionEventsTabState extends State<RegionEventsTab> {
                             selectedTime.minute,
                           );
 
-                          final createdEvent = await eventProvider.createEvent(
-                            groupId:
-                                selectedTag == 'org'
-                                    ? (selectedGroupId ?? '')
-                                    : null, // Don't send groupId for leadership events
-                            title: titleController.text.trim(),
-                            description: descriptionController.text.trim(),
-                            dateTime: eventDateTime,
-                            location: locationController.text.trim(),
-                            tag: selectedTag,
+                          print(
+                            '=== Regional Manager Creating Leadership Event ===',
                           );
+                          print('Title: ${titleController.text.trim()}');
+                          print(
+                            'Description: ${descriptionController.text.trim()}',
+                          );
+                          print('DateTime: $eventDateTime');
+                          print('Location: ${locationController.text.trim()}');
+                          print('Region ID: ${widget.regionId}');
+                          print('Target Audience: regional');
+
+                          final createdEvent =
+                              selectedTag == 'leadership'
+                                  ? await eventProvider.createLeadershipEvent(
+                                    title: titleController.text.trim(),
+                                    description:
+                                        descriptionController.text.trim(),
+                                    dateTime: eventDateTime,
+                                    location: locationController.text.trim(),
+                                    regionId:
+                                        widget
+                                            .regionId, // Regional manager's region ID
+                                    targetAudience:
+                                        'regional', // Only 'regional' allowed for regional managers
+                                  )
+                                  : await eventProvider.createEvent(
+                                    groupId: selectedGroupId ?? '',
+                                    title: titleController.text.trim(),
+                                    description:
+                                        descriptionController.text.trim(),
+                                    dateTime: eventDateTime,
+                                    location: locationController.text.trim(),
+                                    tag: selectedTag,
+                                  );
 
                           if (createdEvent != null) {
                             _showSuccess('Event created successfully');

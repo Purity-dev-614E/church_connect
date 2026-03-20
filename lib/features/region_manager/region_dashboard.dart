@@ -224,7 +224,7 @@ class _RegionDashboardState extends State<RegionDashboard> {
                     // Include regular events from this region OR leadership events targeting this region
                     (event.groupId != null && event.groupId!.isNotEmpty) ||
                     (event.isLeadershipEvent &&
-                        event.regionId == widget.regionId),
+                        event.regionalId == widget.regionId),
               )
               .toList();
 

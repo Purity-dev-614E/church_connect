@@ -11,7 +11,7 @@ class UserDeletionService {
   Future<bool> deleteUser(String userId) async {
     try {
       final response = await _httpClient.delete(
-        ApiEndpoints.deleteUser(userId),
+        await ApiEndpoints.deleteUser(userId),
       );
 
       return response.statusCode == 204;
@@ -24,9 +24,13 @@ class UserDeletionService {
   /// Required Roles: super admin, root only
   Future<Map<String, dynamic>> deleteUserCompletely(String userId) async {
     try {
-      final response = await _httpClient.delete(
-        ApiEndpoints.deleteUserCompletely(userId),
-      );
+      final url = await ApiEndpoints.deleteUserCompletely(userId);
+      print('DEBUG: Making DELETE request to: $url');
+
+      final response = await _httpClient.delete(url);
+
+      print('DEBUG: Response status: ${response.statusCode}');
+      print('DEBUG: Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
@@ -34,6 +38,7 @@ class UserDeletionService {
         throw Exception('Failed to completely delete user: ${response.body}');
       }
     } catch (e) {
+      print('DEBUG: deleteUserCompletely error: $e');
       throw Exception('Failed to completely delete user: $e');
     }
   }

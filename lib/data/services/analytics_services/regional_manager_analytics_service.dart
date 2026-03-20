@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:group_management_church_app/data/services/http_client.dart';
 
 import '../../models/regional_analytics_model.dart';
+import '../../models/database_stats_model.dart';
 
 class RegionAnalyticsService {
   final String baseUrl;
@@ -46,10 +47,12 @@ class RegionAnalyticsService {
   Future<DashboardSummary> getDashboardSummaryForRegion(String regionId) async {
     try {
       print('Fetching dashboard summary for region: $regionId');
-      print('API Endpoint: ${ApiEndpoints.getRegionalManagerDashboardSummary}');
+      print(
+        'API Endpoint: ${await ApiEndpoints.getRegionalManagerDashboardSummary}',
+      );
 
       final response = await _httpClient.get(
-        '${ApiEndpoints.getRegionalManagerDashboardSummary}',
+        await ApiEndpoints.getRegionalManagerDashboardSummary,
       );
 
       print('Dashboard Summary API Response Status: ${response.statusCode}');
@@ -319,11 +322,11 @@ class RegionAnalyticsService {
       print('Fetching overall attendance by period for region: $regionId');
       print('Period: $period');
       print(
-        'API Endpoint: ${ApiEndpoints.getRegionalManagerOverallAttendanceByPeriod(period)}',
+        'API Endpoint: ${await ApiEndpoints.getRegionalManagerOverallAttendanceByPeriod(period)}',
       );
 
       final response = await _httpClient.get(
-        '${ApiEndpoints.getRegionalManagerOverallAttendanceByPeriod(period)}',
+        await ApiEndpoints.getRegionalManagerOverallAttendanceByPeriod(period),
       );
 
       print('Overall Attendance API Response Status: ${response.statusCode}');
@@ -371,7 +374,7 @@ class RegionAnalyticsService {
 
     try {
       final response = await _httpClient.get(
-        '${ApiEndpoints.getRegionalManagerGroupAttendance(groupId)}',
+        await ApiEndpoints.getRegionalManagerGroupAttendance(groupId),
       );
 
       print('Group Attendance API Response Status: ${response.statusCode}');
@@ -531,11 +534,11 @@ class RegionAnalyticsService {
     try {
       print('Fetching member activity status for region: $regionId');
       print(
-        'API Endpoint: ${ApiEndpoints.getRegionalManagerMemberActivityStatus}',
+        'API Endpoint: ${await ApiEndpoints.getRegionalManagerMemberActivityStatus}',
       );
 
       final response = await _httpClient.get(
-        '${ApiEndpoints.getRegionalManagerMemberActivityStatus}',
+        await ApiEndpoints.getRegionalManagerMemberActivityStatus,
       );
 
       print('Member Activity API Response Status: ${response.statusCode}');
@@ -571,6 +574,45 @@ class RegionAnalyticsService {
         print('Exception type: ${error.runtimeType}');
       }
       throw Exception('Error fetching member activity status: $error');
+    }
+  }
+
+  // Database Analytics
+
+  /// Get database statistics for regional manager
+  Future<DatabaseStats> getDatabaseStats() async {
+    try {
+      final endpoint = await ApiEndpoints.getRegionalManagerDatabaseStats;
+      print('Fetching database statistics for regional manager');
+      print('API Endpoint: $endpoint');
+
+      final response = await _httpClient.get(endpoint);
+
+      print('Database Stats API Response Status: ${response.statusCode}');
+      print('Database Stats API Response Headers: ${response.headers}');
+      print('Database Stats API Response Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        // Check if response body starts with HTML DOCTYPE
+        if (response.body.trim().startsWith('<!DOCTYPE')) {
+          throw Exception(
+            'Server returned HTML error page instead of JSON for database statistics.',
+          );
+        }
+
+        return DatabaseStats.fromJson(json.decode(response.body));
+      } else {
+        throw Exception(
+          'Failed to fetch database statistics: ${response.statusCode} - ${response.body}',
+        );
+      }
+    } catch (error) {
+      print('Error fetching database statistics: $error');
+      print('Error details: ${error.toString()}');
+      if (error is Exception) {
+        print('Exception type: ${error.runtimeType}');
+      }
+      throw Exception('Error fetching database statistics: $error');
     }
   }
 }

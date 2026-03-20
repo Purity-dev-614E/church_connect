@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import 'package:group_management_church_app/core/theme/app_theme.dart';
 import 'package:group_management_church_app/core/utils/auth_error_handler.dart';
+import 'package:group_management_church_app/core/services/config_service.dart';
 import 'package:group_management_church_app/data/providers/auth_provider.dart';
 import 'package:group_management_church_app/data/providers/event_provider.dart';
 import 'package:group_management_church_app/data/providers/group_provider.dart';
@@ -27,6 +28,9 @@ import 'features/auth/password_reset_handler.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize ConfigService
+  await ConfigService.instance.initialize();
 
   // Optional: lock orientation to portrait
   await SystemChrome.setPreferredOrientations([

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/regional_analytics_model.dart';
+import '../../models/database_stats_model.dart';
 import '../../services/analytics_services/regional_manager_analytics_service.dart';
 
 // Parameter classes
@@ -537,6 +538,28 @@ class RegionalManagerAnalyticsProvider extends ChangeNotifier {
       }
     } catch (e) {
       print('Error in getActivityStatus: $e');
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return null;
+    }
+  }
+
+  // Database Analytics
+  Future<DatabaseStats?> getDatabaseStats() async {
+    try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      print('Fetching database statistics for regional manager');
+      final response = await _analyticsService.getDatabaseStats();
+
+      _isLoading = false;
+      notifyListeners();
+      return response;
+    } catch (e) {
+      print('Error in getDatabaseStats: $e');
       _error = e.toString();
       _isLoading = false;
       notifyListeners();

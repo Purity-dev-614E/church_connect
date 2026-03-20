@@ -81,33 +81,46 @@ class _RegionManagerAnalyticsScreenState
 
   Future<void> _loadQuickStats() async {
     try {
-      print('Loading quick stats for region: ${widget.regionId}');
-      final quickStats = await _analyticsProvider.getDashboardSummaryForRegion(
-        widget.regionId,
-      );
+      print('Loading quick stats using optimized database stats endpoint');
+      final databaseStats = await _analyticsProvider.getDatabaseStats();
 
-      if (quickStats != null) {
-        print('Received quick stats: $quickStats');
+      if (databaseStats != null) {
         if (!mounted) return;
         setState(() {
           _quickStatsData = {
-            quickStats.groupCount,
-            quickStats.eventCount,
-            quickStats.userCount,
-            quickStats.attendanceCount ?? 0,
+            databaseStats.totalGroups,
+            databaseStats.totalEvents,
+            databaseStats.totalUsers,
+            databaseStats.overallAttendancePercentage,
           };
         });
       } else {
-        print('No quick stats data available, using default values');
-        if (mounted) {
+        print('No database stats available, falling back to dashboard summary');
+        // Fallback to the original method if database stats fails
+        final quickStats = await _analyticsProvider
+            .getDashboardSummaryForRegion(widget.regionId);
+
+        if (quickStats != null) {
+          if (!mounted) return;
           setState(() {
-            _quickStatsData = {0, 0, 0, 0};
+            _quickStatsData = {
+              quickStats.groupCount,
+              quickStats.eventCount,
+              quickStats.userCount,
+              quickStats.attendanceCount ?? 0,
+            };
           });
+        } else {
+          print('No quick stats data available, using default values');
+          if (mounted) {
+            setState(() {
+              _quickStatsData = {0, 0, 0, 0};
+            });
+          }
         }
       }
     } catch (e) {
       print('Error loading quick stats: $e');
-      print('Error stack trace: ${StackTrace.current}');
       if (mounted) {
         setState(() {
           _quickStatsData = {0, 0, 0, 0};
@@ -324,41 +337,62 @@ class _RegionManagerAnalyticsScreenState
                   ),
                 ),
                 // Detailed Analytics Tab
-                ChangeNotifierProvider<attendance_overview.AttendanceProvider>(
-                  create: (_) {
-                    final service = attendance_services.AttendanceService(
-                      ApiEndpoints.baseUrl,
-                    );
-                    final provider = attendance_overview.AttendanceProvider(
-                      service,
-                    );
-                    // Load initial data for this region scope
-                    provider.loadData(
-                      scope: 'region',
-                      regionId: widget.regionId,
-                    );
-                    return provider;
-                  },
-                  child: Builder(
-                    builder:
-                        (innerContext) => SingleChildScrollView(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              buildScopedAttendanceChart(
-                                context: innerContext,
-                                scope: 'region',
-                                regionId: widget.regionId,
+                FutureBuilder<String>(
+                  future: ApiEndpoints.baseUrl,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (snapshot.hasError) {
+                      return Center(child: Text('Error: ${snapshot.error}'));
+                    }
+                    if (!snapshot.hasData) {
+                      return const Center(child: Text('No data available'));
+                    }
+
+                    return ChangeNotifierProvider<
+                      attendance_overview.AttendanceProvider
+                    >(
+                      create: (_) {
+                        final service = attendance_services.AttendanceService(
+                          snapshot.data!,
+                        );
+                        final provider = attendance_overview.AttendanceProvider(
+                          service,
+                        );
+                        // Load initial data for this region scope
+                        provider.loadData(
+                          scope: 'region',
+                          regionId: widget.regionId,
+                        );
+                        return provider;
+                      },
+                      child: Builder(
+                        builder:
+                            (innerContext) => SingleChildScrollView(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  buildScopedAttendanceChart(
+                                    context: innerContext,
+                                    scope: 'region',
+                                    regionId: widget.regionId,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  _buildGroupAttendanceChart(
+                                    _groupAttendanceData,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  _buildActivityStatusChart(
+                                    _activityStatusData,
+                                  ),
+                                ],
                               ),
-                              const SizedBox(height: 16),
-                              _buildGroupAttendanceChart(_groupAttendanceData),
-                              const SizedBox(height: 16),
-                              _buildActivityStatusChart(_activityStatusData),
-                            ],
-                          ),
-                        ),
-                  ),
+                            ),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),
@@ -429,8 +463,18 @@ class _RegionManagerAnalyticsScreenState
               children: [
                 Expanded(
                   child: _buildStatCard(
+                    'Total Members',
+                    stats[2].toString(),
+                    Icons.people,
+                    AppColors.accentColor,
+                    'Registered members',
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: _buildStatCard(
                     'Attendance Rate',
-                    '${_regionalAttendanceData.isNotEmpty ? _regionalAttendanceData[0].toStringAsFixed(1) : 0}%',
+                    '${stats[3] is double ? (stats[3] as double).toStringAsFixed(1) : stats[3].toString()}%',
                     Icons.trending_up,
                     AppColors.successColor,
                     'Overall attendance',
@@ -519,12 +563,12 @@ class _RegionManagerAnalyticsScreenState
               ),
               child: Column(
                 children: [
-                  // _buildActivityItem(
-                  //   Icons.people,
-                  //   'Member Growth',
-                  //   '${_quickStatsData.isNotEmpty ? (int.parse(_quickStatsData.elementAt(2).toString()) * 0.1).toStringAsFixed(0) : 0} new members this week',
-                  //   AppColors.primaryColor,
-                  // ),
+                  _buildActivityItem(
+                    Icons.people,
+                    'Member Growth',
+                    '${_quickStatsData.isNotEmpty ? (int.parse(_quickStatsData.elementAt(2).toString()) * 0.1).toStringAsFixed(0) : 0} new members this week',
+                    AppColors.primaryColor,
+                  ),
                   const SizedBox(height: 12),
                   _buildActivityItem(
                     Icons.event,
@@ -536,7 +580,7 @@ class _RegionManagerAnalyticsScreenState
                   _buildActivityItem(
                     Icons.trending_up,
                     'Attendance Trend',
-                    '${_regionalAttendanceData.isNotEmpty ? (_regionalAttendanceData[0] * 1.05).toStringAsFixed(1) : 0}% expected next week',
+                    '${_quickStatsData.isNotEmpty && _quickStatsData.elementAt(3) is double ? ((_quickStatsData.elementAt(3) as double) * 1.05).toStringAsFixed(1) : 0}% expected next week',
                     AppColors.successColor,
                   ),
                 ],

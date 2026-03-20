@@ -1,36 +1,41 @@
 import 'dart:convert';
 
 import 'package:group_management_church_app/core/constants/app_endpoints.dart';
+import 'package:group_management_church_app/core/utils/role_utils.dart';
 import 'package:group_management_church_app/data/models/user_model.dart';
 import 'package:group_management_church_app/data/providers/auth_provider.dart';
 import 'package:group_management_church_app/data/services/http_client.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/material.dart';
+import 'package:logger/logger.dart';
 
 import 'auth_services.dart';
 
 class UserServices {
   final AuthServices _authServices = AuthServices();
   final HttpClient _httpClient = HttpClient();
+  final Logger _logger = Logger();
 
   //get current user data
   Future<UserModel> fetchCurrentUser(String id, [BuildContext? context]) async {
     try {
       // Validate the ID parameter
       if (id.isEmpty) {
-        print('Error: Empty user ID provided to fetchCurrentUser');
+        _logger.e('Error: Empty user ID provided to fetchCurrentUser');
         throw Exception('User ID cannot be empty');
       }
 
-      print('Fetching user data for ID: $id');
+      _logger.d('Fetching user data for ID: $id');
 
-      final response = await _httpClient.get(ApiEndpoints.getUserById(id));
+      final response = await _httpClient.get(
+        await ApiEndpoints.getUserById(id),
+      );
 
-      print('User data response status: ${response.statusCode}');
+      _logger.d('User data response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
-        print('User data response: $responseData');
+        _logger.d('User data response: $responseData');
 
         // Create user model with null safety
         return UserModel.fromJson(responseData);
@@ -47,16 +52,16 @@ class UserServices {
         }
       } else if (response.statusCode == 403) {
         // Handle forbidden access - could be token issue or permissions
-        print('Access denied (403) when fetching user data for ID: $id');
-        print('Response body: ${response.body}');
+        _logger.w('Access denied (403) when fetching user data for ID: $id');
+        _logger.w('Response body: ${response.body}');
 
         // Try to get more context about the token issue
         try {
           final httpClient = HttpClient();
           final headers = await httpClient.getHeaders();
-          print('Current auth headers being used: $headers');
+          _logger.d('Current auth headers being used: $headers');
         } catch (e) {
-          print('Could not get auth headers for debugging: $e');
+          _logger.e('Could not get auth headers for debugging: $e');
         }
 
         throw Exception(
@@ -67,7 +72,7 @@ class UserServices {
         // Return a minimal, clearly "incomplete" user so that the app
         // can route them to profile setup, but DO NOT pretend they have
         // groups or a finalized role.
-        print(
+        _logger.w(
           'User not found (404), returning minimal placeholder for ID: $id',
         );
         return UserModel(
@@ -83,17 +88,22 @@ class UserServices {
           regionalID: '',
         );
       } else {
-        print(
+        _logger.e(
           'Failed to load user. Status: ${response.statusCode}, Body: ${response.body}',
         );
         throw Exception('Failed to load user: ${response.statusCode}');
       }
     } catch (e) {
-      print('Exception in fetchCurrentUser: $e');
+      _logger.e('Exception in fetchCurrentUser: $e');
       // Bubble the error up so callers can show a proper error state
       // instead of silently treating the user as a plain "user" with no group.
       rethrow;
     }
+  }
+
+  // Get current user ID
+  Future<String?> getUserId() async {
+    return await _authServices.getUserId();
   }
 
   //fetch user role
@@ -103,7 +113,9 @@ class UserServices {
       throw Exception('User ID is null');
     }
 
-    final response = await _httpClient.get(ApiEndpoints.getUserById(userId));
+    final response = await _httpClient.get(
+      await ApiEndpoints.getUserById(userId),
+    );
 
     if (response.statusCode == 200) {
       final user = UserModel.fromJson(jsonDecode(response.body));
@@ -113,10 +125,39 @@ class UserServices {
     }
   }
 
+  //fetch user region ID
+  Future<String?> getUserRegionId() async {
+    final userId = await _authServices.getUserId();
+    if (userId == null) {
+      throw Exception('User ID is null');
+    }
+
+    final response = await _httpClient.get(
+      await ApiEndpoints.getUserById(userId),
+    );
+
+    if (response.statusCode == 200) {
+      final user = UserModel.fromJson(jsonDecode(response.body));
+
+      // For regional leadership roles, return regionalID instead of regionId
+      if (RoleUtils.isRegionalLeadership(user.role)) {
+        _logger.d(
+          'Getting regionalID for regional manager: ${user.regionalID}',
+        );
+        return user.regionalID;
+      }
+
+      _logger.d('Getting regionId for regular user: ${user.regionId}');
+      return user.regionId;
+    } else {
+      throw Exception('Failed to load user region ID');
+    }
+  }
+
   // assign user to group
   Future<bool> assignUserToGroup(String userId, String groupId) async {
     final response = await _httpClient.post(
-      ApiEndpoints.addGroupMember(userId, groupId),
+      await ApiEndpoints.addGroupMember(userId, groupId),
     );
 
     if (response.statusCode == 200) {
@@ -128,7 +169,7 @@ class UserServices {
 
   //getall users
   Future<List<UserModel>> fetchAllUsers() async {
-    final response = await _httpClient.get(ApiEndpoints.users);
+    final response = await _httpClient.get(await ApiEndpoints.users);
 
     if (response.statusCode == 200) {
       List<dynamic> jsonResponse = jsonDecode(response.body);
@@ -142,7 +183,7 @@ class UserServices {
   Future<List<UserModel>> searchUsers(String query) async {
     try {
       final response = await _httpClient.get(
-        '${ApiEndpoints.searchUsers}?query=$query',
+        '${await ApiEndpoints.searchUsers}?query=$query',
       );
 
       if (response.statusCode == 200) {
@@ -162,7 +203,7 @@ class UserServices {
             .toList();
       }
     } catch (e) {
-      print('Error searching users: $e');
+      _logger.e('Error searching users: $e');
       // Fall back to filtering all users locally
       final allUsers = await fetchAllUsers();
       final lowercaseQuery = query.toLowerCase();
@@ -183,12 +224,12 @@ class UserServices {
   Future<List<UserModel>> getUsersByRegion(String regionId) async {
     try {
       final response = await _httpClient.get(
-        ApiEndpoints.getRegionUsers(regionId),
+        await ApiEndpoints.getRegionUsers(regionId),
       );
 
       if (response.statusCode == 200) {
         final jsonResponse = jsonDecode(response.body);
-        print('Region users response: $jsonResponse');
+        _logger.d('Region users response: $jsonResponse');
 
         // Handle different response structures
         List<dynamic> usersData = [];
@@ -204,7 +245,7 @@ class UserServices {
             usersData = jsonResponse['users'] ?? [];
           } else {
             // If the response structure is different, try to extract users
-            print('Unexpected response structure: $jsonResponse');
+            _logger.w('Unexpected response structure: $jsonResponse');
             usersData = [];
           }
         }
@@ -216,10 +257,10 @@ class UserServices {
             if (userData is Map<String, dynamic>) {
               users.add(UserModel.fromJson(userData));
             } else {
-              print('Invalid user data format: $userData');
+              _logger.e('Invalid user data format: $userData');
             }
           } catch (e) {
-            print('Error parsing user data: $userData, Error: $e');
+            _logger.e('Error parsing user data: $userData, Error: $e');
             // Skip this user and continue with others
             continue;
           }
@@ -227,7 +268,7 @@ class UserServices {
 
         return users;
       } else {
-        print(
+        _logger.e(
           'API request failed with status: ${response.statusCode}, Body: ${response.body}',
         );
         // If the API fails, fall back to filtering all users locally by region
@@ -235,13 +276,13 @@ class UserServices {
         return allUsers.where((user) => user.regionId == regionId).toList();
       }
     } catch (e) {
-      print('Error fetching users by region: $e');
+      _logger.e('Error fetching users by region: $e');
       // Fall back to filtering all users locally
       try {
         final allUsers = await fetchAllUsers();
         return allUsers.where((user) => user.regionId == regionId).toList();
       } catch (fallbackError) {
-        print('Fallback also failed: $fallbackError');
+        _logger.e('Fallback also failed: $fallbackError');
         return []; // Return empty list if everything fails
       }
     }
@@ -257,7 +298,7 @@ class UserServices {
   ) async {
     try {
       final response = await _httpClient.post(
-        ApiEndpoints.users,
+        await ApiEndpoints.users,
         body: jsonEncode({
           'full_name': fullName,
           'email': email,
@@ -270,7 +311,7 @@ class UserServices {
 
       return response.statusCode == 201;
     } catch (e) {
-      print('Error creating user: $e');
+      _logger.e('Error creating user: $e');
       return false;
     }
   }
@@ -297,13 +338,13 @@ class UserServices {
 
       // Update the user
       final response = await _httpClient.put(
-        ApiEndpoints.updateUser(userId),
+        await ApiEndpoints.updateUser(userId),
         body: jsonEncode(updatedUser.toJson()),
       );
 
       return response.statusCode == 200;
     } catch (e) {
-      print('Error assigning user to region: $e');
+      _logger.e('Error assigning user to region: $e');
       return false;
     }
   }
@@ -330,13 +371,13 @@ class UserServices {
 
       // Update the user
       final response = await _httpClient.put(
-        ApiEndpoints.updateUser(userId),
+        await ApiEndpoints.updateUser(userId),
         body: jsonEncode(updatedUser.toJson()),
       );
 
       return response.statusCode == 200;
     } catch (e) {
-      print('Error removing user from region: $e');
+      _logger.e('Error removing user from region: $e');
       return false;
     }
   }

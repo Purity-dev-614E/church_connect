@@ -35,28 +35,78 @@ void main() {
 
       // Test splitting logic
       final records = [
-        {'user': UserModel(id: 'user1', fullName: 'User 1', email: 'user1@test.com'), 'attendance': attendanceWithApology},
-        {'user': UserModel(id: 'user2', fullName: 'User 2', email: 'user2@test.com'), 'attendance': attendanceWithoutApology},
-        {'user': UserModel(id: 'user3', fullName: 'User 3', email: 'user3@test.com'), 'attendance': attendanceWithEmptyApology},
+        {
+          'user': UserModel(
+            id: 'user1',
+            fullName: 'User 1',
+            email: 'user1@test.com',
+            contact: '1234567890',
+            nextOfKin: 'Kin1',
+            nextOfKinContact: '0987654321',
+            role: 'member',
+            gender: 'Male',
+            regionId: 'region1',
+            regionalID: 'regional1',
+          ),
+          'attendance': attendanceWithApology,
+        },
+        {
+          'user': UserModel(
+            id: 'user2',
+            fullName: 'User 2',
+            email: 'user2@test.com',
+            contact: '1234567891',
+            nextOfKin: 'Kin2',
+            nextOfKinContact: '0987654322',
+            role: 'member',
+            gender: 'Female',
+            regionId: 'region2',
+            regionalID: 'regional2',
+          ),
+          'attendance': attendanceWithoutApology,
+        },
+        {
+          'user': UserModel(
+            id: 'user3',
+            fullName: 'User 3',
+            email: 'user3@test.com',
+            contact: '1234567892',
+            nextOfKin: 'Kin3',
+            nextOfKinContact: '0987654323',
+            role: 'member',
+            gender: 'Male',
+            regionId: 'region3',
+            regionalID: 'regional3',
+          ),
+          'attendance': attendanceWithEmptyApology,
+        },
       ];
 
       // Simulate the splitting logic from the app
-      final withApology = records.where((record) {
-        final attendance = record['attendance'] as AttendanceModel;
-        return attendance.apology != null && attendance.apology!.isNotEmpty;
-      }).toList();
+      final withApology =
+          records.where((record) {
+            final attendance = record['attendance'] as AttendanceModel;
+            return attendance.apology != null && attendance.apology!.isNotEmpty;
+          }).toList();
 
-      final withoutApology = records.where((record) {
-        final attendance = record['attendance'] as AttendanceModel;
-        return attendance.apology == null || attendance.apology!.isEmpty;
-      }).toList();
+      final withoutApology =
+          records.where((record) {
+            final attendance = record['attendance'] as AttendanceModel;
+            return attendance.apology == null || attendance.apology!.isEmpty;
+          }).toList();
 
       expect(withApology.length, equals(1));
       expect(withoutApology.length, equals(2));
-      
+
       // Check the first record
-      expect(withApology.first['user'].fullName, equals('User 1'));
-      expect(withoutApology.first['user'].fullName, equals('User 2'));
+      expect(
+        (withApology.first['user'] as UserModel).fullName,
+        equals('User 1'),
+      );
+      expect(
+        (withoutApology.first['user'] as UserModel).fullName,
+        equals('User 2'),
+      );
     });
 
     test('Should display apology only when showApology is true', () {
@@ -71,8 +121,11 @@ void main() {
 
       // Test UI logic - when showApology is true, apology should be visible
       final showApology = true;
-      final displayApology = showApology && attendance.apology != null && attendance.apology!.isNotEmpty;
-      
+      final displayApology =
+          showApology &&
+          attendance.apology != null &&
+          attendance.apology!.isNotEmpty;
+
       expect(displayApology, isTrue);
       expect(attendance.apology, equals('Family emergency'));
     });
@@ -89,8 +142,11 @@ void main() {
 
       // Test UI logic - when showApology is false, apology should not be visible
       final showApology = false;
-      final displayApology = showApology && attendance.apology != null && attendance.apology!.isNotEmpty;
-      
+      final displayApology =
+          showApology &&
+          attendance.apology != null &&
+          attendance.apology!.isNotEmpty;
+
       expect(displayApology, isFalse);
     });
 
@@ -106,8 +162,11 @@ void main() {
 
       // Test UI logic - empty string should not display
       final showApology = true;
-      final displayApology = showApology && attendance.apology != null && attendance.apology!.isNotEmpty;
-      
+      final displayApology =
+          showApology &&
+          attendance.apology != null &&
+          attendance.apology!.isNotEmpty;
+
       expect(displayApology, isFalse);
     });
   });

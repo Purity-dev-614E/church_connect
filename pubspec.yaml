@@ -82,6 +82,7 @@ flutter:
     - assets/images/
     - assets/icons/
     - assets/lottie/
+    - config/
 
   fonts:
     - family: WinkySans

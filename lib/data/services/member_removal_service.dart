@@ -13,11 +13,11 @@ class MemberRemovalService {
   ) async {
     try {
       print('Fetching user details for userId: ${member.userId}');
-      print('API Endpoint: ${ApiEndpoints.getUserById(member.userId)}');
+      print('API Endpoint: ${await ApiEndpoints.getUserById(member.userId)}');
 
       // Always fetch user details to ensure we have correct name and email
       final userResponse = await _httpClient.get(
-        ApiEndpoints.getUserById(member.userId),
+        await ApiEndpoints.getUserById(member.userId),
       );
 
       print('Response status: ${userResponse.statusCode}');
@@ -65,7 +65,7 @@ class MemberRemovalService {
   }) async {
     try {
       final response = await _httpClient.post(
-        ApiEndpoints.removeGroupMemberWithReason(groupId, userId),
+        await ApiEndpoints.removeGroupMemberWithReason(groupId, userId),
         body: {'reason': reason},
       );
 
@@ -94,7 +94,7 @@ class MemberRemovalService {
       };
 
       final uri = Uri.parse(
-        ApiEndpoints.getRemovedMembers(groupId),
+        await ApiEndpoints.getRemovedMembers(groupId),
       ).replace(queryParameters: queryParams);
 
       final response = await http.get(
@@ -142,7 +142,7 @@ class MemberRemovalService {
   Future<RemovalStats> getGroupRemovalStats(String groupId) async {
     try {
       final response = await _httpClient.get(
-        ApiEndpoints.getGroupRemovalStats(groupId),
+        await ApiEndpoints.getGroupRemovalStats(groupId),
       );
 
       if (response.statusCode == 200) {
@@ -159,7 +159,7 @@ class MemberRemovalService {
   Future<bool> canRemoveMembers(String groupId) async {
     try {
       final response = await _httpClient.get(
-        ApiEndpoints.getGroupRemovalPermissions(groupId),
+        await ApiEndpoints.getGroupRemovalPermissions(groupId),
       );
 
       if (response.statusCode == 200) {
@@ -177,7 +177,7 @@ class MemberRemovalService {
   Future<bool> restoreMember(String groupId, String userId) async {
     try {
       final response = await _httpClient.post(
-        ApiEndpoints.restoreGroupMember(groupId, userId),
+        await ApiEndpoints.restoreGroupMember(groupId, userId),
       );
 
       if (response.statusCode == 200) {
@@ -194,7 +194,7 @@ class MemberRemovalService {
   Future<List<RemovedMemberModel>> getUserRemovalHistory(String userId) async {
     try {
       final response = await _httpClient.get(
-        ApiEndpoints.getUserRemovalHistory(userId),
+        await ApiEndpoints.getUserRemovalHistory(userId),
       );
 
       if (response.statusCode == 200) {
@@ -254,7 +254,7 @@ class MemberRemovalService {
       };
 
       final uri = Uri.parse(
-        ApiEndpoints.getAllRemovedMembers,
+        await ApiEndpoints.getAllRemovedMembers,
       ).replace(queryParameters: queryParams);
 
       final response = await http.get(
@@ -308,7 +308,7 @@ class MemberRemovalService {
     try {
       // 1. Get all groups in the region
       final response = await _httpClient.get(
-        ApiEndpoints.getRegionGroups(regionId),
+        await ApiEndpoints.getRegionGroups(regionId),
       );
 
       if (response.statusCode != 200) {

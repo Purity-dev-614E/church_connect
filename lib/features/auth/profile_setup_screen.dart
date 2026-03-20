@@ -275,17 +275,22 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
             // Set region if available
             _selectedRegionId = currentUser.regionId;
-
-            // Set profile image URL if available
-            if (currentUser.profileImageUrl != null) {
-              // If the URL is relative, make it absolute
-              _profileImageUrl =
-                  currentUser.profileImageUrl!.startsWith('http')
-                      ? currentUser.profileImageUrl
-                      : '${ApiEndpoints.baseUrl}${currentUser.profileImageUrl}';
-              print('Profile image URL set to: $_profileImageUrl');
-            }
           });
+
+          // Set profile image URL if available (outside setState)
+          if (currentUser.profileImageUrl != null) {
+            // If the URL is relative, make it absolute
+            final baseUrl = await ApiEndpoints.baseUrl;
+            final profileImageUrl =
+                currentUser.profileImageUrl!.startsWith('http')
+                    ? currentUser.profileImageUrl
+                    : '$baseUrl${currentUser.profileImageUrl}';
+            print('Profile image URL set to: $profileImageUrl');
+
+            setState(() {
+              _profileImageUrl = profileImageUrl;
+            });
+          }
         }
       } catch (e) {
         _showError('Error loading user data: $e');

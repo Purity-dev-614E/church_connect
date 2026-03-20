@@ -12,7 +12,7 @@ enum AuthStatus {
   authenticated,
   unauthenticated,
   authenticating,
-  error
+  error,
 }
 
 class AuthResult {
@@ -20,17 +20,13 @@ class AuthResult {
   final String message;
   final UserModel? user;
 
-  AuthResult({
-    required this.success,
-    required this.message,
-    this.user,
-  });
+  AuthResult({required this.success, required this.message, this.user});
 }
 
 class AuthProvider extends ChangeNotifier {
   final AuthServices _authService = AuthServices();
   final FlutterSecureStorage _secureStorage = FlutterSecureStorage();
-  static const String _baseUrl = ApiEndpoints.baseUrl; // Replace with your actual API base URL
+  // Base URL is now handled dynamically by ApiEndpoints class
 
   AuthStatus _status = AuthStatus.initial;
   AuthStatus get status => _status;
@@ -87,25 +83,22 @@ class AuthProvider extends ChangeNotifier {
       // Trim inputs to avoid whitespace issues
       final trimmedEmail = email.trim();
       final trimmedPassword = password;
-      
+
       // Validate inputs
       if (trimmedEmail.isEmpty || trimmedPassword.isEmpty) {
         _status = AuthStatus.unauthenticated;
         _errorMessage = 'Email and password are required';
         notifyListeners();
-        return AuthResult(
-          success: false,
-          message: _errorMessage,
-        );
+        return AuthResult(success: false, message: _errorMessage);
       }
-      
+
       // Call the login service
       final result = await _authService.login(trimmedEmail, trimmedPassword);
       print('Auth provider login result: $result');
-      
+
       final bool success = result['success'] == true;
       final String message = result['message'] ?? 'Unknown error';
-      
+
       if (success) {
         // Set the current user from the login response
         // The Supabase user object structure is different from our UserModel
@@ -116,16 +109,18 @@ class AuthProvider extends ChangeNotifier {
             // Create a minimal user model from Supabase user object
             _currentUser = UserModel(
               id: userData['id']?.toString() ?? '',
-              fullName: userData['user_metadata']?['full_name']?.toString() ?? 
-                       userData['email']?.toString().split('@')[0] ?? 
-                       'User ${userData['id']?.toString() ?? ''}',
+              fullName:
+                  userData['user_metadata']?['full_name']?.toString() ??
+                  userData['email']?.toString().split('@')[0] ??
+                  'User ${userData['id']?.toString() ?? ''}',
               email: userData['email']?.toString() ?? '',
               contact: userData['phone']?.toString() ?? '',
               nextOfKin: '',
               nextOfKinContact: '',
-              role: userData['user_metadata']?['role']?.toString() ?? 
-                   userData['role']?.toString() ?? 
-                   'user',
+              role:
+                  userData['user_metadata']?['role']?.toString() ??
+                  userData['role']?.toString() ??
+                  'user',
               gender: '',
               regionId: '',
               regionalID: '',
@@ -149,7 +144,7 @@ class AuthProvider extends ChangeNotifier {
             );
           }
         }
-        
+
         _status = AuthStatus.authenticated;
         notifyListeners();
         return AuthResult(
@@ -161,19 +156,13 @@ class AuthProvider extends ChangeNotifier {
         _status = AuthStatus.unauthenticated;
         _errorMessage = message;
         notifyListeners();
-        return AuthResult(
-          success: false,
-          message: _errorMessage,
-        );
+        return AuthResult(success: false, message: _errorMessage);
       }
     } catch (e) {
       _status = AuthStatus.error;
       _errorMessage = _getReadableErrorMessage(e.toString());
       notifyListeners();
-      return AuthResult(
-        success: false,
-        message: _errorMessage,
-      );
+      return AuthResult(success: false, message: _errorMessage);
     }
   }
 
@@ -191,20 +180,15 @@ class AuthProvider extends ChangeNotifier {
           message: 'Password reset link sent successfully',
         );
       } else {
-        _errorMessage = 'Failed to send reset link. Please check your email address.';
+        _errorMessage =
+            'Failed to send reset link. Please check your email address.';
         notifyListeners();
-        return AuthResult(
-          success: false,
-          message: _errorMessage,
-        );
+        return AuthResult(success: false, message: _errorMessage);
       }
     } catch (e) {
       _errorMessage = _getReadableErrorMessage(e.toString());
       notifyListeners();
-      return AuthResult(
-        success: false,
-        message: _errorMessage,
-      );
+      return AuthResult(success: false, message: _errorMessage);
     }
   }
 
@@ -233,7 +217,8 @@ class AuthProvider extends ChangeNotifier {
         return loginResult;
       } else {
         _status = AuthStatus.unauthenticated;
-        _errorMessage = 'Failed to create account. Email may already be in use.';
+        _errorMessage =
+            'Failed to create account. Email may already be in use.';
         notifyListeners();
         return AuthResult(success: false, message: _errorMessage);
       }
@@ -245,7 +230,6 @@ class AuthProvider extends ChangeNotifier {
       return AuthResult(success: false, message: _errorMessage);
     }
   }
-
 
   Future<bool> logout() async {
     try {
@@ -278,7 +262,8 @@ class AuthProvider extends ChangeNotifier {
 
   // Helper method to convert technical error messages to user-friendly ones
   String _getReadableErrorMessage(String error) {
-    if (error.contains('SocketException') || error.contains('Connection refused')) {
+    if (error.contains('SocketException') ||
+        error.contains('Connection refused')) {
       return 'Network error. Please check your internet connection.';
     } else if (error.contains('TimeoutException')) {
       return 'Request timed out. Please try again.';
@@ -302,20 +287,22 @@ class AuthProvider extends ChangeNotifier {
     }
     notifyListeners();
   }
-  
+
   /// Refresh the authentication token
-  /// 
+  ///
   /// Returns true if token was successfully refreshed
   Future<bool> refreshToken() async {
     try {
       final success = await _authService.refreshToken();
-      
+
       if (!success) {
         // If refresh fails but we still have an access token, don't force logout.
         // Some web contexts block storage writes, making refresh "appear" to fail.
         final existingToken = await _authService.getAccessToken();
         if (existingToken != null && existingToken.isNotEmpty) {
-          print('Token refresh failed, but access token exists; continuing without refresh.');
+          print(
+            'Token refresh failed, but access token exists; continuing without refresh.',
+          );
           return true;
         }
 
@@ -323,12 +310,14 @@ class AuthProvider extends ChangeNotifier {
         _errorMessage = 'Your session has expired. Please login again.';
         notifyListeners();
       }
-      
+
       return success;
     } catch (e) {
       final existingToken = await _authService.getAccessToken();
       if (existingToken != null && existingToken.isNotEmpty) {
-        print('Token refresh threw, but access token exists; continuing without refresh.');
+        print(
+          'Token refresh threw, but access token exists; continuing without refresh.',
+        );
         return true;
       }
 
@@ -338,20 +327,20 @@ class AuthProvider extends ChangeNotifier {
       return false;
     }
   }
-  
+
   /// Handle authentication errors
-  /// 
+  ///
   /// This method should be called when API requests return 401 errors
   Future<bool> handleAuthError() async {
     // Try to refresh the token
     final refreshed = await refreshToken();
-    
+
     if (!refreshed) {
       // If refresh fails, logout the user
       await logout();
       return false;
     }
-    
+
     return true;
   }
 
@@ -364,20 +353,23 @@ class AuthProvider extends ChangeNotifier {
       }
 
       // Format the base64 image with the data URL prefix if it doesn't have one
-      final formattedBase64Image = base64Image.startsWith('data:image/') 
-          ? base64Image 
-          : 'data:image/jpeg;base64,$base64Image';
+      final formattedBase64Image =
+          base64Image.startsWith('data:image/')
+              ? base64Image
+              : 'data:image/jpeg;base64,$base64Image';
 
       // Make API request to upload profile image
-      final url = Uri.parse(ApiEndpoints.uploadUserImage(userId));
-      
+      final url = Uri.parse(await ApiEndpoints.uploadUserImage(userId));
+
       // Log request details (excluding the full base64 string for brevity)
       print('Upload request details:');
       print('- URL: $url');
       print('- Method: PUT');
       print('- Headers: Authorization: Bearer ${token.substring(0, 10)}...');
       print('- Base64 image length: ${formattedBase64Image.length} characters');
-      print('- Base64 image format: ${formattedBase64Image.substring(0, 30)}...');
+      print(
+        '- Base64 image format: ${formattedBase64Image.substring(0, 30)}...',
+      );
 
       final response = await http.put(
         url,
@@ -385,9 +377,7 @@ class AuthProvider extends ChangeNotifier {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({
-          'image': formattedBase64Image,
-        }),
+        body: jsonEncode({'image': formattedBase64Image}),
       );
 
       print('\nUpload response details:');
@@ -402,9 +392,10 @@ class AuthProvider extends ChangeNotifier {
             // Construct the full image URL by combining the server base URL with the relative path
             // The response URL is typically relative, so we prepend the server base URL
             final serverBaseUrl = 'https://safari-backend-fgl3.onrender.com';
-            final imagePath = responseData['url'].toString().startsWith('/') 
-                ? responseData['url'] 
-                : '/${responseData['url']}';
+            final imagePath =
+                responseData['url'].toString().startsWith('/')
+                    ? responseData['url']
+                    : '/${responseData['url']}';
             final fullImageUrl = '$serverBaseUrl$imagePath';
             print('Full image URL: $fullImageUrl');
 

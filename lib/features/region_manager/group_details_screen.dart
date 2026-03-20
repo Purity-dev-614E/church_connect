@@ -618,7 +618,7 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen>
     return '$weekday, $month $day at $hour:$minute $amPm';
   }
 
-  void _showCreateEventDialog() {
+  void _showCreateEventDialog() async {
     final TextEditingController titleController = TextEditingController();
     final TextEditingController descriptionController = TextEditingController();
     final TextEditingController locationController = TextEditingController();

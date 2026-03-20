@@ -9,11 +9,11 @@ class UserDeletionDialog extends StatefulWidget {
   final VoidCallback? onDeletionComplete;
 
   const UserDeletionDialog({
-    Key? key,
+    super.key,
     required this.user,
     required this.currentUserRole,
     this.onDeletionComplete,
-  }) : super(key: key);
+  }) : super();
 
   @override
   State<UserDeletionDialog> createState() => _UserDeletionDialogState();
@@ -44,77 +44,90 @@ class _UserDeletionDialogState extends State<UserDeletionDialog> {
           children: [
             Text(
               'Are you sure you want to delete ${widget.user.fullName}?',
-              style: const TextStyle(fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
             ),
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.grey[100],
+                color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey[300]!),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Email: ${widget.user.email}'),
-                  Text('Phone: +${widget.user.contact}'),
-                  Text('Role: ${_getRoleDisplay(userCanonicalRole)}'),
+                  Text(
+                    'Email: ${widget.user.email}',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                  Text(
+                    'Phone: +${widget.user.contact}',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                  Text(
+                    'Role: ${_getRoleDisplay(userCanonicalRole)}',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Choose deletion type:',
-              style: TextStyle(fontWeight: FontWeight.bold),
+            Text(
+              'This will permanently delete the user from the system.',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              '• Backend Only: Removes user from database but keeps authentication',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-            if (isSuperAdminOrRoot)
-              const Text(
-                '• Complete Delete: Removes user from database AND authentication',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
+            Text(
+              '• Removes user from database AND authentication',
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
               ),
+            ),
           ],
         ),
       ),
       actions: [
         TextButton(
           onPressed: _isDeleting ? null : () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        TextButton(
-          onPressed: _isDeleting ? null : () => _deleteUser(context, false),
-          child:
-              _isDeleting
-                  ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                  : const Text('Delete (Backend Only)'),
+          child: Text(
+            'Cancel',
+            style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+          ),
         ),
         if (isSuperAdminOrRoot)
           ElevatedButton(
             onPressed: _isDeleting ? null : () => _deleteUser(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
             ),
             child:
                 _isDeleting
-                    ? const SizedBox(
+                    ? SizedBox(
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.white,
+                        color: Theme.of(context).colorScheme.onError,
                       ),
                     )
-                    : const Text('Delete Completely'),
+                    : const Text('Delete User'),
           ),
       ],
     );

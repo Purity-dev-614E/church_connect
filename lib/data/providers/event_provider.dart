@@ -65,7 +65,7 @@ class EventProvider extends ChangeNotifier {
   Future<List<EventModel>> fetchOverallEvents() async {
     _setLoading(true);
     try {
-      debugPrint('Fetching overall events from: ${ApiEndpoints.events}');
+      debugPrint('Fetching overall events from: ${await ApiEndpoints.events}');
       final events = await _eventServices.getOverallEvents();
       _errorMessage = null;
       debugPrint('Successfully fetched ${events.length} overall events');
@@ -153,6 +153,7 @@ class EventProvider extends ChangeNotifier {
     required DateTime dateTime,
     required String location,
     String? regionId,
+    String? targetAudience,
   }) async {
     _setLoading(true);
     try {
@@ -162,6 +163,7 @@ class EventProvider extends ChangeNotifier {
         dateTime: dateTime,
         location: location,
         regionId: regionId,
+        targetAudience: targetAudience,
       );
 
       // Refresh overall events list to include the new leadership event
@@ -459,6 +461,21 @@ class EventProvider extends ChangeNotifier {
     }
   }
 
+  /// Fetch events by region
+  Future<List<EventModel>> fetchEventsByRegion(String regionId) async {
+    _setLoading(true);
+    try {
+      final regionEvents = await _eventServices.getEventsByRegion(regionId);
+      _errorMessage = null;
+      return regionEvents;
+    } catch (error) {
+      _handleError('fetching events by region', error);
+      return [];
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   // SECTION: Leadership Event Management
 
   /// Fetch leadership events
@@ -518,6 +535,30 @@ class EventProvider extends ChangeNotifier {
     } catch (error) {
       _handleError('marking leadership attendance', error);
       return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Get leadership attendees based on user roles and permissions
+  ///
+  /// This method fetches leadership event attendees using the new endpoint
+  /// that implements conditional logic based on user role, region, and user_tle values
+  Future<List<UserModel>> fetchLeadershipAttendees({
+    required String eventId,
+    List<String>? userTle,
+  }) async {
+    _setLoading(true);
+    try {
+      final attendees = await _eventServices.getLeadershipAttendees(
+        eventId: eventId,
+        userTle: userTle,
+      );
+      _errorMessage = null;
+      return attendees;
+    } catch (error) {
+      _handleError('fetching leadership attendees', error);
+      return [];
     } finally {
       _setLoading(false);
     }

@@ -70,7 +70,7 @@ class EventServices {
     // For regular admins, check if they are the admin of this group
     try {
       final response = await _httpClient.get(
-        ApiEndpoints.getGroupById(groupId),
+        await ApiEndpoints.getGroupById(groupId),
       );
 
       if (response.statusCode == 200) {
@@ -90,21 +90,57 @@ class EventServices {
 
   // SECTION: Event Management
 
-  /// Check if user has permission to create leadership events
-  Future<void> _checkLeadershipPermission() async {
+  /// Check if user has permission to create leadership events with specific target audience
+  Future<void> _checkLeadershipPermissionWithTargetAudience(
+    String? targetAudience,
+    String? regionId,
+  ) async {
     final userRole = await _userServices.getUserRole();
 
     if (userRole == null) {
       throw Exception('User role is null');
     }
 
-    // Allow root, super admin, and regional leadership to create leadership events
+    // Check base permission for creating leadership events
     if (!RoleUtils.isRoot(userRole) &&
         !RoleUtils.isSuperAdmin(userRole) &&
         !RoleUtils.isRegionalLeadership(userRole)) {
       throw Exception(
         'Only super admin, root, and regional managers can create leadership events',
       );
+    }
+
+    // Validate target_audience based on role
+    if (RoleUtils.isRegionalLeadership(userRole)) {
+      // Regional managers can only create 'regional' events
+      if (targetAudience != null && targetAudience != 'regional') {
+        throw Exception(
+          'Regional managers can only create events with target_audience = "regional"',
+        );
+      }
+      // Regional managers MUST provide regionId for 'regional' events
+      if (regionId == null || regionId.isEmpty) {
+        throw Exception(
+          'Regional ID is required when creating regional leadership events',
+        );
+      }
+    } else if (RoleUtils.isSuperAdmin(userRole) || RoleUtils.isRoot(userRole)) {
+      // Super admin/root can create 'all', 'rc_only', or 'regional' events
+      if (targetAudience != null &&
+          targetAudience != 'all' &&
+          targetAudience != 'rc_only' &&
+          targetAudience != 'regional') {
+        throw Exception(
+          'Invalid target_audience. Must be "all", "rc_only", or "regional"',
+        );
+      }
+      // For super admin creating 'regional' events, regionId is also required
+      if (targetAudience == 'regional' &&
+          (regionId == null || regionId.isEmpty)) {
+        throw Exception(
+          'Regional ID is required when creating regional leadership events',
+        );
+      }
     }
   }
 
@@ -141,10 +177,23 @@ class EventServices {
     required DateTime dateTime,
     required String location,
     String? regionId,
+    String? targetAudience, // 'all', 'rc_only', or 'regional'
   }) async {
     try {
-      // Check if user has permission to create leadership events
-      await _checkLeadershipPermission();
+      // Check if user has permission to create leadership events with this target audience
+      await _checkLeadershipPermissionWithTargetAudience(
+        targetAudience,
+        regionId,
+      );
+
+      print('=== Creating Leadership Event ===');
+      print('Title: $title');
+      print('Description: $description');
+      print('DateTime: ${dateTime.toUtc().toIso8601String()}');
+      print('Location: $location');
+      print('Target Audience: $targetAudience');
+      print('Region ID: $regionId');
+      print('User Role: ${await _userServices.getUserRole()}');
 
       final body = <String, dynamic>{
         'title': title,
@@ -154,12 +203,16 @@ class EventServices {
         'location': location,
         'tag': 'leadership',
         // Do not include group_id - backend will set it to null
-        // Include region_id if provided (for regional managers)
-        if (regionId != null) 'region_id': regionId,
+        // Include target_audience for leadership events
+        if (targetAudience != null) 'target_audience': targetAudience,
+        // Always include regional_id (empty string for non-regional events as backend workaround)
+        'regional_id': regionId ?? '',
       };
 
+      print('Request Body: $body');
+
       final response = await _httpClient.post(
-        ApiEndpoints.createLeadershipEvent,
+        await ApiEndpoints.createLeadershipEvent,
         body: body,
       );
 
@@ -193,8 +246,8 @@ class EventServices {
       // Use different endpoint for leadership events
       final endpoint =
           (tag == 'leadership')
-              ? ApiEndpoints.createLeadershipEvent
-              : ApiEndpoints.createGroupEvent(groupId ?? '');
+              ? await ApiEndpoints.createLeadershipEvent
+              : await ApiEndpoints.createGroupEvent(groupId ?? '');
 
       final response = await _httpClient.post(
         endpoint,
@@ -230,7 +283,7 @@ class EventServices {
   Future<List<EventModel>> getEventsByGroup(String groupId) async {
     try {
       final response = await _httpClient.get(
-        ApiEndpoints.getEventsByGroup(groupId),
+        await ApiEndpoints.getEventsByGroup(groupId),
       );
 
       if (response.statusCode == 200) {
@@ -252,7 +305,7 @@ class EventServices {
   Future<EventModel> getEventById(String eventId) async {
     try {
       final response = await _httpClient.get(
-        ApiEndpoints.getEventById(eventId),
+        await ApiEndpoints.getEventById(eventId),
       );
 
       if (response.statusCode == 200) {
@@ -287,7 +340,7 @@ class EventServices {
       }
 
       final response = await _httpClient.put(
-        ApiEndpoints.updateEvent(eventId),
+        await ApiEndpoints.updateEvent(eventId),
         body: {
           'title': title,
           'description': description,
@@ -323,7 +376,7 @@ class EventServices {
       }
 
       final response = await _httpClient.delete(
-        ApiEndpoints.deleteEvent(eventId),
+        await ApiEndpoints.deleteEvent(eventId),
       );
 
       if (response.statusCode == 200) {
@@ -394,7 +447,7 @@ class EventServices {
   //getall events
   Future<List<EventModel>> getAllEvents(String groupId) async {
     try {
-      final response = await _httpClient.get(ApiEndpoints.events);
+      final response = await _httpClient.get(await ApiEndpoints.events);
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         return data.map((event) => EventModel.fromJson(event)).toList();
@@ -427,7 +480,7 @@ class EventServices {
       }
 
       final response = await _httpClient.post(
-        ApiEndpoints.createEventAttendance(eventId),
+        await ApiEndpoints.createEventAttendance(eventId),
         body: {'event_id': eventId, 'attended_members': attendedMemberIds},
       );
 
@@ -449,7 +502,7 @@ class EventServices {
   Future<List<UserModel>> getAttendedMembers(String eventId) async {
     try {
       final response = await _httpClient.get(
-        ApiEndpoints.getAttendedMembers(eventId),
+        await ApiEndpoints.getAttendedMembers(eventId),
       );
 
       if (response.statusCode == 200) {
@@ -471,7 +524,7 @@ class EventServices {
   Future<List<AttendanceModel>> getEventAttendance(String eventId) async {
     try {
       final response = await _httpClient.get(
-        ApiEndpoints.getAttendanceByEvent(eventId),
+        await ApiEndpoints.getAttendanceByEvent(eventId),
       );
 
       if (response.statusCode == 200) {
@@ -494,7 +547,7 @@ class EventServices {
   Future<Map<String, dynamic>> getGroupAttendance(String groupId) async {
     try {
       final response = await _httpClient.get(
-        ApiEndpoints.getGroupAttendance(groupId),
+        await ApiEndpoints.getGroupAttendance(groupId),
       );
 
       if (response.statusCode == 200) {
@@ -557,7 +610,7 @@ class EventServices {
       );
 
       final response = await _httpClient.post(
-        ApiEndpoints.createEventAttendance(eventId),
+        await ApiEndpoints.createEventAttendance(eventId),
         body: jsonEncode(body),
       );
 
@@ -606,7 +659,7 @@ class EventServices {
   ) async {
     try {
       final response = await _httpClient.get(
-        ApiEndpoints.getAttendanceByUser(userId),
+        await ApiEndpoints.getAttendanceByUser(userId),
       );
 
       if (response.statusCode == 200) {
@@ -648,7 +701,7 @@ class EventServices {
   Future<List<EventModel>> getEventsByRegion(String regionId) async {
     try {
       final response = await _httpClient.get(
-        ApiEndpoints.getEventsByRegion(regionId),
+        await ApiEndpoints.getEventsByRegion(regionId),
       );
 
       if (response.statusCode == 200) {
@@ -668,7 +721,9 @@ class EventServices {
       // Fallback: Try to get all events and filter by region
       try {
         final allEvents = await getOverallEvents();
-        return allEvents.where((event) => event.regionId == regionId).toList();
+        return allEvents
+            .where((event) => event.regionalId == regionId)
+            .toList();
       } catch (fallbackError) {
         throw Exception(
           'Failed to fetch region events: $e, Fallback error: $fallbackError',
@@ -680,7 +735,7 @@ class EventServices {
   /// Get all events
   Future<List<EventModel>> getOverallEvents() async {
     try {
-      final response = await _httpClient.get(ApiEndpoints.events);
+      final response = await _httpClient.get(await ApiEndpoints.events);
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
@@ -698,7 +753,9 @@ class EventServices {
   /// Get leadership events
   Future<List<EventModel>> getLeadershipEvents() async {
     try {
-      final response = await _httpClient.get(ApiEndpoints.leadershipEvents);
+      final response = await _httpClient.get(
+        await ApiEndpoints.leadershipEvents,
+      );
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
@@ -722,7 +779,7 @@ class EventServices {
     String? targetAudience,
   }) async {
     try {
-      String url = ApiEndpoints.getEventParticipants(eventId);
+      String url = await ApiEndpoints.getEventParticipants(eventId);
       if (targetAudience != null) {
         url += '?target_audience=$targetAudience';
       }
@@ -756,7 +813,7 @@ class EventServices {
   }) async {
     try {
       final response = await _httpClient.post(
-        ApiEndpoints.createLeadershipAttendance(eventId),
+        await ApiEndpoints.createLeadershipAttendance(eventId),
         body: json.encode({
           'user_id': userId,
           'present': present,
@@ -775,7 +832,76 @@ class EventServices {
         throw Exception(errorMessage);
       }
     } catch (e) {
-      throw Exception('Failed to mark attendance: $e');
+      throw Exception('Failed to mark leadership attendance: $e');
+    }
+  }
+
+  /// Get leadership attendees based on user roles and permissions
+  ///
+  /// This endpoint implements the conditional logic for fetching leadership event attendees
+  /// based on the user's role, region, and the specified user_tle values
+  Future<List<UserModel>> getLeadershipAttendees({
+    required String eventId,
+    List<String>? userTle, // Optional list of user_tle values to filter by
+  }) async {
+    try {
+      // Use the same endpoint as getLeadershipEventParticipants for consistency
+      String url = await ApiEndpoints.getEventParticipants(eventId);
+
+      // Add user_tle filter if provided (though this endpoint may not use it)
+      if (userTle != null && userTle.isNotEmpty) {
+        final tleValues = userTle.join(',');
+        url += '?user_tle=$tleValues';
+      }
+
+      final response = await _httpClient.get(url);
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        final participants =
+            data
+                .map((participant) => Participant.fromJson(participant))
+                .toList();
+
+        // Convert Participant objects to UserModel objects
+        final users =
+            participants.map((participant) {
+              return UserModel(
+                id: participant.id,
+                fullName: participant.fullName,
+                email: participant.email,
+                contact: '', // Required field, using empty string as default
+                nextOfKin: '', // Required field, using empty string as default
+                nextOfKinContact:
+                    '', // Required field, using empty string as default
+                role: participant.role,
+                gender: '', // Required field, using empty string as default
+                regionId: participant.regionId ?? '',
+                regionalID:
+                    participant.regionId ?? '', // Using same value for both
+                // Optional fields
+                regionName: null,
+                createdAt: null,
+                profileImageUrl: null,
+                age: null,
+                citam_Assembly: null,
+                if_Not: null,
+                overalRegionName: null,
+                regionalTitle: null,
+              );
+            }).toList();
+
+        return users;
+      } else {
+        final errorData = jsonDecode(response.body);
+        final errorMessage = ApiErrorHandler.getParticipantErrorMessage(
+          response.statusCode,
+          errorData,
+        );
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      throw Exception('Failed to fetch leadership attendees: $e');
     }
   }
 }

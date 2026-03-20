@@ -3,6 +3,7 @@ import 'package:group_management_church_app/core/constants/app_endpoints.dart';
 import 'package:group_management_church_app/data/services/auth_services.dart';
 import 'package:http/http.dart' as http;
 import '../../models/super_analytics_model.dart';
+import '../../models/database_stats_model.dart';
 import '../user_services.dart';
 import '../http_client.dart';
 
@@ -25,15 +26,17 @@ class SuperAdminAnalyticsService {
   }
 
   // Helper method to handle HTTP response and refresh token if needed
-  Future<http.Response> _handleRequest(Future<http.Response> Function() requestFunction) async {
+  Future<http.Response> _handleRequest(
+    Future<http.Response> Function() requestFunction,
+  ) async {
     try {
       final response = await requestFunction();
-      
+
       // If unauthorized, try to refresh token and retry
       if (response.statusCode == 401) {
         print('Token expired, attempting to refresh...');
         final refreshed = await _authServices.refreshToken();
-        
+
         if (refreshed) {
           print('Token refreshed successfully, retrying request...');
           return await requestFunction();
@@ -42,12 +45,12 @@ class SuperAdminAnalyticsService {
           throw Exception('Authentication failed. Please login again.');
         }
       }
-      
+
       // Handle other errors
       if (response.statusCode >= 400) {
         throw Exception('API Error: ${response.statusCode} - ${response.body}');
       }
-      
+
       return response;
     } catch (e) {
       print('HTTP request error: $e');
@@ -59,8 +62,10 @@ class SuperAdminAnalyticsService {
 
   /// Get demographic breakdown of a group
   Future<GroupDemographics> getGroupDemographics(String groupId) async {
-    final url = Uri.parse(ApiEndpoints.getSuperAdminGroupDemographics(groupId));
-    
+    final url = Uri.parse(
+      await ApiEndpoints.getSuperAdminGroupDemographics(groupId),
+    );
+
     final response = await _handleRequest(() async {
       return await http.get(url, headers: await _getHeaders());
     });
@@ -72,8 +77,10 @@ class SuperAdminAnalyticsService {
 
   /// Get attendance statistics for a group
   Future<GroupAttendanceStats> getGroupAttendanceStats(String groupId) async {
-    final url = Uri.parse(ApiEndpoints.getSuperAdminGroupAttendance(groupId));
-    
+    final url = Uri.parse(
+      await ApiEndpoints.getSuperAdminGroupAttendance(groupId),
+    );
+
     final response = await _handleRequest(() async {
       return await http.get(url, headers: await _getHeaders());
     });
@@ -84,8 +91,8 @@ class SuperAdminAnalyticsService {
 
   /// Get growth analytics for a group
   Future<GroupGrowthAnalytics> getGroupGrowthAnalytics(String groupId) async {
-    final url = Uri.parse(ApiEndpoints.getSuperAdminGroupGrowth(groupId));
-    
+    final url = Uri.parse(await ApiEndpoints.getSuperAdminGroupGrowth(groupId));
+
     final response = await _handleRequest(() async {
       return await http.get(url, headers: await _getHeaders());
     });
@@ -96,8 +103,8 @@ class SuperAdminAnalyticsService {
 
   /// Compare multiple groups
   Future<GroupComparison> compareGroups(List<String> groupIds) async {
-    final url = Uri.parse(ApiEndpoints.compareSuperAdminGroups);
-    
+    final url = Uri.parse(await ApiEndpoints.compareSuperAdminGroups);
+
     final response = await _handleRequest(() async {
       return await http.post(
         url,
@@ -118,8 +125,10 @@ class SuperAdminAnalyticsService {
       throw ArgumentError('Period must be one of: week, month, year');
     }
 
-    final url = Uri.parse(ApiEndpoints.getSuperAdminAttendanceByPeriod(period));
-    
+    final url = Uri.parse(
+      await ApiEndpoints.getSuperAdminAttendanceByPeriod(period),
+    );
+
     final response = await _handleRequest(() async {
       return await http.get(url, headers: await _getHeaders());
     });
@@ -129,13 +138,17 @@ class SuperAdminAnalyticsService {
   }
 
   /// Get overall attendance statistics for a specific period
-  Future<OverallAttendanceByPeriod> getOverallAttendanceByPeriod(String period) async {
+  Future<OverallAttendanceByPeriod> getOverallAttendanceByPeriod(
+    String period,
+  ) async {
     if (!['week', 'month', 'year'].contains(period)) {
       throw ArgumentError('Period must be one of: week, month, year');
     }
 
-    final url = Uri.parse(ApiEndpoints.getSuperAdminOverallAttendanceByPeriod(period));
-    
+    final url = Uri.parse(
+      await ApiEndpoints.getSuperAdminOverallAttendanceByPeriod(period),
+    );
+
     final response = await _handleRequest(() async {
       return await http.get(url, headers: await _getHeaders());
     });
@@ -146,8 +159,10 @@ class SuperAdminAnalyticsService {
 
   /// Get attendance trends for a specific user
   Future<Map<String, dynamic>> getUserAttendanceTrends(String userId) async {
-    final url = Uri.parse(ApiEndpoints.getSuperAdminUserAttendanceTrends(userId));
-    
+    final url = Uri.parse(
+      await ApiEndpoints.getSuperAdminUserAttendanceTrends(userId),
+    );
+
     final response = await _handleRequest(() async {
       return await http.get(url, headers: await _getHeaders());
     });
@@ -159,9 +174,13 @@ class SuperAdminAnalyticsService {
   // Event Analytics
 
   /// Get participation statistics for an event
-  Future<EventParticipationStats> getEventParticipationStats(String eventId) async {
-    final url = Uri.parse(ApiEndpoints.getSuperAdminEventParticipation(eventId));
-    
+  Future<EventParticipationStats> getEventParticipationStats(
+    String eventId,
+  ) async {
+    final url = Uri.parse(
+      await ApiEndpoints.getSuperAdminEventParticipation(eventId),
+    );
+
     final response = await _handleRequest(() async {
       return await http.get(url, headers: await _getHeaders());
     });
@@ -171,9 +190,11 @@ class SuperAdminAnalyticsService {
   }
 
   /// Compare attendance across multiple events
-  Future<EventAttendanceComparison> compareEventAttendance(List<String> eventIds) async {
-    final url = Uri.parse(ApiEndpoints.compareSuperAdminEventAttendance);
-    
+  Future<EventAttendanceComparison> compareEventAttendance(
+    List<String> eventIds,
+  ) async {
+    final url = Uri.parse(await ApiEndpoints.compareSuperAdminEventAttendance);
+
     final response = await _handleRequest(() async {
       return await http.post(
         url,
@@ -197,9 +218,10 @@ class SuperAdminAnalyticsService {
     if (startDate != null) queryParams['startDate'] = startDate;
     if (endDate != null) queryParams['endDate'] = endDate;
 
-    final uri = Uri.parse(ApiEndpoints.getSuperAdminMemberParticipation)
-        .replace(queryParameters: queryParams);
-    
+    final uri = Uri.parse(
+      await ApiEndpoints.getSuperAdminMemberParticipation,
+    ).replace(queryParameters: queryParams);
+
     final response = await _handleRequest(() async {
       return await http.get(uri, headers: await _getHeaders());
     });
@@ -211,10 +233,10 @@ class SuperAdminAnalyticsService {
   /// Get activity status for all members
   Future<MemberActivityStatus> getMemberActivityStatus() async {
     try {
-      final endpoint = ApiEndpoints.getSuperAdminMemberActivityStatus;
+      final endpoint = await ApiEndpoints.getSuperAdminMemberActivityStatus;
       print('Fetching member activity status for super admin');
       print('API Endpoint: $endpoint');
-      
+
       final response = await _httpClient.get(endpoint);
 
       print('Member Activity API Response Status: ${response.statusCode}');
@@ -225,7 +247,7 @@ class SuperAdminAnalyticsService {
         return json.decode(response.body);
       } else {
         throw Exception(
-          'Failed to fetch member activity status: ${response.statusCode} - ${response.body}'
+          'Failed to fetch member activity status: ${response.statusCode} - ${response.body}',
         );
       }
     } catch (error) {
@@ -243,10 +265,10 @@ class SuperAdminAnalyticsService {
   /// Get overall dashboard summary
   Future<DashboardSummary> getDashboardSummary() async {
     try {
-      final endpoint = ApiEndpoints.getSuperAdminDashboardSummary;
+      final endpoint = await ApiEndpoints.getSuperAdminDashboardSummary;
       print('Fetching dashboard summary');
       print('API Endpoint: $endpoint');
-      
+
       final response = await _httpClient.get(endpoint);
 
       print('Dashboard Summary API Response Status: ${response.statusCode}');
@@ -257,7 +279,7 @@ class SuperAdminAnalyticsService {
         return DashboardSummary.fromJson(json.decode(response.body));
       } else {
         throw Exception(
-          'Failed to fetch dashboard summary: ${response.statusCode} - ${response.body}'
+          'Failed to fetch dashboard summary: ${response.statusCode} - ${response.body}',
         );
       }
     } catch (error) {
@@ -272,8 +294,10 @@ class SuperAdminAnalyticsService {
 
   /// Get dashboard data for a specific group
   Future<GroupDashboardData> getGroupDashboardData(String groupId) async {
-    final url = Uri.parse(ApiEndpoints.getSuperAdminGroupDashboardData(groupId));
-    
+    final url = Uri.parse(
+      await ApiEndpoints.getSuperAdminGroupDashboardData(groupId),
+    );
+
     final response = await _handleRequest(() async {
       return await http.get(url, headers: await _getHeaders());
     });
@@ -281,5 +305,36 @@ class SuperAdminAnalyticsService {
     final data = json.decode(response.body);
     return GroupDashboardData.fromJson(data);
   }
-}
 
+  // Database Analytics
+
+  /// Get database statistics
+  Future<DatabaseStats> getDatabaseStats() async {
+    try {
+      final endpoint = await ApiEndpoints.getSuperAdminDatabaseStats;
+      print('Fetching database statistics');
+      print('API Endpoint: $endpoint');
+
+      final response = await _httpClient.get(endpoint);
+
+      print('Database Stats API Response Status: ${response.statusCode}');
+      print('Database Stats API Response Headers: ${response.headers}');
+      print('Database Stats API Response Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return DatabaseStats.fromJson(json.decode(response.body));
+      } else {
+        throw Exception(
+          'Failed to fetch database statistics: ${response.statusCode} - ${response.body}',
+        );
+      }
+    } catch (error) {
+      print('Error fetching database statistics: $error');
+      print('Error details: ${error.toString()}');
+      if (error is Exception) {
+        print('Exception type: ${error.runtimeType}');
+      }
+      throw Exception('Error fetching database statistics: $error');
+    }
+  }
+}

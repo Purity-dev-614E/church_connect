@@ -1,18 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'package:group_management_church_app/data/services/auth_services.dart';
-import '../../../core/constants/app_endpoints.dart';
 import '../../services/analytics_services/admin_analytics_service.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 // Parameter classes
 class GroupPeriodParams {
   final String groupId;
   final String period;
 
-  GroupPeriodParams({
-    required this.groupId,
-    required this.period,
-  });
+  GroupPeriodParams({required this.groupId, required this.period});
 
   @override
   bool operator ==(Object other) {
@@ -52,73 +47,74 @@ class GroupMemberParticipationParams {
 
 class AdminAnalyticsProvider extends ChangeNotifier {
   final AdminAnalyticsService _analyticsService;
-  
+
   // State variables
   bool _isLoading = false;
   String? _errorMessage;
-  
+
   // Date range for analytics
   DateTime? _startDate;
   DateTime? _endDate;
-  
+
   // Group analytics data
   final Map<String, Map<String, dynamic>> _groupDemographics = {};
   final Map<String, Map<String, dynamic>> _groupAttendanceStats = {};
   final Map<String, Map<String, dynamic>> _groupGrowthAnalytics = {};
   final Map<String, Map<String, dynamic>> _groupAttendanceByPeriod = {};
-  
+
   // Event analytics data
   final Map<String, Map<String, dynamic>> _eventParticipationStats = {};
-  
+
   // Member analytics data
   final Map<String, Map<String, dynamic>> _groupMemberParticipationStats = {};
   final Map<String, Map<String, dynamic>> _groupMemberActivityStatus = {};
-  
+
   // Dashboard data
   final Map<String, Map<String, dynamic>> _groupDashboardData = {};
   final Map<String, Map<String, dynamic>> _combinedDashboardData = {};
-  
+
   // Getters
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
   AdminAnalyticsProvider({
     AdminAnalyticsService? analyticsService,
-    String baseUrl = ApiEndpoints.baseUrl,
-    String token = AuthServices.accessTokenKey,
-  }) : _analyticsService = analyticsService ??
-            AdminAnalyticsService(
-              baseUrl: baseUrl,
-              token: token,
-            );
+    String? baseUrl,
+    String? token,
+  }) : _analyticsService =
+           analyticsService ??
+           AdminAnalyticsService(
+             baseUrl: baseUrl ?? 'https://safari-backend-fgl3.onrender.com/api',
+             token: token ?? AuthServices.accessTokenKey,
+           );
 
   // Helper methods
   void _setLoading(bool loading) {
     _isLoading = loading;
     notifyListeners();
   }
-  
+
   void _handleError(String operation, dynamic error) {
     _errorMessage = 'Error $operation: $error';
     debugPrint(_errorMessage);
     notifyListeners();
   }
-  
+
   void clearError() {
     _errorMessage = null;
     notifyListeners();
   }
-  
+
   // Date Range Methods
   void setDateRange(DateTime startDate, DateTime endDate) {
     _startDate = startDate;
     _endDate = endDate;
     notifyListeners();
   }
-  
+
   DateTime? get startDate => _startDate;
   DateTime? get endDate => _endDate;
-  
+
   // Group Analytics Methods
   Future<Map<String, dynamic>> getGroupDemographics(String groupId) async {
     _setLoading(true);
@@ -126,25 +122,26 @@ class AdminAnalyticsProvider extends ChangeNotifier {
       // Use class-level date range if set
       String? startDateStr;
       String? endDateStr;
-      
+
       if (_startDate != null) {
         startDateStr = _startDate!.toIso8601String();
       }
-      
+
       if (_endDate != null) {
         endDateStr = _endDate!.toIso8601String();
       }
-      
+
       final data = await _analyticsService.getGroupDemographics(
         groupId,
         startDate: startDateStr,
         endDate: endDateStr,
       );
-      
-      final key = _startDate != null && _endDate != null 
-          ? '$groupId-${_startDate!.toIso8601String()}-${_endDate!.toIso8601String()}'
-          : groupId;
-          
+
+      final key =
+          _startDate != null && _endDate != null
+              ? '$groupId-${_startDate!.toIso8601String()}-${_endDate!.toIso8601String()}'
+              : groupId;
+
       _groupDemographics[key] = data;
       _errorMessage = null;
       _setLoading(false);
@@ -155,32 +152,33 @@ class AdminAnalyticsProvider extends ChangeNotifier {
       return {};
     }
   }
-  
+
   Future<Map<String, dynamic>> getGroupAttendanceStats(String groupId) async {
     _setLoading(true);
     try {
       // Use class-level date range if set
       String? startDateStr;
       String? endDateStr;
-      
+
       if (_startDate != null) {
         startDateStr = _startDate!.toIso8601String();
       }
-      
+
       if (_endDate != null) {
         endDateStr = _endDate!.toIso8601String();
       }
-      
+
       final data = await _analyticsService.getGroupAttendanceStats(
         groupId,
         startDate: startDateStr,
         endDate: endDateStr,
       );
-      
-      final key = _startDate != null && _endDate != null 
-          ? '$groupId-${_startDate!.toIso8601String()}-${_endDate!.toIso8601String()}'
-          : groupId;
-          
+
+      final key =
+          _startDate != null && _endDate != null
+              ? '$groupId-${_startDate!.toIso8601String()}-${_endDate!.toIso8601String()}'
+              : groupId;
+
       _groupAttendanceStats[key] = data;
       _errorMessage = null;
       _setLoading(false);
@@ -191,7 +189,7 @@ class AdminAnalyticsProvider extends ChangeNotifier {
       return {};
     }
   }
-  
+
   Future<Map<String, dynamic>> getGroupGrowthAnalytics(String groupId) async {
     _setLoading(true);
     try {
@@ -206,11 +204,17 @@ class AdminAnalyticsProvider extends ChangeNotifier {
       return {};
     }
   }
-  
-  Future<Map<String, dynamic>> getGroupAttendanceByPeriod(String groupId, String period) async {
+
+  Future<Map<String, dynamic>> getGroupAttendanceByPeriod(
+    String groupId,
+    String period,
+  ) async {
     _setLoading(true);
     try {
-      final data = await _analyticsService.getGroupAttendanceByPeriod(groupId, period);
+      final data = await _analyticsService.getGroupAttendanceByPeriod(
+        groupId,
+        period,
+      );
       final key = '$groupId-$period';
       _groupAttendanceByPeriod[key] = data;
       _errorMessage = null;
@@ -222,33 +226,36 @@ class AdminAnalyticsProvider extends ChangeNotifier {
       return {};
     }
   }
-  
+
   // Event Analytics Methods
-  Future<Map<String, dynamic>> getEventParticipationStats(String eventId) async {
+  Future<Map<String, dynamic>> getEventParticipationStats(
+    String eventId,
+  ) async {
     _setLoading(true);
     try {
       // Use class-level date range if set
       String? startDateStr;
       String? endDateStr;
-      
+
       if (_startDate != null) {
         startDateStr = _startDate!.toIso8601String();
       }
-      
+
       if (_endDate != null) {
         endDateStr = _endDate!.toIso8601String();
       }
-      
+
       final data = await _analyticsService.getEventParticipationStats(
         eventId,
         startDate: startDateStr,
         endDate: endDateStr,
       );
-      
-      final key = _startDate != null && _endDate != null 
-          ? '$eventId-${_startDate!.toIso8601String()}-${_endDate!.toIso8601String()}'
-          : eventId;
-          
+
+      final key =
+          _startDate != null && _endDate != null
+              ? '$eventId-${_startDate!.toIso8601String()}-${_endDate!.toIso8601String()}'
+              : eventId;
+
       _eventParticipationStats[key] = data;
       _errorMessage = null;
       _setLoading(false);
@@ -259,8 +266,6 @@ class AdminAnalyticsProvider extends ChangeNotifier {
       return {};
     }
   }
-
-
 
   // Member Analytics Methods
   Future<Map<String, dynamic>> getGroupMemberParticipationStats(
@@ -273,21 +278,22 @@ class AdminAnalyticsProvider extends ChangeNotifier {
       // Use provided dates or fall back to the class-level date range if set
       String? effectiveStartDate = startDate;
       String? effectiveEndDate = endDate;
-      
+
       if (effectiveStartDate == null && _startDate != null) {
         effectiveStartDate = _startDate!.toIso8601String();
       }
-      
+
       if (effectiveEndDate == null && _endDate != null) {
         effectiveEndDate = _endDate!.toIso8601String();
       }
-      
+
       final data = await _analyticsService.getGroupMemberParticipationStats(
         groupId,
         startDate: effectiveStartDate,
         endDate: effectiveEndDate,
       );
-      final key = '$groupId-${effectiveStartDate ?? ''}-${effectiveEndDate ?? ''}';
+      final key =
+          '$groupId-${effectiveStartDate ?? ''}-${effectiveEndDate ?? ''}';
       _groupMemberParticipationStats[key] = data;
       _errorMessage = null;
       _setLoading(false);
@@ -298,11 +304,15 @@ class AdminAnalyticsProvider extends ChangeNotifier {
       return {};
     }
   }
-  
-  Future<Map<String, dynamic>> getGroupMemberActivityStatus(String groupId) async {
+
+  Future<Map<String, dynamic>> getGroupMemberActivityStatus(
+    String groupId,
+  ) async {
     _setLoading(true);
     try {
-      final data = await _analyticsService.getGroupMemberActivityStatus(groupId);
+      final data = await _analyticsService.getGroupMemberActivityStatus(
+        groupId,
+      );
       _groupMemberActivityStatus[groupId] = data;
       _errorMessage = null;
       _setLoading(false);
@@ -313,7 +323,7 @@ class AdminAnalyticsProvider extends ChangeNotifier {
       return {};
     }
   }
-  
+
   // Dashboard Analytics Methods
   Future<Map<String, dynamic>> getGroupDashboardData(String groupId) async {
     _setLoading(true);
@@ -329,24 +339,24 @@ class AdminAnalyticsProvider extends ChangeNotifier {
       return {};
     }
   }
-  
+
   // Combined Dashboard Data
   Future<Map<String, dynamic>> getCombinedGroupDashboard(String groupId) async {
     _setLoading(true);
     try {
       // Get dashboard data
       final dashboardData = await getGroupDashboardData(groupId);
-      
+
       // Get member activity status
       final memberActivity = await getGroupMemberActivityStatus(groupId);
-      
+
       // Combine the data
       final combinedData = {
         'dashboardData': dashboardData,
         'memberActivity': memberActivity,
         'timestamp': DateTime.now().toIso8601String(),
       };
-      
+
       _combinedDashboardData[groupId] = combinedData;
       _errorMessage = null;
       _setLoading(false);

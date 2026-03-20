@@ -56,9 +56,11 @@ class GroupProvider extends ChangeNotifier {
     _setLoading(true);
     try {
       print(
-        'Attempting to fetch groups from: ${ApiEndpoints.groupsAllForProfile}',
+        'Attempting to fetch groups from: ${await ApiEndpoints.groupsAllForProfile}',
       );
-      final response = await _httpClient.get(ApiEndpoints.groupsAllForProfile);
+      final response = await _httpClient.get(
+        await ApiEndpoints.groupsAllForProfile,
+      );
 
       print('Response status code: ${response.statusCode}');
       print('Response body: ${response.body}');

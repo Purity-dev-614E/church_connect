@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:group_management_church_app/data/services/auth_services.dart';
+import 'package:group_management_church_app/core/constants/app_endpoints.dart';
 import 'package:http/http.dart' as http;
+import '../../models/database_stats_model.dart';
 
 class AdminAnalyticsService {
   final String baseUrl;
@@ -145,5 +147,44 @@ class AdminAnalyticsService {
       headers: headers,
     );
     return _handleResponse(response);
+  }
+
+  // Database Analytics
+
+  /// Get database statistics for admin
+  Future<DatabaseStats> getDatabaseStats() async {
+    try {
+      final endpoint = await ApiEndpoints.getAdminDatabaseStats;
+      print('Fetching database statistics for admin');
+      print('API Endpoint: $endpoint');
+      
+      final token = await FlutterSecureStorage().read(key: AuthServices.accessTokenKey);
+      final response = await http.get(
+        Uri.parse(endpoint),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      print('Database Stats API Response Status: ${response.statusCode}');
+      print('Database Stats API Response Headers: ${response.headers}');
+      print('Database Stats API Response Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return DatabaseStats.fromJson(jsonDecode(response.body));
+      } else {
+        throw Exception(
+          'Failed to fetch database statistics: ${response.statusCode} - ${response.body}',
+        );
+      }
+    } catch (error) {
+      print('Error fetching database statistics: $error');
+      print('Error details: ${error.toString()}');
+      if (error is Exception) {
+        print('Exception type: ${error.runtimeType}');
+      }
+      throw Exception('Error fetching database statistics: $error');
+    }
   }
 }

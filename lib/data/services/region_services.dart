@@ -17,7 +17,7 @@ class RegionServices {
       }
 
       final response = await http.get(
-        Uri.parse(ApiEndpoints.regions),
+        Uri.parse(await ApiEndpoints.regions),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -73,7 +73,7 @@ class RegionServices {
 
       print('Fetching region with ID: $regionId');
       final response = await http.get(
-        Uri.parse(ApiEndpoints.getRegionById(regionId)),
+        Uri.parse(await ApiEndpoints.getRegionById(regionId)),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -127,7 +127,7 @@ class RegionServices {
       }
 
       final response = await http.post(
-        Uri.parse(ApiEndpoints.regions),
+        Uri.parse(await ApiEndpoints.regions),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -155,7 +155,7 @@ class RegionServices {
       }
 
       final response = await http.put(
-        Uri.parse(ApiEndpoints.updateRegion(regionId)),
+        Uri.parse(await ApiEndpoints.updateRegion(regionId)),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -183,7 +183,7 @@ class RegionServices {
       }
 
       final response = await http.delete(
-        Uri.parse(ApiEndpoints.deleteRegion(regionId)),
+        Uri.parse(await ApiEndpoints.deleteRegion(regionId)),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',

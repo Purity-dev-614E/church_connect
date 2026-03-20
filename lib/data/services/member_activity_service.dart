@@ -108,7 +108,7 @@ class MemberActivityService {
     for (final userId in userIds) {
       try {
         final response = await _httpClient.put(
-          ApiEndpoints.markGroupMemberInactive(groupId, userId),
+          await ApiEndpoints.markGroupMemberInactive(groupId, userId),
           body: jsonEncode({'is_active': false}),
         );
         if (response.statusCode >= 200 && response.statusCode < 300) {

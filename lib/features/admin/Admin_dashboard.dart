@@ -931,7 +931,7 @@ class _AdminDashboardState extends State<AdminDashboard>
     );
   }
 
-  void _showCreateEventDialog() {
+  void _showCreateEventDialog() async {
     // Create new controllers for each dialog instance
     final TextEditingController titleController = TextEditingController();
     final TextEditingController descriptionController = TextEditingController();
@@ -2451,10 +2451,7 @@ class _AdminDashboardState extends State<AdminDashboard>
           child: GestureDetector(
             onTap: () => _showEventOptionsDialog(event),
             child: EventCard(
-              eventTitle: event.title,
-              eventDate: _formatEventDate(event.dateTime),
-              eventLocation: event.location,
-              tag: event.tag,
+              event: event,
               onTap: () => _showEventOptionsDialog(event),
             ),
           ),
@@ -2507,10 +2504,7 @@ class _AdminDashboardState extends State<AdminDashboard>
           child: GestureDetector(
             onTap: () => _showEventOptionsDialog(event),
             child: EventCard(
-              eventTitle: event.title,
-              eventDate: _formatEventDate(event.dateTime),
-              eventLocation: event.location,
-              tag: event.tag,
+              event: event,
               onTap: () => _showEventOptionsDialog(event),
             ),
           ),
@@ -2873,14 +2867,14 @@ class _AdminDashboardState extends State<AdminDashboard>
         backgroundColor: _accentColor,
         child: const Icon(Icons.person_add, color: Colors.white),
       );
-    } else if (_selectedIndex == 2) {
-      // Events tab
+    } else if (_selectedIndex == 3) {
+      // Events tab - show create event button
       return FloatingActionButton(
         onPressed: _showCreateEventDialog,
         backgroundColor: _accentColor,
         child: const Icon(Icons.add, color: Colors.white),
       );
-    } else if (_selectedIndex == 0 || _selectedIndex == 3) {
+    } else if (_selectedIndex == 0 || _selectedIndex == 4) {
       // Dashboard or Analytics tab - show refresh button
       return FloatingActionButton(
         onPressed: _refreshData,

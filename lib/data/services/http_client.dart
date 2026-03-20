@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -95,7 +96,7 @@ class HttpClient {
       }
 
       final response = await http.post(
-        Uri.parse(ApiEndpoints.refreshToken),
+        Uri.parse(await ApiEndpoints.refreshToken),
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
@@ -218,6 +219,9 @@ class HttpClient {
     try {
       final response = await requestFunction();
 
+      print('DEBUG: Response Status: ${response.statusCode}');
+      print('DEBUG: Response Body: ${response.body}');
+
       // If unauthorized and not already refreshing, try to refresh token
       if (response.statusCode == 401 && !_isRefreshing) {
         _isRefreshing = true;
@@ -269,10 +273,14 @@ class HttpClient {
   Future<http.Response> post(String url, {Object? body}) async {
     return _handleResponse(() async {
       final headers = await getHeaders();
+      final encodedBody = body is String ? body : jsonEncode(body);
+      print('DEBUG: POST URL: $url');
+      print('DEBUG: POST Headers: $headers');
+      print('DEBUG: POST Body: $encodedBody');
       return await http.post(
         Uri.parse(url),
         headers: headers,
-        body: body is String ? body : jsonEncode(body),
+        body: encodedBody,
       );
     });
   }
@@ -291,9 +299,16 @@ class HttpClient {
 
   /// DELETE request with automatic token refresh
   Future<http.Response> delete(String url) async {
+    print('DEBUG: HTTP DELETE request to: $url');
     return _handleResponse(() async {
       final headers = await getHeaders();
-      return await http.delete(Uri.parse(url), headers: headers);
+      print('DEBUG: DELETE request headers: $headers');
+      print(
+        'DEBUG: Authorization header: ${headers["Authorization"]?.substring(0, math.min(20, headers["Authorization"]?.length ?? 0))}...',
+      );
+      final response = await http.delete(Uri.parse(url), headers: headers);
+      print('DEBUG: DELETE response status: ${response.statusCode}');
+      return response;
     });
   }
 }

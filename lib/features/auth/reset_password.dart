@@ -4,6 +4,7 @@ import 'package:group_management_church_app/core/constants/colors.dart';
 import 'package:group_management_church_app/core/constants/text_styles.dart';
 import 'package:group_management_church_app/core/constants/supabase_config.dart';
 import 'package:group_management_church_app/data/services/supabase_service.dart';
+import 'package:group_management_church_app/data/services/auth_services.dart';
 import 'package:group_management_church_app/features/auth/login.dart';
 import 'package:group_management_church_app/widgets/custom_button.dart';
 import 'package:group_management_church_app/widgets/input_field.dart';
@@ -17,9 +18,11 @@ class ResetPasswordScreen extends StatefulWidget {
   State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
 }
 
-class _ResetPasswordScreenState extends State<ResetPasswordScreen> with SingleTickerProviderStateMixin {
+class _ResetPasswordScreenState extends State<ResetPasswordScreen>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _emailController = TextEditingController();
+  final AuthServices _authServices = AuthServices();
   bool _isLoading = false;
   bool _resetLinkSent = false;
   late AnimationController _animationController;
@@ -106,22 +109,24 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with SingleTi
 
       try {
         final email = _emailController.text.trim();
-        
-    
-        await SupabaseService.client.auth.resetPasswordForEmail(
-          email,
-          redirectTo: SupabaseConfig.resetRedirectUrl,
-        );
+
+        // Use backend API instead of Supabase for production compatibility
+        final success = await _authServices.resetPassword(email);
 
         if (mounted) {
-          setState(() {
-            _resetLinkSent = true;
-          });
-          _showSuccess('Password reset link sent successfully!');
+          if (success) {
+            setState(() {
+              _resetLinkSent = true;
+            });
+            _showSuccess('Password reset link sent successfully!');
+          } else {
+            _showError('Failed to send reset link. Please try again.');
+          }
         }
       } catch (e) {
         if (mounted) {
-          String errorMessage = 'An unexpected error occurred. Please try again.';
+          String errorMessage =
+              'An unexpected error occurred. Please try again.';
           if (e.toString().contains('Invalid email')) {
             errorMessage = 'Invalid email address. Please check and try again.';
           } else if (e.toString().contains('rate limit')) {
@@ -165,7 +170,10 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with SingleTi
                   opacity: _fadeAnimation,
                   child: SlideTransition(
                     position: _slideAnimation,
-                    child: _resetLinkSent ? _buildSuccessMessage() : _buildResetForm(),
+                    child:
+                        _resetLinkSent
+                            ? _buildSuccessMessage()
+                            : _buildResetForm(),
                   ),
                 ),
               ),
@@ -200,7 +208,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with SingleTi
           Text(
             'Enter your email to receive a password reset link',
             style: TextStyles.bodyText.copyWith(
-              color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+              color: Theme.of(
+                context,
+              ).colorScheme.onBackground.withOpacity(0.7),
             ),
           ),
           const SizedBox(height: 32),
@@ -232,10 +242,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with SingleTi
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                'Remember your password? ',
-                style: TextStyles.bodyText,
-              ),
+              Text('Remember your password? ', style: TextStyles.bodyText),
               GestureDetector(
                 onTap: _navigateToLogin,
                 child: Text(
@@ -325,7 +332,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with SingleTi
               Text(
                 'Check your spam folder or try again in a few minutes.',
                 style: TextStyles.bodyText.copyWith(
-                  color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onBackground.withOpacity(0.7),
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -535,7 +544,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with SingleTi
             'Need help? Contact safariconnect.com',
             style: TextStyle(
               fontSize: 11,
-              color: Theme.of(context).colorScheme.onBackground.withOpacity(0.6),
+              color: Theme.of(
+                context,
+              ).colorScheme.onBackground.withOpacity(0.6),
             ),
           ),
         ],
@@ -548,10 +559,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with SingleTi
 class VerificationCodeScreen extends StatefulWidget {
   final String email;
 
-  const VerificationCodeScreen({
-    super.key,
-    required this.email,
-  });
+  const VerificationCodeScreen({super.key, required this.email});
 
   @override
   State<VerificationCodeScreen> createState() => _VerificationCodeScreenState();
@@ -562,10 +570,7 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
     6,
     (index) => TextEditingController(),
   );
-  final List<FocusNode> _focusNodes = List.generate(
-    6,
-    (index) => FocusNode(),
-  );
+  final List<FocusNode> _focusNodes = List.generate(6, (index) => FocusNode());
   bool _isLoading = false;
 
   @override
@@ -607,9 +612,7 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
           // Navigate to new password screen
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (context) => const NewPasswordScreen(),
-            ),
+            MaterialPageRoute(builder: (context) => const NewPasswordScreen()),
           );
         }
       });
@@ -648,9 +651,7 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
 
             Text(
               widget.email,
-              style: TextStyles.bodyText.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyles.bodyText.copyWith(fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 40),
@@ -726,12 +727,8 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
 class NewPasswordScreen extends StatefulWidget {
   final String? accessToken; // Optional: token from reset link
   final String? refreshToken; // Optional: refresh token from reset link
-  
-  const NewPasswordScreen({
-    super.key,
-    this.accessToken,
-    this.refreshToken,
-  });
+
+  const NewPasswordScreen({super.key, this.accessToken, this.refreshToken});
 
   @override
   State<NewPasswordScreen> createState() => _NewPasswordScreenState();
@@ -740,7 +737,8 @@ class NewPasswordScreen extends StatefulWidget {
 class _NewPasswordScreenState extends State<NewPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
   bool _isLoading = false;
 
   @override
@@ -816,18 +814,17 @@ class _NewPasswordScreenState extends State<NewPasswordScreen> {
 
       try {
         final newPassword = _passwordController.text.trim();
-        
 
         if (widget.accessToken != null && widget.refreshToken != null) {
-
           await SupabaseService.client.auth.setSession(widget.accessToken!);
         } else {
           final session = SupabaseService.client.auth.currentSession;
           if (session == null) {
-            throw Exception('No active session. Please use the reset link from your email.');
+            throw Exception(
+              'No active session. Please use the reset link from your email.',
+            );
           }
         }
-
 
         final response = await SupabaseService.client.auth.updateUser(
           UserAttributes(password: newPassword),
@@ -836,10 +833,10 @@ class _NewPasswordScreenState extends State<NewPasswordScreen> {
         if (mounted) {
           if (response.user != null) {
             _showSuccess('Password reset successfully!');
-            
+
             // Sign out to ensure clean state
             await SupabaseService.client.auth.signOut();
-            
+
             // Navigate to login
             Navigator.pushAndRemoveUntil(
               context,
@@ -854,12 +851,16 @@ class _NewPasswordScreenState extends State<NewPasswordScreen> {
         if (mounted) {
           String errorMessage = 'Failed to reset password. Please try again.';
           final errorString = e.toString().toLowerCase();
-          if (errorString.contains('session') || errorString.contains('token')) {
-            errorMessage = 'Invalid or expired reset link. Please request a new one from the reset password screen.';
+          if (errorString.contains('session') ||
+              errorString.contains('token')) {
+            errorMessage =
+                'Invalid or expired reset link. Please request a new one from the reset password screen.';
           } else if (errorString.contains('password')) {
-            errorMessage = 'Password does not meet requirements. Please try again.';
+            errorMessage =
+                'Password does not meet requirements. Please try again.';
           } else if (errorString.contains('active session')) {
-            errorMessage = 'No active session. Please use the reset link from your email or request a new one.';
+            errorMessage =
+                'No active session. Please use the reset link from your email or request a new one.';
           }
           _showError(errorMessage);
         }
@@ -901,7 +902,9 @@ class _NewPasswordScreenState extends State<NewPasswordScreen> {
               Text(
                 'Your new password must be different from previously used passwords.',
                 style: TextStyles.bodyText.copyWith(
-                  color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onBackground.withOpacity(0.7),
                 ),
               ),
               const SizedBox(height: 32),
@@ -915,7 +918,8 @@ class _NewPasswordScreenState extends State<NewPasswordScreen> {
                 isPasswordField: true,
                 validator: _validatePassword,
                 autovalidate: true,
-                helperText: 'Must be at least 6 characters with 1 uppercase letter and 1 number',
+                helperText:
+                    'Must be at least 6 characters with 1 uppercase letter and 1 number',
               ),
               const SizedBox(height: 24),
 

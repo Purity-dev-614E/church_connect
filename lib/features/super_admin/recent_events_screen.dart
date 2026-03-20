@@ -1,24 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:group_management_church_app/core/constants/text_styles.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/colors.dart';
 import '../../data/models/event_model.dart';
-import '../../data/models/group_model.dart';
 import '../../data/models/region_model.dart';
-import '../../data/providers/event_provider.dart';
-import '../../data/providers/group_provider.dart';
 import '../../data/providers/region_provider.dart';
 import '../events/overall_event_details.dart';
+import '../../widgets/event_card.dart';
 
 class RecentEventsScreen extends StatefulWidget {
   final List<dynamic> recentEvents;
 
-  const RecentEventsScreen({
-    super.key,
-    required this.recentEvents,
-  });
+  const RecentEventsScreen({super.key, required this.recentEvents});
 
   @override
   State<RecentEventsScreen> createState() => _RecentEventsScreenState();
@@ -44,7 +38,10 @@ class _RecentEventsScreenState extends State<RecentEventsScreen> {
   Future<void> _loadRegions() async {
     setState(() => _isLoadingRegions = true);
     try {
-      final regionProvider = Provider.of<RegionProvider>(context, listen: false);
+      final regionProvider = Provider.of<RegionProvider>(
+        context,
+        listen: false,
+      );
       await regionProvider.loadRegions();
       setState(() {
         _regions = regionProvider.regions;
@@ -59,19 +56,53 @@ class _RecentEventsScreenState extends State<RecentEventsScreen> {
   @override
   Widget build(BuildContext context) {
     // Convert recent events to EventModel objects
-    final List<EventModel> events = widget.recentEvents
-        .map((event) => EventModel.fromJson(event as Map<String, dynamic>))
-        .toList();
+    final List<EventModel> events =
+        widget.recentEvents.map((eventData) {
+          // Check if this is a RecentAttendance object or already an EventModel
+          if (eventData is Map<String, dynamic>) {
+            // If it's already in EventModel format, convert directly
+            if (eventData.containsKey('id') && eventData.containsKey('title')) {
+              return EventModel.fromJson(eventData);
+            }
+            // Otherwise, assume it's RecentAttendance data and convert properly
+            return EventModel(
+              id: eventData['eventId'] ?? '',
+              title: eventData['eventTitle'] ?? '',
+              description: '', // Not available in recent attendance
+              dateTime:
+                  eventData['eventDate'] != null
+                      ? DateTime.parse(eventData['eventDate'])
+                      : DateTime.now(),
+              location: '', // Not available in recent attendance
+              groupId: eventData['groupId'],
+              tag: eventData['tag'] ?? 'org', // Preserve tag if available
+            );
+          }
+          // Fallback
+          return EventModel.fromJson(eventData as Map<String, dynamic>);
+        }).toList();
+
+    // Remove duplicate events based on ID
+    final Set<String> seenEventIds = {};
+    final uniqueEvents =
+        events.where((event) {
+          if (seenEventIds.contains(event.id)) {
+            return false; // Skip duplicate
+          }
+          seenEventIds.add(event.id);
+          return true;
+        }).toList();
 
     // Apply search filter
     final searchQuery = _searchController.text.toLowerCase();
-    final filteredEvents = searchQuery.isEmpty
-        ? events
-        : events.where((event) {
-            return event.title.toLowerCase().contains(searchQuery) ||
-                   event.description.toLowerCase().contains(searchQuery) ||
-                   event.location.toLowerCase().contains(searchQuery);
-          }).toList();
+    final filteredEvents =
+        searchQuery.isEmpty
+            ? uniqueEvents
+            : uniqueEvents.where((event) {
+              return event.title.toLowerCase().contains(searchQuery) ||
+                  event.description.toLowerCase().contains(searchQuery) ||
+                  event.location.toLowerCase().contains(searchQuery);
+            }).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -85,19 +116,23 @@ class _RecentEventsScreenState extends State<RecentEventsScreen> {
           const SizedBox(height: 8),
           _buildSearchBar(),
           Expanded(
-            child: filteredEvents.isEmpty
-                ? _buildEmptyState()
-                : ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              itemCount: filteredEvents.length,
-              itemBuilder: (context, index) {
-                final event = filteredEvents[index];
-                return EventCard(
-                  event: event,
-                  onTap: () => _navigateToEventDetails(event),
-                );
-              },
-            ),
+            child:
+                filteredEvents.isEmpty
+                    ? _buildEmptyState()
+                    : ListView.builder(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      itemCount: filteredEvents.length,
+                      itemBuilder: (context, index) {
+                        final event = filteredEvents[index];
+                        return EventCard(
+                          event: event,
+                          onTap: () => _navigateToEventDetails(event),
+                        );
+                      },
+                    ),
           ),
         ],
       ),
@@ -108,10 +143,11 @@ class _RecentEventsScreenState extends State<RecentEventsScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => OverallEventDetailsScreen(
-          eventId: event.id,
-          eventTitle: event.title,
-        ),
+        builder:
+            (context) => OverallEventDetailsScreen(
+              eventId: event.id,
+              eventTitle: event.title,
+            ),
       ),
     );
   }
@@ -125,22 +161,29 @@ class _RecentEventsScreenState extends State<RecentEventsScreen> {
         decoration: InputDecoration(
           hintText: 'Search recent events...',
           prefixIcon: const Icon(Icons.search, color: AppColors.primaryColor),
-          suffixIcon: _searchController.text.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.clear, color: AppColors.primaryColor),
-                  onPressed: () {
-                    _searchController.clear();
-                    setState(() {});
-                  },
-                )
-              : null,
+          suffixIcon:
+              _searchController.text.isNotEmpty
+                  ? IconButton(
+                    icon: const Icon(
+                      Icons.clear,
+                      color: AppColors.primaryColor,
+                    ),
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() {});
+                    },
+                  )
+                  : null,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: const BorderSide(color: AppColors.secondaryColor),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.primaryColor, width: 2),
+            borderSide: const BorderSide(
+              color: AppColors.primaryColor,
+              width: 2,
+            ),
           ),
           filled: true,
           fillColor: Theme.of(context).colorScheme.surface,
@@ -163,253 +206,22 @@ class _RecentEventsScreenState extends State<RecentEventsScreen> {
           Text(
             'No recent events found',
             style: TextStyles.heading2.copyWith(
-              color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+              color: Theme.of(
+                context,
+              ).colorScheme.onBackground.withOpacity(0.7),
             ),
           ),
           const SizedBox(height: 8),
           Text(
             'Try adjusting your search',
             style: TextStyles.bodyText.copyWith(
-              color: Theme.of(context).colorScheme.onBackground.withOpacity(0.5),
+              color: Theme.of(
+                context,
+              ).colorScheme.onBackground.withOpacity(0.5),
             ),
           ),
         ],
       ),
-    );
-  }
-}
-
-class EventCard extends StatelessWidget {
-  final EventModel event;
-  final VoidCallback? onTap;
-
-  const EventCard({
-    Key? key,
-    required this.event,
-    this.onTap,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    final formattedDate = DateFormat('EEE, MMM d • h:mm a').format(event.dateTime);
-    final isUpcoming = event.dateTime.isAfter(DateTime.now());
-    final isPast = event.dateTime.isBefore(DateTime.now());
-
-    final groupProvider = Provider.of<GroupProvider>(context, listen: false);
-    final regionProvider = Provider.of<RegionProvider>(context, listen: false);
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: FutureBuilder(
-            future: Future.wait([
-              groupProvider.getGroupById(event.groupId!),
-              regionProvider.getRegionById(event.regionId!),
-            ]).timeout(
-              const Duration(seconds: 10),
-              onTimeout: () => [null, null],
-            ),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(20.0),
-                    child: CircularProgressIndicator(),
-                  ),
-                );
-              }
-
-              if (snapshot.hasError) {
-                print('Error loading group/region data: ${snapshot.error}');
-                return _buildEventCardContent(
-                  context,
-                  event,
-                  formattedDate,
-                  isUpcoming,
-                  isPast,
-                  null, // group
-                  null, // region
-                );
-              }
-
-              final group = snapshot.data?[0] as GroupModel?;
-              final region = snapshot.data?[1] as RegionModel?;
-
-              return _buildEventCardContent(
-                context,
-                event,
-                formattedDate,
-                isUpcoming,
-                isPast,
-                group,
-                region,
-              );
-            },
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEventCardContent(
-    BuildContext context,
-    EventModel event,
-    String formattedDate,
-    bool isUpcoming,
-    bool isPast,
-    GroupModel? group,
-    RegionModel? region,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Event title and status
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                event.title,
-                style: TextStyles.heading2.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.onBackground,
-                ),
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: isUpcoming 
-                    ? Colors.green.withOpacity(0.1)
-                    : isPast 
-                        ? Colors.grey.withOpacity(0.1)
-                        : Colors.orange.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isUpcoming 
-                      ? Colors.green
-                      : isPast 
-                          ? Colors.grey
-                          : Colors.orange,
-                  width: 1,
-                ),
-              ),
-              child: Text(
-                isUpcoming ? 'Upcoming' : isPast ? 'Past' : 'Ongoing',
-                style: TextStyles.bodyText.copyWith(
-                  color: isUpcoming 
-                      ? Colors.green
-                      : isPast 
-                          ? Colors.grey
-                          : Colors.orange,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-
-        // Event description
-        if (event.description.isNotEmpty) ...[
-          Text(
-            event.description,
-            style: TextStyles.bodyText.copyWith(
-              color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 12),
-        ],
-
-        // Group and Region info
-        Row(
-          children: [
-            Expanded(
-              child: _buildInfoRow(
-                Icons.group,
-                'Group',
-                group?.name ?? 'Unknown Group',
-                context,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _buildInfoRow(
-                Icons.location_on,
-                'Region',
-                region?.name ?? 'Unknown Region',
-                context,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-
-        // Date and Location
-        Row(
-          children: [
-            Expanded(
-              child: _buildInfoRow(
-                Icons.calendar_today,
-                'Date',
-                formattedDate,
-                context,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _buildInfoRow(
-                Icons.place,
-                'Location',
-                event.location,
-                context,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildInfoRow(IconData icon, String label, String value, BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: AppColors.primaryColor),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyles.bodyText.copyWith(
-                  color: Theme.of(context).colorScheme.onBackground.withOpacity(0.6),
-                  fontSize: 12,
-                ),
-              ),
-              Text(
-                value,
-                style: TextStyles.bodyText.copyWith(
-                  color: Theme.of(context).colorScheme.onBackground,
-                  fontWeight: FontWeight.w600,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }

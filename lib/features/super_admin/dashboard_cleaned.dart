@@ -185,11 +185,11 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         setState(() {
           if (_analyticsProvider.dashboardSummary != null) {
             _dashboardSummary = _analyticsProvider.dashboardSummary!.toMap();
-            print('Dashboard summary loaded successfully');
+            // print removed);
             _isLoading = false; // Clear loading state after data is loaded
           } else {
             _errorMessage = 'Dashboard data is not available';
-            print('Dashboard summary is null');
+            // print removed);
             _isLoading =
                 false; // Clear loading state even if data is not available
           }

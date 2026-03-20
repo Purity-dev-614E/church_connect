@@ -39,7 +39,7 @@ class GroupServices {
       }
 
       final response = await _httpClient.post(
-        ApiEndpoints.groups,
+        await await ApiEndpoints.groups,
         body: {'name': name, 'group_admin_id': userId},
       );
 
@@ -64,7 +64,7 @@ class GroupServices {
   ) async {
     try {
       final response = await _httpClient.post(
-        ApiEndpoints.groups,
+        await await ApiEndpoints.groups,
         body: jsonEncode({
           'name': name,
           'description': description,
@@ -82,7 +82,7 @@ class GroupServices {
   // Fetch all groups
   Future<List<GroupModel>> fetchAllGroups() async {
     try {
-      final response = await _httpClient.get(ApiEndpoints.groups);
+      final response = await _httpClient.get(await await ApiEndpoints.groups);
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
@@ -103,7 +103,9 @@ class GroupServices {
   // Fetch group by id
   Future<GroupModel> fetchGroupById(String id) async {
     try {
-      final response = await _httpClient.get(ApiEndpoints.getGroupById(id));
+      final response = await _httpClient.get(
+        await await ApiEndpoints.getGroupById(id),
+      );
 
       if (response.statusCode == 200) {
         return GroupModel.fromJson(jsonDecode(response.body));
@@ -121,7 +123,7 @@ class GroupServices {
   Future<List<dynamic>> fetchGroupMembers(String groupId) async {
     try {
       final response = await _httpClient.get(
-        ApiEndpoints.getGroupMembers(groupId),
+        await await ApiEndpoints.getGroupMembers(groupId),
       );
 
       if (response.statusCode == 200) {
@@ -143,7 +145,7 @@ class GroupServices {
     try {
       // Make a GET request to the new endpoint for fetching user groups by user ID
       final response = await _httpClient.get(
-        ApiEndpoints.getmemberGroups(userId),
+        await await ApiEndpoints.getmemberGroups(userId),
       );
 
       if (response.statusCode == 200) {
@@ -163,7 +165,7 @@ class GroupServices {
   Future<GroupModel> updateGroup(String id, String name) async {
     try {
       final response = await _httpClient.put(
-        ApiEndpoints.updateGroup(id),
+        await await ApiEndpoints.updateGroup(id),
         body: {'name': name},
       );
 
@@ -189,7 +191,7 @@ class GroupServices {
   ) async {
     try {
       final response = await _httpClient.put(
-        ApiEndpoints.updateGroup(id),
+        await await ApiEndpoints.updateGroup(id),
         body: jsonEncode({
           'name': name,
           'description': description,
@@ -207,7 +209,9 @@ class GroupServices {
   // Delete group
   Future<bool> deleteGroup(String id) async {
     try {
-      final response = await _httpClient.delete(ApiEndpoints.deleteGroup(id));
+      final response = await _httpClient.delete(
+        await await ApiEndpoints.deleteGroup(id),
+      );
 
       if (response.statusCode == 200) {
         return true;
@@ -241,7 +245,7 @@ class GroupServices {
       }
 
       final response = await _httpClient.put(
-        ApiEndpoints.updateGroup(groupId),
+        await await ApiEndpoints.updateGroup(groupId),
         body: {'group_admin_id': userId},
       );
 
@@ -260,7 +264,7 @@ class GroupServices {
   // Add member to group
   Future<bool> addMemberToGroup(String groupId, String userId) async {
     try {
-      final endpoint = ApiEndpoints.addGroupMember(groupId, userId);
+      final endpoint = await await ApiEndpoints.addGroupMember(groupId, userId);
       print("GroupServices: Adding member to group");
       print("GroupServices: Endpoint: $endpoint");
       print("GroupServices: GroupId: $groupId, UserId: $userId");
@@ -294,7 +298,7 @@ class GroupServices {
   Future<bool> removeMemberFromGroup(String groupId, String userId) async {
     try {
       final response = await _httpClient.delete(
-        ApiEndpoints.removeGroupMember(groupId, userId),
+        await await ApiEndpoints.removeGroupMember(groupId, userId),
       );
 
       if (response.statusCode == 200) {
@@ -318,7 +322,7 @@ class GroupServices {
   ) async {
     try {
       final response = await _httpClient.post(
-        ApiEndpoints.removeGroupMemberWithReason(groupId, userId),
+        await await ApiEndpoints.removeGroupMemberWithReason(groupId, userId),
         body: jsonEncode({'reason': reason.trim()}),
       );
 
@@ -344,7 +348,7 @@ class GroupServices {
   Future<List<RemovedMemberModel>> getRemovedMembers(String groupId) async {
     try {
       final response = await _httpClient.get(
-        ApiEndpoints.getRemovedMembers(groupId),
+        await await ApiEndpoints.getRemovedMembers(groupId),
       );
 
       if (response.statusCode == 200) {
@@ -366,7 +370,7 @@ class GroupServices {
   Future<List<GroupModel>> getGroupsByAdmin(String adminId) async {
     try {
       final response = await _httpClient.get(
-        ApiEndpoints.getGroupsByAdmin(adminId),
+        await await ApiEndpoints.getGroupsByAdmin(adminId),
       );
 
       if (response.statusCode == 200) {
@@ -387,7 +391,7 @@ class GroupServices {
   Future<Map<String, dynamic>> getGroupDemographics(String groupId) async {
     try {
       final response = await _httpClient.get(
-        ApiEndpoints.getGroupDemographics(groupId),
+        await await ApiEndpoints.getGroupDemographics(groupId),
       );
 
       if (response.statusCode == 200) {
@@ -441,7 +445,7 @@ class GroupServices {
   Future<List<GroupModel>> getGroupsByRegion(String regionId) async {
     try {
       final response = await _httpClient.get(
-        ApiEndpoints.getGroupsByRegion(regionId),
+        await await ApiEndpoints.getGroupsByRegion(regionId),
       );
 
       if (response.statusCode == 200) {
@@ -472,7 +476,7 @@ class GroupServices {
 
       // Update the group with the new region ID
       final response = await _httpClient.put(
-        ApiEndpoints.updateGroup(groupId),
+        await ApiEndpoints.updateGroup(groupId),
         body: jsonEncode({
           'name': group.name,
           'description': group.description,
@@ -496,7 +500,7 @@ class GroupServices {
 
       // Update the group with null region ID
       final response = await _httpClient.put(
-        ApiEndpoints.updateGroup(groupId),
+        await ApiEndpoints.updateGroup(groupId),
         body: jsonEncode({
           'name': group.name,
           'description': group.description,
@@ -517,7 +521,7 @@ class GroupServices {
   ) async {
     try {
       final response = await _httpClient.get(
-        ApiEndpoints.getGroupAttendancePercentage(groupId),
+        await await ApiEndpoints.getGroupAttendancePercentage(groupId),
       );
 
       if (response.statusCode == 200) {

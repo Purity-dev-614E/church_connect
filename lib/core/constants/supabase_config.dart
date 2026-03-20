@@ -8,7 +8,7 @@ class SupabaseConfig {
   static const String productionResetUrl =
       'https://safariconnect.org/reset-password-handler';
   static const String developmentResetUrl =
-      'http://localhost:3000/reset-password-handler';
+      'http://localhost:65427/reset-password-handler';
 
   // Get appropriate redirect URL based on environment
   static String get resetRedirectUrl {

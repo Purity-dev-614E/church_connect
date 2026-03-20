@@ -22,14 +22,15 @@ class SuperAdminAnalyticsScreen extends StatefulWidget {
       _SuperAdminAnalyticsScreenState();
 }
 
-class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> with SingleTickerProviderStateMixin {
+class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen>
+    with SingleTickerProviderStateMixin {
   final SuperAdminAnalyticsProvider _superProvider =
       SuperAdminAnalyticsProvider();
   final RegionalManagerAnalyticsProvider _regionalProvider =
       RegionalManagerAnalyticsProvider();
   final RegionProvider _regionProvider = RegionProvider();
   final attendance_services.AttendanceService _attendanceService =
-      attendance_services.AttendanceService(ApiEndpoints.baseUrl);
+      attendance_services.AttendanceService('');
 
   String _selectedPeriod = 'week';
   bool _isLoading = false;
@@ -57,10 +58,7 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
     );
 
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.easeOut,
-      ),
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
     );
 
     _animationController.forward();
@@ -102,7 +100,7 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
   Future<void> _loadQuickStats() async {
     try {
       final quickstats = await _superProvider.getDashboardSummary();
-      
+
       if (quickstats != null) {
         setState(() {
           _totalUsers = quickstats['totalUsers'];
@@ -140,7 +138,9 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
             );
             return MapEntry(region.name, overview.summary.attendanceRate);
           } catch (e) {
-            debugPrint('Error loading attendance for region ${region.name}: $e');
+            debugPrint(
+              'Error loading attendance for region ${region.name}: $e',
+            );
             return MapEntry(region.name, 0.0);
           }
         }),
@@ -164,7 +164,7 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
   Future<void> _loadActivityStatus() async {
     try {
       final activityStatus = await _superProvider.getMemberActivityStatus();
-      
+
       if (activityStatus?.counts != null) {
         setState(() {
           _activityStatus = {
@@ -175,20 +175,14 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
       } else {
         // Provide fallback data if activity status is not available
         setState(() {
-          _activityStatus = {
-            'active': 0.0,
-            'inactive': 0.0,
-          };
+          _activityStatus = {'active': 0.0, 'inactive': 0.0};
         });
       }
     } catch (e) {
       print('Error loading activity status: $e');
       // Don't throw exception, just set empty data
       setState(() {
-        _activityStatus = {
-          'active': 0.0,
-          'inactive': 0.0,
-        };
+        _activityStatus = {'active': 0.0, 'inactive': 0.0};
       });
     }
   }
@@ -200,14 +194,17 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
         List<double> monthlyRates = [];
 
         for (int i = 0; i < 3; i++) {
-          final attendance = await _superProvider.getOverallAttendanceByPeriod("month");
+          final attendance = await _superProvider.getOverallAttendanceByPeriod(
+            "month",
+          );
           if (attendance?.overallStats?.attendanceRate != null) {
             monthlyRates.add(attendance!.overallStats!.attendanceRate);
           }
         }
 
         if (monthlyRates.isNotEmpty) {
-          final avgQuarterly = monthlyRates.reduce((a, b) => a + b) / monthlyRates.length;
+          final avgQuarterly =
+              monthlyRates.reduce((a, b) => a + b) / monthlyRates.length;
 
           setState(() {
             _overallAttendance = avgQuarterly;
@@ -222,7 +219,9 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
         }
       } else {
         // Normal case
-        final attendance = await _superProvider.getOverallAttendanceByPeriod(_selectedPeriod);
+        final attendance = await _superProvider.getOverallAttendanceByPeriod(
+          _selectedPeriod,
+        );
 
         if (attendance?.overallStats?.attendanceRate != null) {
           setState(() {
@@ -248,7 +247,6 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
     }
   }
 
-
   void _refreshData() {
     _loadData();
   }
@@ -268,80 +266,81 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
           ],
           bottom: TabBar(
             tabs: [
-              Tab(text: "Quick Analytics",),
+              Tab(text: "Quick Analytics"),
               Tab(text: "Detailed Analytics"),
             ],
           ),
         ),
-        body: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _errorMessage != null
+        body:
+            _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _errorMessage != null
                 ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          _errorMessage!,
-                          style: const TextStyle(color: Colors.red),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: _refreshData,
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  )
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        _errorMessage!,
+                        style: const TextStyle(color: Colors.red),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _refreshData,
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                )
                 : SafeArea(
-          child: TabBarView(
-            children: [
-              // Quick Analytics Tab
-              FadeTransition(
-                opacity: _fadeAnimation,
-                child: ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    _buildQuickStatsCard(),
-                  ],
-                ),
-              ),
+                  child: TabBarView(
+                    children: [
+                      // Quick Analytics Tab
+                      FadeTransition(
+                        opacity: _fadeAnimation,
+                        child: ListView(
+                          padding: const EdgeInsets.all(16),
+                          children: [_buildQuickStatsCard()],
+                        ),
+                      ),
 
-              // Detailed Analytics Tab
-              ChangeNotifierProvider<attendance_overview.AttendanceProvider>(
-                create: (_) {
-                  final service = attendance_services.AttendanceService(
-                    ApiEndpoints.baseUrl,
-                  );
-                  final provider =
-                      attendance_overview.AttendanceProvider(service);
-                  provider.loadData(scope: 'overall');
-                  return provider;
-                },
-                child: FadeTransition(
-                  opacity: _fadeAnimation,
-                  child: Builder(
-                    builder: (context) => ListView(
-                      padding: const EdgeInsets.all(16),
-                      children: [
-                        // _buildPeriodSelector(),
-                        // const SizedBox(height: 16),
-                        _buildGlobalAttendanceOverview(context),
-                        const SizedBox(height: 16),
-                        // _buildOverallAttendanceChart(),
-                        // const SizedBox(height: 16),
-                        _buildActivityStatusChart(),
-                        const SizedBox(height: 16),
-                        _buildRegionalAttendanceChart(),
-                      ],
-                    ),
+                      // Detailed Analytics Tab
+                      ChangeNotifierProvider<
+                        attendance_overview.AttendanceProvider
+                      >(
+                        create: (_) {
+                          final service = attendance_services.AttendanceService(
+                            '',
+                          );
+                          final provider =
+                              attendance_overview.AttendanceProvider(service);
+                          provider.loadData(scope: 'overall');
+                          return provider;
+                        },
+                        child: FadeTransition(
+                          opacity: _fadeAnimation,
+                          child: Builder(
+                            builder:
+                                (context) => ListView(
+                                  padding: const EdgeInsets.all(16),
+                                  children: [
+                                    // _buildPeriodSelector(),
+                                    // const SizedBox(height: 16),
+                                    _buildGlobalAttendanceOverview(context),
+                                    const SizedBox(height: 16),
+                                    // _buildOverallAttendanceChart(),
+                                    // const SizedBox(height: 16),
+                                    _buildActivityStatusChart(),
+                                    const SizedBox(height: 16),
+                                    _buildRegionalAttendanceChart(),
+                                  ],
+                                ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-            ],
-          ),
-        ),
-
       ),
     );
   }
@@ -404,70 +403,68 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
             const SizedBox(height: 24),
             _totalUsers == 0 && _totalGroups == 0 && _totalEvents == 0
                 ? const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: Text('No data available at this time'),
-                    ),
-                  )
-                : Column(
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildStatCard(
-                              'Total Users',
-                              _totalUsers.toString(),
-                              Icons.people,
-                              AppColors.primaryColor,
-                              'Active members across all groups',
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: _buildStatCard(
-                              'All Groups',
-                              _totalGroups.toString(),
-                              Icons.group_work,
-                              AppColors.secondaryColor,
-                              'Active groups in the system',
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildStatCard(
-                              'Total Events',
-                              _totalEvents.toString(),
-                              Icons.event,
-                              AppColors.accentColor,
-                              'Scheduled events across groups',
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: _buildStatCard(
-                              'Attendance',
-                              '${_overallAttendance.toStringAsFixed(1)}%',
-                              Icons.trending_up,
-                              AppColors.successColor,
-                              'Average attendance rate',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                  child: Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: Text('No data available at this time'),
                   ),
+                )
+                : Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildStatCard(
+                            'Total Users',
+                            _totalUsers.toString(),
+                            Icons.people,
+                            AppColors.primaryColor,
+                            'Active members across all groups',
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _buildStatCard(
+                            'All Groups',
+                            _totalGroups.toString(),
+                            Icons.group_work,
+                            AppColors.secondaryColor,
+                            'Active groups in the system',
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildStatCard(
+                            'Total Events',
+                            _totalEvents.toString(),
+                            Icons.event,
+                            AppColors.accentColor,
+                            'Scheduled events across groups',
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _buildStatCard(
+                            'Attendance',
+                            '${_overallAttendance.toStringAsFixed(1)}%',
+                            Icons.trending_up,
+                            AppColors.successColor,
+                            'Average attendance rate',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
             const SizedBox(height: 24),
             const Divider(),
             const SizedBox(height: 16),
             Text(
               'Recent Activity',
-              style: TextStyles.heading2.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyles.heading2.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             _buildActivitySummary(),
@@ -477,7 +474,13 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color, String description) {
+  Widget _buildStatCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color,
+    String description,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -513,7 +516,9 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
           Text(
             description,
             style: TextStyles.bodyText.copyWith(
-              color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+              color: Theme.of(
+                context,
+              ).colorScheme.onBackground.withOpacity(0.7),
             ),
           ),
         ],
@@ -546,10 +551,7 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
               isLoading: attendanceProvider.loading,
               onPeriodChange: (value) {
                 if (value == null) return;
-                attendanceProvider.changePeriod(
-                  value,
-                  scope: 'overall',
-                );
+                attendanceProvider.changePeriod(value, scope: 'overall');
               },
             ),
           ],
@@ -593,7 +595,12 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
     );
   }
 
-  Widget _buildActivityItem(IconData icon, String title, String description, Color color) {
+  Widget _buildActivityItem(
+    IconData icon,
+    String title,
+    String description,
+    Color color,
+  ) {
     return Row(
       children: [
         Container(
@@ -619,7 +626,9 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
               Text(
                 description,
                 style: TextStyles.bodyText.copyWith(
-                  color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onBackground.withOpacity(0.7),
                 ),
               ),
             ],
@@ -638,77 +647,85 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-           Text(
+            Text(
               'Regional Attendance',
-              style: TextStyles.heading2.copyWith(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyles.heading2.copyWith(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 16),
             SizedBox(
               height: 300,
               width: double.infinity,
-              child: _regionAttendance.isEmpty
-                  ? const Center(
-                child: Text(
-                  'No regional attendance data available at this time',
-                  textAlign: TextAlign.center,
-                ),
-              )
-              : BarChart(
-                BarChartData(
-                  alignment: BarChartAlignment.spaceAround,
-                  maxY: _regionAttendance.values.isEmpty
-                      ? 100
-                      : _regionAttendance.values.reduce(
-                        (a, b) => a > b ? a : b,
-                  ) *
-                      1.2,
-                  gridData: const FlGridData(
-                    show: true,
-                    drawVerticalLine: false,
-                  ),
-                  barTouchData: BarTouchData(enabled: false),
-                  titlesData: FlTitlesData(
-                    leftTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: true),
-                    ),
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        getTitlesWidget: (value, meta) {
-                          final index = value.toInt();
-                          if (index >= 0 &&
-                              index < _regionAttendance.length) {
-                            return Padding(
-                              padding: const EdgeInsets.only(top: 8.0),
-                              child: Text(
-                                _regionAttendance.keys.elementAt(index),
-                                style: TextStyles.bodyText.copyWith(fontSize: 10),
-                                textAlign: TextAlign.center,
-                              ),
-                            );
-                          }
-                          return const Text('');
-                        },
-                      ),
-                    ),
-                  ),
-                  borderData: FlBorderData(show: true),
-                  barGroups: _regionAttendance.entries.map((entry) {
-                    return BarChartGroupData(
-                      x: _regionAttendance.keys.toList().indexOf(
-                        entry.key,
-                      ),
-                      barRods: [
-                        BarChartRodData(
-                          toY: entry.value,
-                          color: Colors.red,
-                          width: 20,
+              child:
+                  _regionAttendance.isEmpty
+                      ? const Center(
+                        child: Text(
+                          'No regional attendance data available at this time',
+                          textAlign: TextAlign.center,
                         ),
-                      ],
-                    );
-                  }).toList(),
-                ),
-              ),
+                      )
+                      : BarChart(
+                        BarChartData(
+                          alignment: BarChartAlignment.spaceAround,
+                          maxY:
+                              _regionAttendance.values.isEmpty
+                                  ? 100
+                                  : _regionAttendance.values.reduce(
+                                        (a, b) => a > b ? a : b,
+                                      ) *
+                                      1.2,
+                          gridData: const FlGridData(
+                            show: true,
+                            drawVerticalLine: false,
+                          ),
+                          barTouchData: BarTouchData(enabled: false),
+                          titlesData: FlTitlesData(
+                            leftTitles: const AxisTitles(
+                              sideTitles: SideTitles(showTitles: true),
+                            ),
+                            bottomTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                getTitlesWidget: (value, meta) {
+                                  final index = value.toInt();
+                                  if (index >= 0 &&
+                                      index < _regionAttendance.length) {
+                                    return Padding(
+                                      padding: const EdgeInsets.only(top: 8.0),
+                                      child: Text(
+                                        _regionAttendance.keys.elementAt(index),
+                                        style: TextStyles.bodyText.copyWith(
+                                          fontSize: 10,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    );
+                                  }
+                                  return const Text('');
+                                },
+                              ),
+                            ),
+                          ),
+                          borderData: FlBorderData(show: true),
+                          barGroups:
+                              _regionAttendance.entries.map((entry) {
+                                return BarChartGroupData(
+                                  x: _regionAttendance.keys.toList().indexOf(
+                                    entry.key,
+                                  ),
+                                  barRods: [
+                                    BarChartRodData(
+                                      toY: entry.value,
+                                      color: Colors.red,
+                                      width: 20,
+                                    ),
+                                  ],
+                                );
+                              }).toList(),
+                        ),
+                      ),
             ),
           ],
         ),
@@ -725,72 +742,74 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-           Text(
+            Text(
               'Activity Status',
-              style: TextStyles.bodyText.copyWith(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyles.bodyText.copyWith(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 16),
             SizedBox(
               height: 200,
               width: double.infinity,
-              child: _activityStatus.isEmpty
-                  ? const Center(
-                child: Text(
-                  'No activity status data available at this time',
-                  textAlign: TextAlign.center,
-                ),
-              )
-                  : Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: PieChart(
-                      PieChartData(
-                        sections: [
-                          PieChartSectionData(
-                            value: _activityStatus['active'] ?? 0,
-                            title:
-                            '${(_activityStatus['active'] ?? 0).toStringAsFixed(
-                                1)}%',
-                            color: Colors.green,
-                            radius: 80,
-                            titleStyle: TextStyles.heading1.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+              child:
+                  _activityStatus.isEmpty
+                      ? const Center(
+                        child: Text(
+                          'No activity status data available at this time',
+                          textAlign: TextAlign.center,
+                        ),
+                      )
+                      : Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: PieChart(
+                              PieChartData(
+                                sections: [
+                                  PieChartSectionData(
+                                    value: _activityStatus['active'] ?? 0,
+                                    title:
+                                        '${(_activityStatus['active'] ?? 0).toStringAsFixed(1)}%',
+                                    color: Colors.green,
+                                    radius: 80,
+                                    titleStyle: TextStyles.heading1.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  PieChartSectionData(
+                                    value: _activityStatus['inactive'] ?? 0,
+                                    title:
+                                        '${(_activityStatus['inactive'] ?? 0).toStringAsFixed(1)}%',
+                                    color: Colors.red,
+                                    radius: 80,
+                                    titleStyle: TextStyles.heading1.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                                sectionsSpace: 2,
+                                centerSpaceRadius: 40,
+                              ),
                             ),
                           ),
-                          PieChartSectionData(
-                            value: _activityStatus['inactive'] ?? 0,
-                            title:
-                            '${(_activityStatus['inactive'] ?? 0)
-                                .toStringAsFixed(1)}%',
-                            color: Colors.red,
-                            radius: 80,
-                            titleStyle: TextStyles.heading1.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                          Expanded(
+                            flex: 2,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildLegendItem('Active', Colors.green),
+                                const SizedBox(height: 8),
+                                _buildLegendItem('Inactive', Colors.red),
+                              ],
                             ),
                           ),
                         ],
-                        sectionsSpace: 2,
-                        centerSpaceRadius: 40,
                       ),
-                    ),
-                  ),
-                  Expanded(
-                    flex: 2,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildLegendItem('Active', Colors.green),
-                        const SizedBox(height: 8),
-                        _buildLegendItem('Inactive', Colors.red),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
             ),
           ],
         ),
@@ -820,20 +839,20 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                 Text(
+                Text(
                   'Overall Attendance Trend',
                   style: TextStyles.heading2.copyWith(
-                      fontWeight: FontWeight.bold
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
                 _overallAttendance > 0
                     ? Text(
-                  'Current: ${_overallAttendance.toStringAsFixed(1)}%',
-                  style: TextStyles.heading1.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue,
-                  ),
-                )
+                      'Current: ${_overallAttendance.toStringAsFixed(1)}%',
+                      style: TextStyles.heading1.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue,
+                      ),
+                    )
                     : const SizedBox(),
               ],
             ),
@@ -841,61 +860,62 @@ class _SuperAdminAnalyticsScreenState extends State<SuperAdminAnalyticsScreen> w
             SizedBox(
               height: 300,
               width: double.infinity,
-              child: _attendanceTrend.isEmpty
-                  ? const Center(
-                child: Text(
-                  'No attendance trend data available at this time',
-                  textAlign: TextAlign.center,
-                ),
-              )
-              : LineChart(
-                LineChartData(
-                  gridData: const FlGridData(
-                    show: true,
-                    drawVerticalLine: false,
-                  ),
-                  titlesData: FlTitlesData(
-                    leftTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: true),
-                    ),
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        getTitlesWidget: (value, meta) {
-                          const labels = [
-                            'Jan',
-                            'Feb',
-                            'Mar',
-                            'Apr',
-                            'May',
-                            'Jun',
-                          ];
-                          final index = value.toInt();
-                          if (index >= 0 && index < labels.length) {
-                            return Text(labels[index]);
-                          }
-                          return const Text('');
-                        },
+              child:
+                  _attendanceTrend.isEmpty
+                      ? const Center(
+                        child: Text(
+                          'No attendance trend data available at this time',
+                          textAlign: TextAlign.center,
+                        ),
+                      )
+                      : LineChart(
+                        LineChartData(
+                          gridData: const FlGridData(
+                            show: true,
+                            drawVerticalLine: false,
+                          ),
+                          titlesData: FlTitlesData(
+                            leftTitles: const AxisTitles(
+                              sideTitles: SideTitles(showTitles: true),
+                            ),
+                            bottomTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                getTitlesWidget: (value, meta) {
+                                  const labels = [
+                                    'Jan',
+                                    'Feb',
+                                    'Mar',
+                                    'Apr',
+                                    'May',
+                                    'Jun',
+                                  ];
+                                  final index = value.toInt();
+                                  if (index >= 0 && index < labels.length) {
+                                    return Text(labels[index]);
+                                  }
+                                  return const Text('');
+                                },
+                              ),
+                            ),
+                          ),
+                          borderData: FlBorderData(show: true),
+                          lineBarsData: [
+                            LineChartBarData(
+                              spots: _attendanceTrend,
+                              isCurved: true,
+                              color: Colors.blue,
+                              barWidth: 3,
+                              isStrokeCapRound: true,
+                              dotData: const FlDotData(show: true),
+                              belowBarData: BarAreaData(
+                                show: true,
+                                color: Colors.blue.withOpacity(0.2),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ),
-                  borderData: FlBorderData(show: true),
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: _attendanceTrend,
-                      isCurved: true,
-                      color: Colors.blue,
-                      barWidth: 3,
-                      isStrokeCapRound: true,
-                      dotData: const FlDotData(show: true),
-                      belowBarData: BarAreaData(
-                        show: true,
-                        color: Colors.blue.withOpacity(0.2),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             ),
           ],
         ),

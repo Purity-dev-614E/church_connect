@@ -276,13 +276,7 @@ class _MemberAttendanceScreenState extends State<MemberAttendanceScreen> {
                           itemCount: _unattendedEvents.length,
                           itemBuilder: (context, index) {
                             final event = _unattendedEvents[index];
-                            return EventCard(
-                              eventTitle: event.title,
-                              eventDate: _formatEventDate(event.dateTime),
-                              eventLocation: event.location,
-                              tag: event.tag,
-                              onTap: () {},
-                            );
+                            return EventCard(event: event, onTap: () {});
                           },
                         ),
                     const SizedBox(height: 24),
@@ -297,13 +291,7 @@ class _MemberAttendanceScreenState extends State<MemberAttendanceScreen> {
                           itemCount: _attendedEvents.length,
                           itemBuilder: (context, index) {
                             final event = _attendedEvents[index];
-                            return EventCard(
-                              eventTitle: event.title,
-                              eventDate: _formatEventDate(event.dateTime),
-                              eventLocation: event.location,
-                              tag: event.tag,
-                              onTap: () {},
-                            );
+                            return EventCard(event: event, onTap: () {});
                           },
                         ),
                   ],

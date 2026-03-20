@@ -1,227 +1,295 @@
-class ApiEndpoints {
-  //   [ PRODUCTION FLAG]
-  static const bool _isProduction = false;
+import '../services/config_service.dart';
 
-  static const String _serverBaseUrl =
-      'https://safari-backend-fgl3.onrender.com';
-  static const String baseUrl = '/api';
-  static String get fullBaseUrl =>
-      _isProduction ? baseUrl : '$_serverBaseUrl$baseUrl';
+class ApiEndpoints {
+  static ConfigService get _config => ConfigService.instance;
+
+  // Production flag - now managed by ConfigService
+  static bool get _isProduction => _config.currentEnvironment == 'production';
+
+  static Future<String> get _apiUrl async {
+    return await _config.getApiUrl();
+  }
+
+  static Future<String> get fullBaseUrl async =>
+      _isProduction ? await _config.getApiUrl() : await _apiUrl;
+
+  static Future<String> get baseUrl async => await fullBaseUrl;
 
   // Authentication Endpoints
-  static String get auth => '$fullBaseUrl/auth';
-  static String get signup => '$auth/signup';
-  static String get login => '$auth/login';
-  static String get forgotPassword => '$auth/forgot-password';
-  static String get refreshToken => '$auth/refresh-token';
+  static Future<String> get auth async => '${await fullBaseUrl}/auth';
+  static Future<String> get signup async => '${await auth}/signup';
+  static Future<String> get login async => '${await auth}/login';
+  static Future<String> get forgotPassword async =>
+      '${await auth}/forgot-password';
+  static Future<String> get refreshToken async => '${await auth}/refresh-token';
 
   // User Endpoints
-  static String get users => '$fullBaseUrl/users';
-  static String get searchUsers => '$users/search';
-  static String getUserById(String id) => '$users/$id';
-  static String getUserByEmail(String email) => '$users/$email';
-  static String updateUser(String id) => '$users/$id';
-  static String deleteUser(String id) => '$users/$id';
-  static String deleteUserCompletely(String id) => '$users/$id/complete';
-  static String uploadUserImage(String id) => '$users/$id/uploadimage';
+  static Future<String> get users async => '${await fullBaseUrl}/users';
+  static Future<String> get searchUsers async => '${await users}/search';
+  static Future<String> getUserById(String id) async => '${await users}/$id';
+  static Future<String> getUserByEmail(String email) async =>
+      '${await users}/$email';
+  static Future<String> updateUser(String id) async => '${await users}/$id';
+  static Future<String> deleteUser(String id) async => '${await users}/$id';
+  static Future<String> deleteUserCompletely(String id) async =>
+      '${await users}/$id/complete';
+  static Future<String> uploadUserImage(String id) async =>
+      '${await users}/$id/uploadimage';
 
   // Region Endpoints
-  static String get regions => '$fullBaseUrl/regions';
-  static String getRegionById(String id) => '$regions/$id';
-  static String updateRegion(String id) => '$regions/$id';
-  static String deleteRegion(String id) => '$regions/$id';
-  static String getRegionUsers(String regionId) => '$regions/$regionId/users';
-  static String getRegionGroups(String regionId) => '$regions/$regionId/groups';
-  static String getRegionAnalytics(String regionId) =>
-      '$regions/$regionId/analytics';
+  static Future<String> get regions async => '${await fullBaseUrl}/regions';
+  static Future<String> getRegionById(String id) async =>
+      '${await regions}/$id';
+  static Future<String> updateRegion(String id) async => '${await regions}/$id';
+  static Future<String> deleteRegion(String id) async => '${await regions}/$id';
+  static Future<String> getRegionUsers(String regionId) async =>
+      '${await regions}/$regionId/users';
+  static Future<String> getRegionGroups(String regionId) async =>
+      '${await regions}/$regionId/groups';
+  static Future<String> getRegionAnalytics(String regionId) async =>
+      '${await regions}/$regionId/analytics';
 
   // Group Endpoints
-  static String get groups => '$fullBaseUrl/groups';
-  static String get groupsAllForProfile => '$groups/all-for-profile';
-  static String getGroupById(String id) => '$groups/$id';
-  static String get getGroupByName => '$groups/name';
-  static String updateGroup(String id) => '$groups/$id';
-  static String deleteGroup(String id) => '$groups/$id';
-  static String getGroupDemographics(String id) =>
-      '$groups/$id/groupDemographics';
-  static String getGroupMembers(String id) => '$groups/$id/members';
-  static String markGroupMemberInactive(String groupId, String userId) =>
-      '$groups/$groupId/members/$userId/status';
-  static String getmemberGroups(String userId) => '$groups/user/$userId';
-  static String addGroupMember(String groupId, String userId) =>
-      '$groups/$groupId/members';
-  static String removeGroupMember(String groupId, String userId) =>
-      '$groups/$groupId/members/$userId';
-  static String removeGroupMemberWithReason(String groupId, String userId) =>
-      '$groups/$groupId/members/$userId/remove';
-  static String getRemovedMembers(String groupId) =>
-      '$groups/$groupId/removed-members';
-  static String restoreGroupMember(String groupId, String userId) =>
-      '$groups/$groupId/members/$userId/restore';
-  static String getGroupRemovalStats(String groupId) =>
-      '$groups/$groupId/removal-stats';
-  static String getGroupRemovalPermissions(String groupId) =>
-      '$groups/$groupId/can-remove-members';
-  static String getUserRemovalHistory(String userId) =>
-      '$fullBaseUrl/users/$userId/removal-history';
-  static String get getAllRemovedMembers =>
-      '$fullBaseUrl/admin/removed-members';
-  static String getRegionRemovedMembers(String regionId) =>
-      '$regionalManagerAnalytics/removed-members/$regionId';
-  static String getGroupsByAdmin(String userId) =>
-      '$groups/admin/$userId/groups';
-  static String get assignAdmin => '$groups/assign-admin';
-  static String getGroupAttendance(String id) => '$groups/$id/attendance';
-  static String getOverallAttendanceByPeriod(String period) =>
-      '$groups/attendance/$period';
-  static String getGroupsByRegion(String regionId) =>
-      '$groups/region/$regionId';
+  static Future<String> get groups async => '${await fullBaseUrl}/groups';
+  static Future<String> get groupsAllForProfile async =>
+      '${await groups}/all-for-profile';
+  static Future<String> getGroupById(String id) async => '${await groups}/$id';
+  static Future<String> get getGroupByName async => '${await groups}/name';
+  static Future<String> updateGroup(String id) async => '${await groups}/$id';
+  static Future<String> deleteGroup(String id) async => '${await groups}/$id';
+  static Future<String> getGroupDemographics(String id) async =>
+      '${await groups}/$id/groupDemographics';
+  static Future<String> getGroupMembers(String id) async =>
+      '${await groups}/$id/members';
+  static Future<String> markGroupMemberInactive(
+    String groupId,
+    String userId,
+  ) async => '${await groups}/$groupId/members/$userId/status';
+  static Future<String> getmemberGroups(String userId) async =>
+      '${await groups}/user/$userId';
+  static Future<String> addGroupMember(String groupId, String userId) async =>
+      '${await groups}/$groupId/members';
+  static Future<String> removeGroupMember(
+    String groupId,
+    String userId,
+  ) async => '${await groups}/$groupId/members/$userId';
+  static Future<String> removeGroupMemberWithReason(
+    String groupId,
+    String userId,
+  ) async => '${await groups}/$groupId/members/$userId/remove';
+  static Future<String> getRemovedMembers(String groupId) async =>
+      '${await groups}/$groupId/removed-members';
+  static Future<String> restoreGroupMember(
+    String groupId,
+    String userId,
+  ) async => '${await groups}/$groupId/members/$userId/restore';
+  static Future<String> getGroupRemovalStats(String groupId) async =>
+      '${await groups}/$groupId/removal-stats';
+  static Future<String> getGroupRemovalPermissions(String groupId) async =>
+      '${await groups}/$groupId/can-remove-members';
+  static Future<String> getUserRemovalHistory(String userId) async =>
+      '${await fullBaseUrl}/users/$userId/removal-history';
+  static Future<String> get getAllRemovedMembers async =>
+      '${await fullBaseUrl}/admin/removed-members';
+  static Future<String> getRegionRemovedMembers(String regionId) async =>
+      '${await regionalManagerAnalytics}/removed-members/$regionId';
+  static Future<String> getGroupsByAdmin(String userId) async =>
+      '${await groups}/admin/$userId/groups';
+  static Future<String> get assignAdmin async => '${await groups}/assign-admin';
+  static Future<String> getGroupAttendance(String id) async =>
+      '${await groups}/$id/attendance';
+  static Future<String> getOverallAttendanceByPeriod(String period) async =>
+      '${await groups}/attendance/$period';
+  static Future<String> getGroupsByRegion(String regionId) async =>
+      '${await groups}/region/$regionId';
 
   // Event Endpoints
-  static String get events => '$fullBaseUrl/events';
-  static String get leadershipEvents => '$events/leadership';
-  static String createGroupEvent(String groupId) => '$events/group/$groupId';
-  static String get createLeadershipEvent => '$events/leadership';
-  static String getEventById(String id) => '$events/$id';
-  static String getEventParticipants(String id) => '$events/$id/participants';
-  static String updateEvent(String id) => '$events/$id';
-  static String deleteEvent(String id) => '$events/$id';
-  static String getEventsByGroup(String groupId) => '$events/group/$groupId';
-  static String getEventsByRegion(String regionId) =>
-      '$events/region/$regionId';
+  static Future<String> get events async => '${await fullBaseUrl}/events';
+  static Future<String> get leadershipEvents async =>
+      '${await events}/leadership';
+  static Future<String> createGroupEvent(String groupId) async =>
+      '${await events}/group/$groupId';
+  static Future<String> get createLeadershipEvent async =>
+      '${await events}/leadership';
+  static Future<String> getEventById(String id) async => '${await events}/$id';
+  static Future<String> getEventParticipants(String id) async =>
+      '${await events}/$id/participants';
+  static Future<String> updateEvent(String id) async => '${await events}/$id';
+  static Future<String> deleteEvent(String id) async => '${await events}/$id';
+  static Future<String> getEventsByGroup(String groupId) async =>
+      '${await events}/group/$groupId';
+  static Future<String> getEventsByRegion(String regionId) async =>
+      '${await events}/region/$regionId';
 
   // Attendance Endpoints
-  static String get attendance => '$fullBaseUrl/attendance';
-  static String createEventAttendance(String eventId) =>
-      '$attendance/event/$eventId';
-  static String createLeadershipAttendance(String eventId) =>
-      '$attendance/leadership/$eventId';
-  static String getAttendanceById(String id) => '$attendance/$id';
-  static String updateAttendance(String id) => '$attendance/$id';
-  static String deleteAttendance(String id) => '$attendance/$id';
-  static String get getAttendanceByWeek => '$attendance/week';
-  static String get getAttendanceByMonth => '$attendance/month';
-  static String get getAttendanceByYear => '$attendance/year';
-  static String getAttendedMembers(String eventId) =>
-      '$attendance/event/$eventId/attended-members';
-  static String get getAttendanceStatus => '$attendance/status';
-  static String getAttendanceByEvent(String eventId) =>
-      '$attendance/event/$eventId';
-  static String getAttendanceByUser(String userId) =>
-      '$attendance/user/$userId';
-  static String getAttendanceByPeriod(String period) => '$attendance/$period';
-  static String getAttendanceByRegion(String regionId) =>
-      '$attendance/region/$regionId';
-  static String getGroupAttendancePercentage(String groupId) =>
-      '$attendance/group/$groupId';
+  static Future<String> get attendance async =>
+      '${await fullBaseUrl}/attendance';
+  static Future<String> createEventAttendance(String eventId) async =>
+      '${await attendance}/event/$eventId';
+  static Future<String> createLeadershipAttendance(String eventId) async =>
+      '${await attendance}/leadership/$eventId';
+  static Future<String> get getLeadershipAttendees async =>
+      '${await attendance}/leadership-attendees';
+  static Future<String> getAttendanceById(String id) async =>
+      '${await attendance}/$id';
+  static Future<String> updateAttendance(String id) async =>
+      '${await attendance}/$id';
+  static Future<String> deleteAttendance(String id) async =>
+      '${await attendance}/$id';
+  static Future<String> get getAttendanceByWeek async =>
+      '${await attendance}/week';
+  static Future<String> get getAttendanceByMonth async =>
+      '${await attendance}/month';
+  static Future<String> get getAttendanceByYear async =>
+      '${await attendance}/year';
+  static Future<String> getAttendedMembers(String eventId) async =>
+      '${await attendance}/event/$eventId/attended-members';
+  static Future<String> get getAttendanceStatus async =>
+      '${await attendance}/status';
+  static Future<String> getAttendanceByEvent(String eventId) async =>
+      '${await attendance}/event/$eventId';
+  static Future<String> getAttendanceByUser(String userId) async =>
+      '${await attendance}/user/$userId';
+  static Future<String> getAttendanceByPeriod(String period) async =>
+      '${await attendance}/$period';
+  static Future<String> getAttendanceByRegion(String regionId) async =>
+      '${await attendance}/region/$regionId';
+  static Future<String> getGroupAttendancePercentage(String groupId) async =>
+      '${await attendance}/group/$groupId';
 
   // Analytics Endpoints
   // Base Analytics URLs
-  static String get superAdminAnalytics => '$fullBaseUrl/super-admin/analytics';
-  static String get regionalManagerAnalytics =>
-      '$fullBaseUrl/regional-manager/analytics';
-  static String get adminAnalytics => '$fullBaseUrl/admin/analytics';
+  static Future<String> get superAdminAnalytics async =>
+      '${await fullBaseUrl}/super-admin/analytics';
+  static Future<String> get regionalManagerAnalytics async =>
+      '${await fullBaseUrl}/regional-manager/analytics';
+  static Future<String> get adminAnalytics async =>
+      '${await fullBaseUrl}/admin/analytics';
 
   // Super Admin Analytics Endpoints
   // Group Analytics
-  static String getSuperAdminGroupDemographics(String groupId) =>
-      '$superAdminAnalytics/groups/$groupId/demographics';
-  static String getSuperAdminGroupAttendance(String groupId) =>
-      '$superAdminAnalytics/groups/$groupId/attendance';
-  static String getSuperAdminGroupGrowth(String groupId) =>
-      '$superAdminAnalytics/groups/$groupId/growth';
-  static String get compareSuperAdminGroups =>
-      '$superAdminAnalytics/groups/compare';
+  static Future<String> getSuperAdminGroupDemographics(String groupId) async =>
+      '${await superAdminAnalytics}/groups/$groupId/demographics';
+  static Future<String> getSuperAdminGroupAttendance(String groupId) async =>
+      '${await superAdminAnalytics}/groups/$groupId/attendance';
+  static Future<String> getSuperAdminGroupGrowth(String groupId) async =>
+      '${await superAdminAnalytics}/groups/$groupId/growth';
+  static Future<String> get compareSuperAdminGroups async =>
+      '${await superAdminAnalytics}/groups/compare';
 
   // Attendance Analytics
-  static String getSuperAdminAttendanceByPeriod(String period) =>
-      '$superAdminAnalytics/attendance/period/$period';
-  static String getSuperAdminOverallAttendanceByPeriod(String period) =>
-      '$superAdminAnalytics/attendance/overall/$period';
-  static String getSuperAdminUserAttendanceTrends(String userId) =>
-      '$superAdminAnalytics/attendance/user/$userId';
+  static Future<String> getSuperAdminAttendanceByPeriod(String period) async =>
+      '${await superAdminAnalytics}/attendance/period/$period';
+  static Future<String> getSuperAdminOverallAttendanceByPeriod(
+    String period,
+  ) async => '${await superAdminAnalytics}/attendance/overall/$period';
+  static Future<String> getSuperAdminUserAttendanceTrends(
+    String userId,
+  ) async => '${await superAdminAnalytics}/attendance/user/$userId';
 
   // Event Analytics
-  static String getSuperAdminEventParticipation(String eventId) =>
-      '$superAdminAnalytics/events/$eventId/participation';
-  static String get compareSuperAdminEventAttendance =>
-      '$superAdminAnalytics/events/compare-attendance';
+  static Future<String> getSuperAdminEventParticipation(String eventId) async =>
+      '${await superAdminAnalytics}/events/$eventId/participation';
+  static Future<String> get compareSuperAdminEventAttendance async =>
+      '${await superAdminAnalytics}/events/compare-attendance';
 
   // Member Analytics
-  static String get getSuperAdminMemberParticipation =>
-      '$superAdminAnalytics/members/participation';
-  static String get getSuperAdminMemberActivityStatus =>
-      '$superAdminAnalytics/members/activity-status';
+  static Future<String> get getSuperAdminMemberParticipation async =>
+      '${await superAdminAnalytics}/members/participation';
+  static Future<String> get getSuperAdminMemberActivityStatus async =>
+      '${await superAdminAnalytics}/members/activity-status';
 
   // Dashboard Analytics
-  static String get getSuperAdminDashboardSummary =>
-      '$superAdminAnalytics/dashboard/summary';
-  static String getSuperAdminGroupDashboardData(String groupId) =>
-      '$superAdminAnalytics/dashboard/group/$groupId';
+  static Future<String> get getSuperAdminDashboardSummary async =>
+      '${await superAdminAnalytics}/dashboard/summary';
+  static Future<String> getSuperAdminGroupDashboardData(String groupId) async =>
+      '${await superAdminAnalytics}/dashboard/group/$groupId';
+
+  // Database Analytics
+  static Future<String> get getSuperAdminDatabaseStats async =>
+      '${await superAdminAnalytics}/database-stats';
 
   // Regional Manager Analytics Endpoints
   // Group Analytics
-  static String getRegionalManagerGroupDemographics(String groupId) =>
-      '$regionalManagerAnalytics/groups/$groupId/demographics';
-  static String getRegionalManagerGroupAttendance(String groupId) =>
-      '$regionalManagerAnalytics/groups/$groupId/attendance';
-  static String getRegionalManagerGroupGrowth(String groupId) =>
-      '$regionalManagerAnalytics/groups/$groupId/growth';
-  static String get compareRegionalManagerGroups =>
-      '$regionalManagerAnalytics/groups/compare';
+  static Future<String> getRegionalManagerGroupDemographics(
+    String groupId,
+  ) async => '${await regionalManagerAnalytics}/groups/$groupId/demographics';
+  static Future<String> getRegionalManagerGroupAttendance(
+    String groupId,
+  ) async => '${await regionalManagerAnalytics}/groups/$groupId/attendance';
+  static Future<String> getRegionalManagerGroupGrowth(String groupId) async =>
+      '${await regionalManagerAnalytics}/groups/$groupId/growth';
+  static Future<String> get compareRegionalManagerGroups async =>
+      '${await regionalManagerAnalytics}/groups/compare';
 
   // Attendance Analytics
-  static String getRegionalManagerAttendanceByPeriod(String period) =>
-      '$regionalManagerAnalytics/attendance/period/$period';
-  static String getRegionalManagerOverallAttendanceByPeriod(String period) =>
-      '$regionalManagerAnalytics/attendance/overall/$period';
-  static String getRegionalManagerUserAttendanceTrends(String userId) =>
-      '$regionalManagerAnalytics/attendance/user/$userId';
+  static Future<String> getRegionalManagerAttendanceByPeriod(
+    String period,
+  ) async => '${await regionalManagerAnalytics}/attendance/period/$period';
+  static Future<String> getRegionalManagerOverallAttendanceByPeriod(
+    String period,
+  ) async => '${await regionalManagerAnalytics}/attendance/overall/$period';
+  static Future<String> getRegionalManagerUserAttendanceTrends(
+    String userId,
+  ) async => '${await regionalManagerAnalytics}/attendance/user/$userId';
 
   // Event Analytics
-  static String getRegionalManagerEventParticipation(String eventId) =>
-      '$regionalManagerAnalytics/events/$eventId/participation';
-  static String get compareRegionalManagerEventAttendance =>
-      '$regionalManagerAnalytics/events/compare-attendance';
+  static Future<String> getRegionalManagerEventParticipation(
+    String eventId,
+  ) async => '${await regionalManagerAnalytics}/events/$eventId/participation';
+  static Future<String> get compareRegionalManagerEventAttendance async =>
+      '${await regionalManagerAnalytics}/events/compare-attendance';
 
   // Member Analytics
-  static String get getRegionalManagerMemberParticipation =>
-      '$regionalManagerAnalytics/members/participation';
-  static String get getRegionalManagerMemberActivityStatus =>
-      '$regionalManagerAnalytics/members/activity-status';
+  static Future<String> get getRegionalManagerMemberParticipation async =>
+      '${await regionalManagerAnalytics}/members/participation';
+  static Future<String> get getRegionalManagerMemberActivityStatus async =>
+      '${await regionalManagerAnalytics}/members/activity-status';
 
   // Dashboard Analytics
-  static String get getRegionalManagerDashboardSummary =>
-      '$regionalManagerAnalytics/dashboard/summary';
-  static String getRegionalManagerGroupDashboardData(String groupId) =>
-      '$regionalManagerAnalytics/dashboard/group/$groupId';
+  static Future<String> get getRegionalManagerDashboardSummary async =>
+      '${await regionalManagerAnalytics}/dashboard/summary';
+  static Future<String> getRegionalManagerGroupDashboardData(
+    String groupId,
+  ) async => '${await regionalManagerAnalytics}/dashboard/group/$groupId';
+
+  // Database Analytics
+  static Future<String> get getRegionalManagerDatabaseStats async =>
+      '${await regionalManagerAnalytics}/database-stats';
 
   // Admin (Group Admin) Analytics Endpoints
   // Group Analytics
-  static String getAdminGroupDemographics(String groupId) =>
-      '$adminAnalytics/groups/$groupId/demographics';
-  static String getAdminGroupAttendance(String groupId) =>
-      '$adminAnalytics/groups/$groupId/attendance';
-  static String getAdminGroupGrowth(String groupId) =>
-      '$adminAnalytics/groups/$groupId/growth';
+  static Future<String> getAdminGroupDemographics(String groupId) async =>
+      '${await adminAnalytics}/groups/$groupId/demographics';
+  static Future<String> getAdminGroupAttendance(String groupId) async =>
+      '${await adminAnalytics}/groups/$groupId/attendance';
+  static Future<String> getAdminGroupGrowth(String groupId) async =>
+      '${await adminAnalytics}/groups/$groupId/growth';
 
   // Attendance Analytics
-  static String getAdminGroupAttendanceByPeriod(
+  static Future<String> getAdminGroupAttendanceByPeriod(
     String groupId,
     String period,
-  ) => '$adminAnalytics/groups/$groupId/attendance/period/$period';
+  ) async =>
+      '${await adminAnalytics}/groups/$groupId/attendance/period/$period';
 
   // Event Analytics
-  static String getAdminEventParticipation(String eventId) =>
-      '$adminAnalytics/events/$eventId/participation';
+  static Future<String> getAdminEventParticipation(String eventId) async =>
+      '${await adminAnalytics}/events/$eventId/participation';
 
   // Member Analytics
-  static String getAdminGroupMemberParticipation(String groupId) =>
-      '$adminAnalytics/groups/$groupId/members/participation';
-  static String getAdminGroupMemberActivityStatus(String groupId) =>
-      '$adminAnalytics/groups/$groupId/members/activity-status';
+  static Future<String> getAdminGroupMemberParticipation(
+    String groupId,
+  ) async => '${await adminAnalytics}/groups/$groupId/members/participation';
+  static Future<String> getAdminGroupMemberActivityStatus(
+    String groupId,
+  ) async => '${await adminAnalytics}/groups/$groupId/members/activity-status';
 
   // Dashboard Analytics
-  static String getAdminGroupDashboardData(String groupId) =>
-      '$adminAnalytics/groups/$groupId/dashboard';
+  static Future<String> getAdminGroupDashboardData(String groupId) async =>
+      '${await adminAnalytics}/groups/$groupId/dashboard';
+
+  // Database Analytics
+  static Future<String> get getAdminDatabaseStats async =>
+      '${await adminAnalytics}/database-stats';
 }
