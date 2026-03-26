@@ -33,19 +33,63 @@ class EventModel {
     this.createdAt,
   });
 
-  /// True if more than 24 hours have passed since the event start for regular events.
-  /// Leadership events are never locked for attendance marking.
+  /// True if attendance marking is locked.
+  /// - Before event start: Locked (cannot mark attendance before event begins)
+  /// - During event: Unlocked (can mark attendance)
+  /// - After 24 hours from event start: Locked (cannot modify attendance)
+  /// - Leadership events: Only locked before start, never locked after
   bool get isAttendanceLocked {
-    // Leadership events are never locked for attendance marking
+    final now = DateTime.now();
+
+    // Always locked before event starts (for all event types)
+    if (now.isBefore(dateTime)) {
+      return true;
+    }
+
+    // Leadership events are never locked after they start
     if (isLeadershipEvent) {
       return false;
     }
 
-    return DateTime.now().isAfter(dateTime.add(attendanceLockDuration));
+    // Regular events are locked after 24 hours from start
+    return now.isAfter(dateTime.add(attendanceLockDuration));
   }
 
   bool get isLeadershipEvent => tag == 'leadership';
   bool get hasGroup => groupId != null;
+
+  /// True if attendance can currently be marked (during the event window)
+  bool get canMarkAttendance {
+    final now = DateTime.now();
+
+    // Cannot mark before event starts
+    if (now.isBefore(dateTime)) {
+      return false;
+    }
+
+    // Leadership events can always be marked after they start
+    if (isLeadershipEvent) {
+      return true;
+    }
+
+    // Regular events can be marked until 24 hours after start
+    return !now.isAfter(dateTime.add(attendanceLockDuration));
+  }
+
+  /// Returns a user-friendly message about attendance availability
+  String get attendanceStatusMessage {
+    final now = DateTime.now();
+
+    if (now.isBefore(dateTime)) {
+      return 'Attendance will be available when the event starts.';
+    } else if (isLeadershipEvent) {
+      return 'Leadership event attendance is always open.';
+    } else if (now.isAfter(dateTime.add(attendanceLockDuration))) {
+      return 'Attendance closed 24 hours after event start.';
+    } else {
+      return 'Attendance is currently open.';
+    }
+  }
 
   factory EventModel.fromJson(Map<String, dynamic> json) {
     final rawDate = json['date_time'] ?? json['date'];

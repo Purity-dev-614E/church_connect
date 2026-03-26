@@ -3,6 +3,7 @@ import 'package:group_management_church_app/core/constants/colors.dart';
 import 'package:group_management_church_app/core/constants/text_styles.dart';
 import 'package:group_management_church_app/data/models/user_model.dart';
 import 'package:group_management_church_app/data/providers/user_provider.dart';
+import 'package:group_management_church_app/data/providers/group_provider.dart';
 import 'package:group_management_church_app/widgets/custom_notification.dart';
 import 'package:provider/provider.dart';
 import 'package:group_management_church_app/widgets/change_user_group_dialog.dart';
@@ -120,19 +121,34 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
 
   // Check if current user can change the target user's group
   bool _canChangeUserGroup(UserModel targetUser) {
-    final currentUser =
-        Provider.of<UserProvider>(context, listen: false).currentUser;
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final currentUser = userProvider.currentUser;
     final currentUserRole = currentUser?.role?.toLowerCase() ?? '';
+
+    debugPrint('DEBUG: Current user role: $currentUserRole');
+    debugPrint('DEBUG: Target user role: ${targetUser.role}');
+    debugPrint(
+      'DEBUG: Target user isRegionalLeadership: ${RoleUtils.isRegionalLeadership(targetUser.role)}',
+    );
+    debugPrint(
+      'DEBUG: Target user isSuperAdmin: ${RoleUtils.isSuperAdmin(targetUser.role)}',
+    );
+    debugPrint(
+      'DEBUG: Target user isRoot: ${RoleUtils.isRoot(targetUser.role)}',
+    );
 
     // Regional Manager cannot change groups of Super Admins, Root, or other Regional Managers
     if (RoleUtils.isRoot(targetUser.role) ||
         RoleUtils.isSuperAdmin(targetUser.role) ||
         RoleUtils.isRegionalLeadership(targetUser.role)) {
+      debugPrint('DEBUG: Cannot change group - target user is protected role');
       return false;
     }
 
     // Regional Manager can change groups of regular users and admins in their region
-    return currentUserRole == 'regional manager';
+    final canChange = currentUserRole == 'regional manager';
+    debugPrint('DEBUG: Can change group: $canChange');
+    return canChange;
   }
 
   @override
@@ -232,7 +248,10 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
                       itemCount: _filteredUsers.length,
                       itemBuilder: (context, index) {
                         final user = _filteredUsers[index];
-                        return _buildUserListItem(user);
+                        return Container(
+                          key: ValueKey('user_${user.id}'),
+                          child: _buildUserListItem(user),
+                        );
                       },
                     ),
                   ),
@@ -331,6 +350,7 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
             // Group change button
             if (_canChangeUserGroup(user))
               IconButton(
+                key: ValueKey('change_group_${user.id}'),
                 icon: const Icon(Icons.groups, color: AppColors.primaryColor),
                 onPressed: () => _showChangeGroupDialog(user),
                 tooltip: 'Change Group',
@@ -375,7 +395,12 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
           ),
     ).then((result) {
       if (result == true) {
-        // Refresh the user list if group was changed successfully
+        // Refresh the current user data first to ensure permissions are up to date
+        final userProvider = Provider.of<UserProvider>(context, listen: false);
+        if (userProvider.currentUser != null) {
+          userProvider.loadUser(userProvider.currentUser!.id);
+        }
+        // Then refresh the user list
         _loadUsers();
       }
     });
@@ -495,7 +520,9 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
                     await userProvider.updateUser(updatedUser);
 
                     _showSuccess('User role updated successfully');
-                    Navigator.pop(context);
+                    if (mounted) {
+                      Navigator.pop(context);
+                    }
                     _loadUsers(); // Refresh the user list
                   } catch (e) {
                     _showError('Failed to update user role: ${e.toString()}');
@@ -523,9 +550,75 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('Remove User'),
-            content: Text(
-              'Are you sure you want to remove ${user.fullName} from this region?',
+            title: Text('Remove ${user.fullName}'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'What would you like to remove the user from?',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                const Text('Choose one option:'),
+                const SizedBox(height: 12),
+                ListTile(
+                  title: const Text('Remove from groups only'),
+                  subtitle: const Text(
+                    'User will be removed from all groups in this region but will remain assigned to the region',
+                  ),
+                  leading: const Icon(
+                    Icons.group_remove,
+                    color: AppColors.primaryColor,
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showRemovalConfirmationDialog(
+                      user,
+                      removeFromGroups: true,
+                    );
+                  },
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  Future<void> _showRemovalConfirmationDialog(
+    UserModel user, {
+    required bool removeFromGroups,
+  }) async {
+    List<String> removalItems = [];
+    if (removeFromGroups) removalItems.add('All groups in this region');
+
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text('Remove ${user.fullName} from Groups'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Are you sure you want to remove this user from:'),
+                const SizedBox(height: 12),
+                ...removalItems.map((item) => Text('• $item')),
+                const SizedBox(height: 12),
+                const Text(
+                  'This action cannot be undone.',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red,
+                  ),
+                ),
+              ],
             ),
             actions: [
               TextButton(
@@ -534,25 +627,80 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
               ),
               ElevatedButton(
                 onPressed: () async {
+                  // Store navigator reference before async operation
+                  final navigator = Navigator.of(context);
+
                   try {
-                    final userProvider = Provider.of<UserProvider>(
-                      context,
-                      listen: false,
-                    );
-                    final success = await userProvider.removeUserFromRegion(
-                      user.id,
-                      widget.regionId,
+                    if (mounted) {
+                      Navigator.pop(context); // Close confirmation dialog
+                    }
+
+                    // Show loading indicator
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder:
+                          (context) => const AlertDialog(
+                            content: Row(
+                              children: [
+                                CircularProgressIndicator(),
+                                SizedBox(width: 16),
+                                Text('Removing user...'),
+                              ],
+                            ),
+                          ),
                     );
 
+                    bool success = true;
+                    String errorMessage = '';
+
+                    // Remove from all groups in this region
+                    if (removeFromGroups) {
+                      try {
+                        await _removeUserFromAllGroupsInRegion(user);
+                      } catch (e) {
+                        success = false;
+                        errorMessage +=
+                            'Failed to remove from groups: ${e.toString()}\n';
+                      }
+                    }
+
+                    // Close loading dialog using stored navigator reference
+                    try {
+                      navigator.pop();
+                    } catch (e) {
+                      debugPrint('Error closing loading dialog: $e');
+                    }
+
                     if (success) {
-                      _showSuccess('User removed from region successfully');
-                      Navigator.pop(context);
-                      _loadUsers(); // Refresh the user list
+                      if (mounted) {
+                        // Add a small delay to ensure dialog closure completes
+                        await Future.delayed(const Duration(milliseconds: 100));
+                        _showSuccess(
+                          'User removed from all groups successfully',
+                        );
+                        _loadUsers(); // Refresh the user list
+                      }
                     } else {
-                      _showError('Failed to remove user from region');
+                      if (mounted) {
+                        _showError(
+                          errorMessage.isNotEmpty
+                              ? errorMessage.trim()
+                              : 'Failed to remove user',
+                        );
+                      }
                     }
                   } catch (e) {
-                    _showError('Failed to remove user: ${e.toString()}');
+                    // Close loading dialog if still open
+                    try {
+                      navigator.pop();
+                    } catch (navError) {
+                      debugPrint('Navigation error ignored: $navError');
+                    }
+
+                    if (mounted) {
+                      _showError('Failed to remove user: ${e.toString()}');
+                    }
                   }
                 },
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
@@ -561,6 +709,32 @@ class _RegionUserManagementTabState extends State<RegionUserManagementTab> {
             ],
           ),
     );
+  }
+
+  Future<void> _removeUserFromAllGroupsInRegion(UserModel user) async {
+    final groupProvider = Provider.of<GroupProvider>(context, listen: false);
+
+    // Only remove from the user's current group (1-user-to-1-group principle)
+    if (user.regionId.isNotEmpty) {
+      try {
+        await groupProvider.removeMemberFromGroupWithReason(
+          user.regionId,
+          user.id,
+          'Removed from region',
+        );
+      } catch (e) {
+        // Try with legacy method if reason method fails
+        try {
+          await groupProvider.removeMemberFromGroup(user.regionId, user.id);
+        } catch (legacyError) {
+          print(
+            'Error removing user from current group ${user.regionId}: $legacyError',
+          );
+          // Re-throw the error so the calling method knows it failed
+          throw legacyError;
+        }
+      }
+    }
   }
 
   Color _getRoleColor(String role) {

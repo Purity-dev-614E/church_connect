@@ -80,9 +80,11 @@ class _RegionRemovedMembersListState extends State<RegionRemovedMembersList> {
         print('  User ID: ${firstMember.userId}');
         print('  User Name: "${firstMember.userName}"');
         print('  User Email: "${firstMember.userEmail}"');
+        print('  Group ID: "${firstMember.groupId}"');
         print('  Group Name: "${firstMember.groupName}"');
         print('  Removed By: "${firstMember.removedByName}"');
         print('  Removed At: ${firstMember.removedAt}');
+        print('  Reason: "${firstMember.reason}"');
         print('  Is Restored: ${firstMember.isRestored}');
       } else {
         print('No removed members found');
@@ -345,142 +347,6 @@ class _RegionRemovedMembersListState extends State<RegionRemovedMembersList> {
     );
   }
 
-  // Widget _buildStatsSection() {
-  //   if (_isLoadingGroups) {
-  //     return Container(
-  //       padding: const EdgeInsets.all(16),
-  //       child: const Center(child: CircularProgressIndicator()),
-  //     );
-  //   }
-
-  //   if (_groupStats.isEmpty) return const SizedBox.shrink();
-
-  //   // Calculate total stats across all groups
-  //   int totalRemoved = 0;
-  //   int activeRemovals = 0;
-  //   int restoredMembers = 0;
-
-  //   for (final groupStat in _groupStats) {
-  //     final stats = groupStat['stats'] as RemovalStats;
-  //     totalRemoved += stats.totalRemoved;
-  //     activeRemovals += stats.activeRemovals;
-  //     restoredMembers += stats.restoredMembers;
-  //   }
-
-  //   return Container(
-  //     margin: const EdgeInsets.all(16),
-  //     padding: const EdgeInsets.all(12), // Reduced padding
-  //     decoration: BoxDecoration(
-  //       color: AppColors.backgroundColor,
-  //       borderRadius: BorderRadius.circular(12),
-  //       boxShadow: [
-  //         BoxShadow(
-  //           color: Colors.black.withValues(alpha:1),
-  //           blurRadius: 4,
-  //           offset: const Offset(0, 2),
-  //         ),
-  //       ],
-  //     ),
-  //     child: Column(
-  //       crossAxisAlignment: CrossAxisAlignment.start,
-  //       mainAxisSize:
-  //           MainAxisSize.min, // Add this to prevent unnecessary expansion
-  //       children: [
-  //         Text(
-  //           'Region Removal Statistics',
-  //           style: TextStyles.heading2.copyWith(
-  //             fontWeight: FontWeight.bold,
-  //             fontSize: 16, // Slightly smaller font
-  //           ),
-  //         ),
-  //         const SizedBox(height: 8), // Reduced spacing
-  //         Row(
-  //           children: [
-  //             Expanded(
-  //               child: _buildStatCard(
-  //                 'Total Removed',
-  //                 totalRemoved.toString(),
-  //                 Icons.person_off,
-  //                 AppColors.errorColor,
-  //               ),
-  //             ),
-  //             const SizedBox(width: 6), // Reduced spacing for 4 items
-  //             Expanded(
-  //               child: _buildStatCard(
-  //                 'Active Removals',
-  //                 activeRemovals.toString(),
-  //                 Icons.remove_circle,
-  //                 Colors.orange,
-  //               ),
-  //             ),
-  //             const SizedBox(width: 6), // Reduced spacing for 4 items
-  //             Expanded(
-  //               child: _buildStatCard(
-  //                 'Restored',
-  //                 restoredMembers.toString(),
-  //                 Icons.restore,
-  //                 AppColors.successColor,
-  //               ),
-  //             ),
-  //             const SizedBox(width: 6), // Reduced spacing for 4 items
-  //             Expanded(
-  //               child: _buildStatCard(
-  //                 'Groups',
-  //                 _groupStats.length.toString(),
-  //                 Icons.groups,
-  //                 AppColors.primaryColor,
-  //               ),
-  //             ),
-  //           ],
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
-
-  // Widget _buildStatCard(
-  //   String title,
-  //   String value,
-  //   IconData icon,
-  //   Color color,
-  // ) {
-  //   return Container(
-  //     padding: const EdgeInsets.all(8), // Reduced padding
-  //     decoration: BoxDecoration(
-  //       color: color.withValues(alpha:1),
-  //       borderRadius: BorderRadius.circular(8),
-  //       border: Border.all(color: color.withValues(alpha:3)),
-  //     ),
-  //     child: Column(
-  //       mainAxisSize: MainAxisSize.min, // Prevent unnecessary expansion
-  //       children: [
-  //         Icon(icon, color: color, size: 20), // Smaller icon
-  //         const SizedBox(height: 2), // Reduced spacing
-  //         Text(
-  //           value,
-  //           style: TextStyles.heading2.copyWith(
-  //             color: color,
-  //             fontWeight: FontWeight.bold,
-  //             fontSize: 14, // Smaller font
-  //           ),
-  //           maxLines: 1,
-  //           overflow: TextOverflow.ellipsis,
-  //         ),
-  //         Text(
-  //           title,
-  //           style: TextStyles.bodyText.copyWith(
-  //             color: color,
-  //             fontSize: 10, // Smaller font
-  //           ),
-  //           maxLines: 1,
-  //           overflow: TextOverflow.ellipsis,
-  //           textAlign: TextAlign.center,
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
-
   Widget _buildSearchSection() {
     return Container(
       margin: const EdgeInsets.all(16),
@@ -559,7 +425,10 @@ class _RegionRemovedMembersListState extends State<RegionRemovedMembersList> {
     }
 
     return Container(
-      height: 400, // Fixed height for the list section
+      constraints: BoxConstraints(
+        minHeight: 300,
+        maxHeight: MediaQuery.of(context).size.height * 0.6,
+      ),
       child: RefreshIndicator(
         onRefresh: () => _fetchRemovedMembers(refresh: true),
         child: ListView.builder(
@@ -575,6 +444,10 @@ class _RegionRemovedMembersListState extends State<RegionRemovedMembersList> {
   }
 
   Widget _buildMemberItem(RemovedMemberModel member) {
+    print(
+      'Building member item: ${member.userId}, name: ${member.userName}, email: ${member.userEmail}',
+    );
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -599,7 +472,9 @@ class _RegionRemovedMembersListState extends State<RegionRemovedMembersList> {
           ),
         ),
         title: Text(
-          member.userName,
+          member.userName.isNotEmpty
+              ? member.userName
+              : 'User ID: ${member.userId}',
           style: TextStyles.heading2.copyWith(
             fontWeight: FontWeight.bold,
             decoration: member.isRestored ? TextDecoration.lineThrough : null,
@@ -609,7 +484,9 @@ class _RegionRemovedMembersListState extends State<RegionRemovedMembersList> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              member.userEmail,
+              member.userEmail.isNotEmpty
+                  ? member.userEmail
+                  : 'Email not available',
               style: TextStyles.bodyText.copyWith(color: Colors.grey[600]),
             ),
             if (member.groupName != null && member.groupName!.isNotEmpty) ...[
@@ -683,17 +560,18 @@ class _RegionRemovedMembersListState extends State<RegionRemovedMembersList> {
   }
 
   String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
+    final now = DateTime.now().toLocal();
+    final localDate = date.toLocal();
+    final difference = now.difference(localDate);
 
     if (difference.inDays == 0) {
-      return 'Today at ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+      return 'Today at ${localDate.hour.toString().padLeft(2, '0')}:${localDate.minute.toString().padLeft(2, '0')}';
     } else if (difference.inDays == 1) {
-      return 'Yesterday at ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+      return 'Yesterday at ${localDate.hour.toString().padLeft(2, '0')}:${localDate.minute.toString().padLeft(2, '0')}';
     } else if (difference.inDays < 7) {
       return '${difference.inDays} days ago';
     } else {
-      return '${date.day}/${date.month}/${date.year}';
+      return '${localDate.day}/${localDate.month}/${localDate.year}';
     }
   }
 }

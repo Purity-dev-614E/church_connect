@@ -6,6 +6,7 @@ import 'package:group_management_church_app/data/models/event_model.dart';
 import 'package:group_management_church_app/data/models/user_model.dart';
 import 'package:group_management_church_app/data/providers/attendance_provider.dart';
 import 'package:group_management_church_app/data/providers/event_provider.dart';
+import 'package:group_management_church_app/data/providers/group_provider.dart';
 import 'package:group_management_church_app/data/providers/user_provider.dart';
 import 'package:group_management_church_app/widgets/custom_app_bar.dart';
 import 'package:group_management_church_app/widgets/event_card.dart';
@@ -61,18 +62,41 @@ class _MemberAttendanceScreenState extends State<MemberAttendanceScreen> {
       // Load all past events for the group
       final pastEvents = await eventProvider.fetchPastEvents(widget.groupId);
 
+      // Get only active (non-removed) members for the group
+      final groupProvider = Provider.of<GroupProvider>(context, listen: false);
+      final activeMembers = await groupProvider.getActiveGroupMembers(
+        widget.groupId,
+      );
+
+      // Check if current user is still an active member
+      final isUserActiveMember = activeMembers.any((member) {
+        final memberId =
+            member is Map<String, dynamic>
+                ? member['user_id'] ??
+                    member['id'] // Check for user_id first, then id
+                : member.toString();
+        return memberId == widget.userId;
+      });
+
+      if (!isUserActiveMember) {
+        setState(() {
+          _errorMessage = 'This member is no longer active in the group.';
+          _isLoading = false;
+        });
+        return;
+      }
+
       // Load attendance records for the member
       final attendanceRecords = await attendanceProvider
           .getUserAttendanceRecords(widget.userId);
 
       // Convert records to AttendanceModel objects
       final List<AttendanceModel> attendanceModels =
-          attendanceRecords
-              .map(
-                (record) =>
-                    AttendanceModel.fromJson(record as Map<String, dynamic>),
-              )
-              .toList();
+          attendanceRecords.map((record) {
+            // Extract the attendance data from the nested structure
+            final attendanceData = record['attendance'] as Map<String, dynamic>;
+            return AttendanceModel.fromJson(attendanceData);
+          }).toList();
 
       // Separate attended and unattended events
       final Set<String> attendedEventIds =
@@ -83,11 +107,11 @@ class _MemberAttendanceScreenState extends State<MemberAttendanceScreen> {
 
       _attendedEvents =
           pastEvents
-              .where((event) => !attendedEventIds.contains(event.id))
+              .where((event) => attendedEventIds.contains(event.id))
               .toList();
       _unattendedEvents =
           pastEvents
-              .where((event) => attendedEventIds.contains(event.id))
+              .where((event) => !attendedEventIds.contains(event.id))
               .toList();
 
       // Calculate active status (attended at least one event in last 30 days)

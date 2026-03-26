@@ -108,11 +108,18 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
       if (mounted) {
         setState(() {
           _events = allEvents;
+          _errorMessage = null; // Clear any previous errors
         });
       }
     } catch (e) {
       print('Error loading events: $e');
-      throw e;
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Failed to load events: ${e.toString()}';
+          _events = []; // Ensure empty list on error
+        });
+      }
+      // Don't re-throw the error to prevent white screen
     }
   }
 
@@ -295,6 +302,7 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
     print('Local events count: ${_events.length}');
     print('Local filtered events count: ${_filteredEvents.length}');
     print('Is loading: $_isLoading');
+    print('Error message: $_errorMessage');
 
     // Show loading state
     if (_isLoading) {
@@ -302,9 +310,13 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
     }
 
     // Show error state
-    if (_errorMessage != null) {
+    if (_errorMessage != null && _errorMessage!.isNotEmpty) {
       return _buildErrorState(_errorMessage!);
     }
+
+    // Ensure we have valid data
+    final events = _filteredEvents;
+    print('Rendering ${events.length} events');
 
     return Scaffold(
       appBar: AppBar(
@@ -320,16 +332,16 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
           _buildFilters(),
           Expanded(
             child:
-                _filteredEvents.isEmpty
+                events.isEmpty
                     ? _buildEmptyState()
                     : ListView.builder(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
                         vertical: 8,
                       ),
-                      itemCount: _filteredEvents.length,
+                      itemCount: events.length,
                       itemBuilder: (context, index) {
-                        final event = _filteredEvents[index];
+                        final event = events[index];
                         return EventCard(
                           event: event,
                           onTap: () => _navigateToEventDetails(event),

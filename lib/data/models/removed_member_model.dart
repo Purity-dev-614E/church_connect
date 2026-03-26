@@ -44,13 +44,13 @@ class RemovedMemberModel {
       removedByName: json['removed_by_name'] as String? ?? '',
       removedAt:
           json['removed_at'] != null
-              ? DateTime.parse(json['removed_at'] as String)
+              ? DateTime.parse(json['removed_at'] as String).toLocal()
               : DateTime.now(),
       reason: json['reason'] as String?,
       isRestored: json['is_restored'] as bool? ?? false,
       restoredAt:
           json['restored_at'] != null
-              ? DateTime.parse(json['restored_at'] as String)
+              ? DateTime.parse(json['restored_at'] as String).toLocal()
               : null,
       restoredBy: json['restored_by'] as String?,
     );

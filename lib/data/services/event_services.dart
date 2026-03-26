@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:group_management_church_app/core/constants/app_endpoints.dart';
+import 'package:group_management_church_app/core/services/config_service.dart';
 import 'package:group_management_church_app/core/utils/api_error_handler.dart';
 import 'package:group_management_church_app/core/utils/role_utils.dart';
 import 'package:group_management_church_app/data/models/attendance_model.dart';
@@ -379,7 +381,7 @@ class EventServices {
         await ApiEndpoints.deleteEvent(eventId),
       );
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 || response.statusCode == 204) {
         return true;
       } else {
         throw Exception(
@@ -734,20 +736,80 @@ class EventServices {
 
   /// Get all events
   Future<List<EventModel>> getOverallEvents() async {
+    List<EventModel> events = [];
+
     try {
-      final response = await _httpClient.get(await ApiEndpoints.events);
+      final response = await _httpClient
+          .get(await ApiEndpoints.events)
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout:
+                () =>
+                    throw Exception('Request timeout: Failed to fetch events'),
+          );
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
-        return data.map((event) => EventModel.fromJson(event)).toList();
+        print('Successfully fetched ${data.length} events from API');
+        events = data.map((event) => EventModel.fromJson(event)).toList();
+      } else if (response.statusCode == 404) {
+        print('No events found (404), returning empty list');
+        events = [];
+      } else {
+        final errorData =
+            response.body.isNotEmpty ? jsonDecode(response.body) : {};
+        final errorMessage = ApiErrorHandler.getErrorMessage(
+          response.statusCode,
+          errorData,
+        );
+        throw Exception('Failed to fetch events: $errorMessage');
+      }
+    } on SocketException catch (e) {
+      print('Network error: $e');
+
+      // In production, if relative URL fails, try full URL as fallback
+      final config = ConfigService.instance;
+      if (config.currentEnvironment == 'production') {
+        print('Trying fallback to full API URL...');
+        try {
+          final fallbackUrl =
+              'https://safari-backend-fgl3.onrender.com/api/events';
+          final response = await _httpClient
+              .get(fallbackUrl)
+              .timeout(
+                const Duration(seconds: 30),
+                onTimeout: () => throw Exception('Fallback request timeout'),
+              );
+
+          if (response.statusCode == 200) {
+            final List<dynamic> data = jsonDecode(response.body);
+            print(
+              'Successfully fetched ${data.length} events from fallback API',
+            );
+            events = data.map((event) => EventModel.fromJson(event)).toList();
+          } else {
+            throw Exception(
+              'Fallback API also failed with status ${response.statusCode}',
+            );
+          }
+        } catch (fallbackError) {
+          print('Fallback API failed: $fallbackError');
+          throw Exception(
+            'Network error: Please check your internet connection. Original: $e',
+          );
+        }
       } else {
         throw Exception(
-          'Failed to fetch all events: HTTP status ${response.statusCode}',
+          'Network error: Please check your internet connection. $e',
         );
       }
+    } on FormatException catch (e) {
+      throw Exception('Data format error: Invalid response from server. $e');
     } catch (e) {
       throw Exception('Failed to fetch all events: $e');
     }
+
+    return events;
   }
 
   /// Get leadership events

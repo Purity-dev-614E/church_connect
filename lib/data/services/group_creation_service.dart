@@ -5,6 +5,7 @@ import 'package:group_management_church_app/data/services/user_services.dart';
 import 'package:group_management_church_app/data/providers/region_provider.dart';
 import 'package:group_management_church_app/data/models/region_model.dart';
 import 'package:group_management_church_app/core/utils/role_utils.dart';
+import 'package:group_management_church_app/core/constants/app_endpoints.dart';
 import 'package:flutter/material.dart';
 
 class GroupCreationService {
@@ -32,9 +33,18 @@ class GroupCreationService {
         throw Exception('User role not found');
       }
 
+      // Debug information
+      print('=== Group Creation Debug ===');
+      print('User role: $userRole');
+
       // Validate role permissions
       final normalizedRole = RoleUtils.normalize(userRole);
-      if (!_canCreateGroup(normalizedRole)) {
+      print('Normalized role: $normalizedRole');
+
+      final canCreate = _canCreateGroup(normalizedRole);
+      print('Can create group: $canCreate');
+
+      if (!canCreate) {
         throw Exception('User does not have permission to create groups');
       }
 
@@ -58,6 +68,8 @@ class GroupCreationService {
       } else if (RoleUtils.isRegionalLeadership(normalizedRole)) {
         // Regional manager gets auto-assigned region
         final userRegionId = await _getUserRegionId();
+        print('Regional manager detected, user region ID: $userRegionId');
+
         if (userRegionId == null) {
           throw Exception('Regional manager must be assigned to a region');
         }
@@ -69,8 +81,11 @@ class GroupCreationService {
         );
       }
 
+      print('Request body: $body');
+      print('Request URL: ${await ApiEndpoints.groups}');
+
       final response = await http.post(
-        Uri.parse('$baseUrl/api/groups'),
+        Uri.parse(await ApiEndpoints.groups),
         headers: {
           'Content-Type': 'application/json',
           'Authorization':
@@ -78,6 +93,9 @@ class GroupCreationService {
         },
         body: jsonEncode(body),
       );
+
+      print('Response status code: ${response.statusCode}');
+      print('Response body: ${response.body}');
 
       if (response.statusCode == 201) {
         final result = jsonDecode(response.body);
@@ -106,8 +124,10 @@ class GroupCreationService {
 
   /// Check if user role can create groups
   bool _canCreateGroup(String normalizedRole) {
-    final allowedRoles = ['regional manager', 'super_admin', 'root'];
-    return allowedRoles.contains(normalizedRole);
+    // Use RoleUtils.isRegionalLeadership() to include all regional leadership roles
+    return RoleUtils.isRegionalLeadership(normalizedRole) ||
+        RoleUtils.isSuperAdmin(normalizedRole) ||
+        RoleUtils.isRoot(normalizedRole);
   }
 
   /// Get the current user's region ID (for regional managers)

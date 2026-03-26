@@ -64,7 +64,7 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen>
       final eventProvider = Provider.of<EventProvider>(context, listen: false);
 
       // Load members
-      final members = await groupProvider.getGroupMembers(widget.groupId);
+      final members = await groupProvider.getActiveGroupMembers(widget.groupId);
 
       // Convert members to UserModel
       final userModels =
@@ -129,7 +129,21 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen>
         role == 'admin';
   }
 
-  void _showRemoveMemberDialog(UserModel member) {
+  Future<bool> _canManageGroup() async {
+    final groupProvider = Provider.of<GroupProvider>(context, listen: false);
+    return await groupProvider.canManageGroup(widget.groupId);
+  }
+
+  void _showRemoveMemberDialog(UserModel member) async {
+    // Check if user can manage this specific group first
+    final canManage = await _canManageGroup();
+    if (!canManage) {
+      _showError(
+        'Access denied: This group is not in your region. You can only manage groups within your assigned region.',
+      );
+      return;
+    }
+
     final reasonController = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
@@ -178,7 +192,25 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen>
                 onPressed: () async {
                   if (!formKey.currentState!.validate()) return;
                   final reason = reasonController.text.trim();
+
+                  // Close the dialog and show loading
                   Navigator.pop(context);
+
+                  // Show loading dialog
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder:
+                        (context) => const AlertDialog(
+                          content: Row(
+                            children: [
+                              CircularProgressIndicator(),
+                              SizedBox(width: 16),
+                              Text('Removing member...'),
+                            ],
+                          ),
+                        ),
+                  );
 
                   final groupProvider = Provider.of<GroupProvider>(
                     context,
@@ -190,15 +222,22 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen>
                         member.id,
                         reason,
                       );
+
+                  // Close loading dialog
                   if (mounted) {
+                    Navigator.pop(context);
+
                     if (success) {
                       _showSuccess(
                         '${member.fullName} has been removed from the group',
                       );
                       _loadData();
                     } else {
+                      // Show the specific error message from the provider
+                      final errorMessage = groupProvider.errorMessage;
                       _showError(
-                        'Failed to remove ${member.fullName} from the group',
+                        errorMessage ??
+                            'Failed to remove ${member.fullName} from the group',
                       );
                     }
                   }

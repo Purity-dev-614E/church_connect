@@ -11,7 +11,7 @@ class RegionServices {
   Future<List<RegionModel>> getRegions() async {
     try {
       final token = await secureStorage.read(key: 'accessToken');
-      
+
       if (token == null) {
         throw Exception('Not authenticated');
       }
@@ -30,7 +30,7 @@ class RegionServices {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         print('Decoded Data: $data');
-        
+
         // Check if data is a list or has a 'data' field
         final List<dynamic> regionsData;
         if (data is List) {
@@ -40,9 +40,9 @@ class RegionServices {
         } else {
           regionsData = [];
         }
-        
+
         print('Regions Data: $regionsData');
-        
+
         // Ensure each region data is properly formatted
         return regionsData.map((region) {
           // Convert all values to strings to ensure type safety
@@ -66,7 +66,7 @@ class RegionServices {
   Future<RegionModel?> getRegionById(String regionId) async {
     try {
       final token = await secureStorage.read(key: 'accessToken');
-      
+
       if (token == null) {
         throw Exception('Not authenticated');
       }
@@ -86,7 +86,7 @@ class RegionServices {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         print('Decoded Region Data: $data');
-        
+
         // Check if data is a map or has a 'data' field
         final Map<String, dynamic> regionData;
         if (data is Map<String, dynamic>) {
@@ -97,16 +97,16 @@ class RegionServices {
           print('Invalid region data format');
           return null;
         }
-        
+
         print('Region Data: $regionData');
-        
+
         // Convert all values to strings to ensure type safety
         final Map<String, dynamic> safeRegion = {
           'id': regionData['id']?.toString() ?? '',
           'name': regionData['name']?.toString() ?? '',
           'description': regionData['description']?.toString(),
         };
-        
+
         return RegionModel.fromJson(safeRegion);
       } else {
         throw Exception('Failed to load region: ${response.statusCode}');
@@ -121,7 +121,7 @@ class RegionServices {
   Future<bool> createRegion(String name, String? description) async {
     try {
       final token = await secureStorage.read(key: 'accessToken');
-      
+
       if (token == null) {
         throw Exception('Not authenticated');
       }
@@ -132,10 +132,7 @@ class RegionServices {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
         },
-        body: json.encode({
-          'name': name,
-          'description': description,
-        }),
+        body: json.encode({'name': name, 'description': description}),
       );
 
       return response.statusCode == 201;
@@ -146,10 +143,14 @@ class RegionServices {
   }
 
   // Update a region (for super admin)
-  Future<bool> updateRegion(String regionId, String name, String? description) async {
+  Future<bool> updateRegion(
+    String regionId,
+    String name,
+    String? description,
+  ) async {
     try {
       final token = await secureStorage.read(key: 'accessToken');
-      
+
       if (token == null) {
         throw Exception('Not authenticated');
       }
@@ -160,10 +161,7 @@ class RegionServices {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
         },
-        body: json.encode({
-          'name': name,
-          'description': description,
-        }),
+        body: json.encode({'name': name, 'description': description}),
       );
 
       return response.statusCode == 200;
@@ -177,7 +175,7 @@ class RegionServices {
   Future<bool> deleteRegion(String regionId) async {
     try {
       final token = await secureStorage.read(key: 'accessToken');
-      
+
       if (token == null) {
         throw Exception('Not authenticated');
       }
@@ -190,7 +188,7 @@ class RegionServices {
         },
       );
 
-      return response.statusCode == 200;
+      return response.statusCode == 200 || response.statusCode == 204;
     } catch (e) {
       print('Error deleting region: $e');
       return false;

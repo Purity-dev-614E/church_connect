@@ -87,6 +87,10 @@ class MemberRemovalService {
     String? search,
   }) async {
     try {
+      print('=== Getting Removed Members for Group ===');
+      print('Group ID: $groupId');
+      print('Page: $page, Limit: $limit, Search: $search');
+
       final queryParams = <String, String>{
         'page': page.toString(),
         'limit': limit.toString(),
@@ -97,10 +101,15 @@ class MemberRemovalService {
         await ApiEndpoints.getRemovedMembers(groupId),
       ).replace(queryParameters: queryParams);
 
+      print('Request URL: $uri');
+
       final response = await http.get(
         uri,
         headers: await _httpClient.getHeaders(),
       );
+
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final decodedData = jsonDecode(response.body);

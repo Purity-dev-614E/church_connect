@@ -27,16 +27,16 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
   bool _isLoading = false;
   bool _hasMarkedAttendance = false;
   bool _isAttending = true; // Default to attending
-  
+
   // Form controllers
   final TextEditingController _topicController = TextEditingController();
   final TextEditingController _aobController = TextEditingController();
   final TextEditingController _apologyController = TextEditingController();
-  
+
   // Form keys
   final _attendedFormKey = GlobalKey<FormState>();
   final _notAttendedFormKey = GlobalKey<FormState>();
-  
+
   @override
   void dispose() {
     _topicController.dispose();
@@ -44,11 +44,32 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
     _apologyController.dispose();
     super.dispose();
   }
-  
+
   // Format date nicely
   String _formatEventDate(DateTime dateTime) {
-    final List<String> weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    final List<String> months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final List<String> weekdays = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+    final List<String> months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
 
     final String weekday = weekdays[dateTime.weekday - 1];
     final String month = months[dateTime.month - 1];
@@ -66,7 +87,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
 
     return '$weekday, $month $day at $hour:$minute $amPm';
   }
-  
+
   void _showError(String message) {
     CustomNotification.show(
       context: context,
@@ -90,32 +111,32 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
       type: NotificationType.info,
     );
   }
-  
+
   // Submit attendance
   Future<void> _submitAttendance() async {
     if (widget.event.isAttendanceLocked) {
-      _showError(
-          'Attendance cannot be changed after 24 hours from the event start time.');
+      _showError(widget.event.attendanceStatusMessage);
       return;
     }
 
     // Validate form based on attendance choice
-    bool isValid = _isAttending 
-        ? _attendedFormKey.currentState!.validate()
-        : _notAttendedFormKey.currentState!.validate();
-        
+    bool isValid =
+        _isAttending
+            ? _attendedFormKey.currentState!.validate()
+            : _notAttendedFormKey.currentState!.validate();
+
     if (!isValid) return;
-    
+
     setState(() {
       _isLoading = true;
     });
-    
+
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final eventProvider = Provider.of<EventProvider>(context, listen: false);
-      
+
       final userId = authProvider.currentUser?.id;
-      
+
       if (userId == null) {
         _showError('User not authenticated');
         setState(() {
@@ -123,7 +144,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
         });
         return;
       }
-      
+
       final result = await eventProvider.markAttendance(
         eventId: widget.event.id,
         userId: userId,
@@ -132,17 +153,19 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
         aob: _isAttending ? _aobController.text : null,
         apology: !_isAttending ? _apologyController.text : null,
       );
-      
+
       if (result) {
         setState(() {
           _hasMarkedAttendance = true;
           _isLoading = false;
         });
-        
+
         if (mounted) {
-          _showSuccess(_isAttending 
-            ? 'Attendance marked successfully!' 
-            : 'Absence recorded successfully!');
+          _showSuccess(
+            _isAttending
+                ? 'Attendance marked successfully!'
+                : 'Absence recorded successfully!',
+          );
         }
         // Check inactivity rules after marking
         MemberActivityService()
@@ -166,14 +189,11 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
       });
     }
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: CustomAppBar(
-        title: 'Event Details',
-        showBackButton: true,
-      ),
+      appBar: CustomAppBar(title: 'Event Details', showBackButton: true),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -182,31 +202,29 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
             children: [
               // Event Header
               _buildEventHeader(),
-              
+
               const SizedBox(height: 24),
-              
+
               // Event Details
               _buildEventDetails(),
-              
+
               const SizedBox(height: 32),
-              
+
               // Attendance Section
               // _hasMarkedAttendance
               //   ? _buildAttendanceConfirmation()
-                // : _buildAttendanceForm(),
+              // : _buildAttendanceForm(),
             ],
           ),
         ),
       ),
     );
   }
-  
+
   Widget _buildEventHeader() {
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(16.0),
@@ -215,10 +233,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              AppColors.primaryColor,
-              AppColors.secondaryColor,
-            ],
+            colors: [AppColors.primaryColor, AppColors.secondaryColor],
           ),
         ),
         child: Column(
@@ -226,9 +241,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
           children: [
             Text(
               widget.event.title,
-              style: TextStyles.heading1.copyWith(
-                color: Colors.white,
-              ),
+              style: TextStyles.heading1.copyWith(color: Colors.white),
             ),
             const SizedBox(height: 8),
             Row(
@@ -238,9 +251,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                 Expanded(
                   child: Text(
                     _formatEventDate(widget.event.dateTime),
-                    style: TextStyles.bodyText.copyWith(
-                      color: Colors.white,
-                    ),
+                    style: TextStyles.bodyText.copyWith(color: Colors.white),
                   ),
                 ),
               ],
@@ -253,9 +264,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                 Expanded(
                   child: Text(
                     widget.event.location,
-                    style: TextStyles.bodyText.copyWith(
-                      color: Colors.white,
-                    ),
+                    style: TextStyles.bodyText.copyWith(color: Colors.white),
                   ),
                 ),
               ],
@@ -265,34 +274,25 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
       ),
     );
   }
-  
+
   Widget _buildEventDetails() {
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Event Description',
-              style: TextStyles.heading2.copyWith(
-              ),
-            ),
+            Text('Event Description', style: TextStyles.heading2.copyWith()),
             const SizedBox(height: 8),
-            Text(
-              widget.event.description,
-              style: TextStyles.bodyText,
-            ),
+            Text(widget.event.description, style: TextStyles.bodyText),
           ],
         ),
       ),
     );
   }
-  
+
   // Widget _buildAttendanceForm() {
   //   return Card(
   //     elevation: 3,

@@ -115,6 +115,10 @@ class _ChangeUserGroupDialogState extends State<ChangeUserGroupDialog> {
       return;
     }
 
+    // Show reason dialog first
+    final reason = await _showReasonDialog();
+    if (reason == null) return; // User cancelled
+
     setState(() {
       _isLoading = true;
     });
@@ -134,25 +138,33 @@ class _ChangeUserGroupDialogState extends State<ChangeUserGroupDialog> {
         throw Exception('Failed to change user group');
       }
 
-      // Remove user from all existing groups and add to new group
-      // First, get all groups to find where the user might be a member
-      await groupProvider.fetchGroups();
-      final allGroups = groupProvider.groups;
-
-      // Remove user from all groups they might be in
-      for (final group in allGroups) {
+      // Sequential operations: Remove from current group, then add to new group
+      // 1. Remove from current group if they have one
+      if (widget.user.regionId != null && widget.user.regionId!.isNotEmpty) {
         try {
-          await groupProvider.removeMemberFromGroup(group.id, widget.user.id);
+          await groupProvider.removeMemberFromGroupWithReason(
+            widget.user.regionId!,
+            widget.user.id,
+            'Moved to ${_selectedGroup!.name}',
+          );
         } catch (e) {
-          // Ignore errors when removing from groups they're not in
-          print('Error removing user from group ${group.id}: $e');
+          // If the reason method fails, fallback to legacy method
+          try {
+            await groupProvider.removeMemberFromGroup(
+              widget.user.regionId!,
+              widget.user.id,
+            );
+          } catch (fallbackError) {
+            // If removal fails, we can still proceed with adding to new group
+            print('Error removing from current group: $fallbackError');
+          }
         }
       }
 
-      // Add user to the new group
+      // 2. Add to the new group
       await groupProvider.addMemberToGroup(_selectedGroup!.id, widget.user.id);
 
-      // If user is an admin, assign them as admin to the new group
+      // 3. If user is an admin, assign them as admin to the new group
       if (widget.user.role.toLowerCase() == 'admin') {
         await groupProvider.assignAdminToGroup(
           _selectedGroup!.id,
@@ -176,6 +188,65 @@ class _ChangeUserGroupDialogState extends State<ChangeUserGroupDialog> {
         });
       }
     }
+  }
+
+  Future<String?> _showReasonDialog() async {
+    final reasonController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    return showDialog<String>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text('Reason for Group Change'),
+            content: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Please provide a reason for changing ${widget.user.fullName}\'s group:',
+                    style: TextStyles.bodyText,
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: reasonController,
+                    decoration: const InputDecoration(
+                      labelText: 'Reason for group change *',
+                      hintText:
+                          'e.g. Reassigned, requested transfer, promotion...',
+                      border: OutlineInputBorder(),
+                    ),
+                    maxLines: 3,
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) {
+                        return 'Please enter a reason for the group change';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  if (!formKey.currentState!.validate()) return;
+                  Navigator.pop(context, reasonController.text.trim());
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryColor,
+                ),
+                child: const Text('Continue'),
+              ),
+            ],
+          ),
+    );
   }
 
   @override

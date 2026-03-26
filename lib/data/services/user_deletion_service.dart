@@ -32,7 +32,7 @@ class UserDeletionService {
       print('DEBUG: Response status: ${response.statusCode}');
       print('DEBUG: Response body: ${response.body}');
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 || response.statusCode == 204) {
         return jsonDecode(response.body);
       } else {
         throw Exception('Failed to completely delete user: ${response.body}');

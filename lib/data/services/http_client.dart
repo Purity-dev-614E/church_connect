@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:math' as math;
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -35,7 +34,7 @@ class HttpClient {
     try {
       token = await _secureStorage.read(key: accessTokenKey);
     } catch (e) {
-      print('Secure storage read failed (continuing): $e');
+      // Secure storage read failed (continuing)
     }
 
     // If not found, try SharedPreferences
@@ -44,7 +43,7 @@ class HttpClient {
         final prefs = await SharedPreferences.getInstance();
         token = prefs.getString('auth_token');
       } catch (e) {
-        print('SharedPreferences read failed (continuing): $e');
+        // SharedPreferences read failed (continuing)
       }
     }
 
@@ -67,7 +66,7 @@ class HttpClient {
     try {
       token = await _secureStorage.read(key: refreshTokenKey);
     } catch (e) {
-      print('Secure storage read failed (continuing): $e');
+      // Secure storage read failed (continuing)
     }
 
     // If not found, try SharedPreferences
@@ -76,7 +75,7 @@ class HttpClient {
         final prefs = await SharedPreferences.getInstance();
         token = prefs.getString('refresh_token');
       } catch (e) {
-        print('SharedPreferences read failed (continuing): $e');
+        // SharedPreferences read failed (continuing)
       }
     }
 
@@ -91,7 +90,6 @@ class HttpClient {
     try {
       final refreshToken = await _getRefreshToken();
       if (refreshToken == null) {
-        print("Cannot refresh token: No refresh token found");
         return false;
       }
 
@@ -109,8 +107,6 @@ class HttpClient {
         try {
           data = json.decode(response.body) as Map<String, dynamic>;
         } catch (e) {
-          print("Error parsing refresh token response: $e");
-          print("Raw refresh token response body: ${response.body}");
           return false;
         }
 
@@ -149,7 +145,6 @@ class HttpClient {
         }
 
         if (newAccessToken == null || newAccessToken.isEmpty) {
-          print("Invalid refresh token response format");
           return false;
         }
 
@@ -172,7 +167,7 @@ class HttpClient {
             );
           }
         } catch (e) {
-          print("Secure storage write failed during refresh (continuing): $e");
+          // Secure storage write failed during refresh (continuing)
         }
 
         try {
@@ -182,19 +177,14 @@ class HttpClient {
             await prefs.setString('refresh_token', newRefreshToken);
           }
         } catch (e) {
-          print(
-            "SharedPreferences write failed during refresh (continuing): $e",
-          );
+          // SharedPreferences write failed during refresh (continuing)
         }
 
         return true;
       } else {
-        print("Refresh token failed with status: ${response.statusCode}");
         return false;
       }
-    } catch (e, st) {
-      print("Refresh token error: $e");
-      print("Refresh token stacktrace: $st");
+    } catch (e) {
       return false;
     }
   }
@@ -202,9 +192,6 @@ class HttpClient {
   /// Get default HTTP headers with authentication
   Future<Map<String, String>> getHeaders() async {
     final token = await _getToken();
-    print(
-      'DEBUG: Retrieved token for request: ${token.isNotEmpty ? "Present (${token.length} chars)" : "MISSING"}',
-    );
     return {
       "Content-Type": "application/json",
       "Accept": "application/json",
@@ -219,23 +206,17 @@ class HttpClient {
     try {
       final response = await requestFunction();
 
-      print('DEBUG: Response Status: ${response.statusCode}');
-      print('DEBUG: Response Body: ${response.body}');
-
       // If unauthorized and not already refreshing, try to refresh token
       if (response.statusCode == 401 && !_isRefreshing) {
         _isRefreshing = true;
         try {
-          print('Token expired, attempting to refresh...');
           final refreshed = await _refreshToken();
 
           if (refreshed) {
-            print('Token refreshed successfully, retrying request...');
             final retryResponse = await requestFunction();
             _isRefreshing = false;
             return retryResponse;
           } else {
-            print('Token refresh failed');
             _isRefreshing = false;
             throw Exception('Authentication failed. Please login again.');
           }
@@ -247,24 +228,22 @@ class HttpClient {
 
       return response;
     } catch (e) {
-      print('HTTP request error: $e');
       throw e;
     }
   }
 
   /// GET request with automatic token refresh
   Future<http.Response> get(String url) async {
-    print('HTTP GET request to: $url');
     try {
       final response = await _handleResponse(() async {
         final headers = await getHeaders();
-        return await http.get(Uri.parse(url), headers: headers);
+        final uri = Uri.parse(url);
+        return await http.get(uri, headers: headers);
       });
       if (response.statusCode >= 400) {}
 
       return response;
     } catch (e) {
-      print('HTTP GET request failed: $e');
       rethrow;
     }
   }
@@ -274,9 +253,6 @@ class HttpClient {
     return _handleResponse(() async {
       final headers = await getHeaders();
       final encodedBody = body is String ? body : jsonEncode(body);
-      print('DEBUG: POST URL: $url');
-      print('DEBUG: POST Headers: $headers');
-      print('DEBUG: POST Body: $encodedBody');
       return await http.post(
         Uri.parse(url),
         headers: headers,
@@ -299,15 +275,9 @@ class HttpClient {
 
   /// DELETE request with automatic token refresh
   Future<http.Response> delete(String url) async {
-    print('DEBUG: HTTP DELETE request to: $url');
     return _handleResponse(() async {
       final headers = await getHeaders();
-      print('DEBUG: DELETE request headers: $headers');
-      print(
-        'DEBUG: Authorization header: ${headers["Authorization"]?.substring(0, math.min(20, headers["Authorization"]?.length ?? 0))}...',
-      );
       final response = await http.delete(Uri.parse(url), headers: headers);
-      print('DEBUG: DELETE response status: ${response.statusCode}');
       return response;
     });
   }

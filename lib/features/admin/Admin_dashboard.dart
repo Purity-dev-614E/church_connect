@@ -406,7 +406,7 @@ class _AdminDashboardState extends State<AdminDashboard>
 
       print('Fetching total members...');
       // Get total members
-      final members = await groupProvider.getGroupMembers(widget.groupId);
+      final members = await groupProvider.getActiveGroupMembers(widget.groupId);
       final totalMembers = members.length.toDouble();
       print('Total members found: $totalMembers');
 
@@ -487,7 +487,10 @@ class _AdminDashboardState extends State<AdminDashboard>
       final groupProvider = Provider.of<GroupProvider>(context, listen: false);
 
       // Get members
-      final members = await groupProvider.getGroupMembers(widget.groupId);
+      final members = await groupProvider.getActiveGroupMembers(widget.groupId);
+      print(
+        'DEBUG: Received ${members.length} members from getActiveGroupMembers',
+      );
 
       // Convert members to UserModel
       final userModels =
@@ -514,10 +517,15 @@ class _AdminDashboardState extends State<AdminDashboard>
             }
           }).toList();
 
+      print('DEBUG: Converted to ${userModels.length} UserModel objects');
+
       if (mounted) {
         setState(() {
           _groupMembers = userModels;
         });
+        print(
+          'DEBUG: Updated _groupMembers with ${_groupMembers.length} members',
+        );
       }
     } catch (e) {
       print('Error loading group members: $e');
@@ -1273,32 +1281,65 @@ class _AdminDashboardState extends State<AdminDashboard>
                 onPressed: () async {
                   if (!formKey.currentState!.validate()) return;
                   final reason = reasonController.text.trim();
+
+                  // Close the dialog and show loading
                   Navigator.pop(context);
+
+                  // Show loading dialog
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder:
+                        (context) => const AlertDialog(
+                          content: Row(
+                            children: [
+                              CircularProgressIndicator(),
+                              SizedBox(width: 16),
+                              Text('Removing member...'),
+                            ],
+                          ),
+                        ),
+                  );
 
                   final groupProvider = Provider.of<GroupProvider>(
                     context,
                     listen: false,
                   );
-                  final success = await groupProvider
-                      .removeMemberFromGroupWithReason(
-                        widget.groupId,
-                        member.id,
-                        reason,
-                      );
-                  if (mounted) {
-                    if (success) {
-                      _showSuccess(
-                        '${member.fullName} has been removed from the group',
-                      );
-                      await _loadGroupMembers();
-                      await _loadRemovedMembers();
-                      setState(() {
-                        _filteredMembers = List.from(_groupMembers);
-                      });
-                    } else {
-                      _showError(
-                        'Failed to remove ${member.fullName} from the group',
-                      );
+                  try {
+                    final success = await groupProvider
+                        .removeMemberFromGroupWithReason(
+                          widget.groupId,
+                          member.id,
+                          reason,
+                        );
+
+                    // Close loading dialog
+                    if (mounted) {
+                      Navigator.pop(context);
+
+                      if (success) {
+                        _showSuccess(
+                          '${member.fullName} has been removed from the group',
+                        );
+                        await _loadGroupMembers();
+                        await _loadRemovedMembers();
+                        setState(() {
+                          _filteredMembers = List.from(_groupMembers);
+                        });
+                      } else {
+                        _showError(
+                          'Failed to remove ${member.fullName} from the group',
+                        );
+                      }
+                    }
+                  } catch (e) {
+                    // Close loading dialog if still open
+                    if (mounted) {
+                      try {
+                        Navigator.pop(context);
+                      } catch (_) {} // Ignore if dialog already closed
+
+                      _showError('Failed to remove ${member.fullName}: $e');
                     }
                   }
                 },
@@ -2017,10 +2058,10 @@ class _AdminDashboardState extends State<AdminDashboard>
               AppColors.primaryColor,
             ),
             _buildStatCard(
-              'Active Members',
-              '${data['activeMembers']?.toInt() ?? 0}',
-              Icons.person_outline,
-              AppColors.secondaryColor,
+              'Upcoming Events',
+              '${_upcomingEvents.length}',
+              Icons.event,
+              AppColors.buttonColor,
             ),
             // _buildStatCard(
             //   'Events This Month',
@@ -2055,7 +2096,7 @@ class _AdminDashboardState extends State<AdminDashboard>
       final lastDayOfMonth = DateTime(now.year, now.month + 1, 0);
 
       // Total members
-      final members = await groupProvider.getGroupMembers(widget.groupId);
+      final members = await groupProvider.getActiveGroupMembers(widget.groupId);
       final totalMembers = members.length.toDouble();
 
       // Past events in last 30 days

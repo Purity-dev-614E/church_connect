@@ -79,8 +79,14 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen>
       }
       final currentUser = await userServices.fetchCurrentUser(userId);
       final groupId =
-          currentUser
-              .citam_Assembly; // Using citam_Assembly as group ID for admins
+          currentUser.regionId; // Using regionId as group ID for admins
+
+      print('Admin user data debug:');
+      print('  - User ID: $userId');
+      print('  - User fullName: ${currentUser.fullName}');
+      print('  - User role: ${currentUser.role}');
+      print('  - regionId field: ${currentUser.regionId}');
+      print('  - Extracted groupId: $groupId');
 
       if (mounted) {
         setState(() {
@@ -184,11 +190,34 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen>
         _canManageAttendance = false;
       } else {
         // For regular events, check if this event belongs to their group
-        _canManageAttendance =
-            _event!.groupId != null &&
-            _event!.groupId!.isNotEmpty &&
-            _event!.groupId == _userGroupId;
+        print('Admin permission check:');
+        print('  - Event groupId: ${_event!.groupId}');
+        print('  - User groupId: $_userGroupId');
+        print('  - Event groupId is null: ${_event!.groupId == null}');
+        print(
+          '  - Event groupId is empty: ${_event!.groupId?.isEmpty ?? true}',
+        );
+        print('  - Group IDs match: ${_event!.groupId == _userGroupId}');
+
+        // Check if event has a valid group ID and it matches the admin's group
+        final eventHasValidGroup =
+            _event!.groupId != null && _event!.groupId!.isNotEmpty;
+        final groupIdsMatch = _event!.groupId == _userGroupId;
+
+        _canManageAttendance = eventHasValidGroup && groupIdsMatch;
+
         print('✅ Admin regular event permission: $_canManageAttendance');
+
+        // Additional debug info if permission is denied
+        if (!_canManageAttendance) {
+          if (!eventHasValidGroup) {
+            print(
+              '⚠️ Event has no valid group ID - this might be a data issue',
+            );
+          } else if (!groupIdsMatch) {
+            print('⚠️ Event group ID does not match admin\'s group ID');
+          }
+        }
       }
       return;
     }
@@ -295,7 +324,7 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen>
         if (event.groupId == null || event.groupId!.isEmpty) {
           throw Exception('Group ID is required for regular events');
         }
-        final groupMembersJson = await groupProvider.getGroupMembers(
+        final groupMembersJson = await groupProvider.getActiveGroupMembers(
           event.groupId!,
         );
         groupMembers =
@@ -713,7 +742,7 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen>
                         Padding(
                           padding: const EdgeInsets.only(bottom: 8.0),
                           child: Text(
-                            'Attendance cannot be changed after 24 hours from the event start.\nNote: Leadership events can always be updated.',
+                            _event!.attendanceStatusMessage,
                             style: TextStyles.bodyText.copyWith(
                               color: Theme.of(
                                 context,
@@ -830,7 +859,7 @@ class _OverallEventDetailsScreenState extends State<OverallEventDetailsScreen>
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'Attendance and changes are locked 24 hours after the event start time.\nNote: Leadership events can always be updated.',
+              _event!.attendanceStatusMessage,
               style: TextStyles.bodyText.copyWith(
                 color: Colors.orange.shade900,
                 fontWeight: FontWeight.w500,

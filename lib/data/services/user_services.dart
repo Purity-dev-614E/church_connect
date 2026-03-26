@@ -375,7 +375,7 @@ class UserServices {
         body: jsonEncode(updatedUser.toJson()),
       );
 
-      return response.statusCode == 200;
+      return response.statusCode == 200 || response.statusCode == 204;
     } catch (e) {
       _logger.e('Error removing user from region: $e');
       return false;

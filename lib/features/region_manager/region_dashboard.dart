@@ -915,33 +915,33 @@ class _RegionDashboardState extends State<RegionDashboard> {
             separatorBuilder: (context, index) => const Divider(),
             itemBuilder: (context, index) {
               final group = displayGroups[index];
-              return ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: AppColors.secondaryColor.withOpacity(0.2),
-                  child: const Icon(
-                    Icons.groups,
-                    color: AppColors.secondaryColor,
+              return Container(
+                key: ValueKey('region_group_${group.id}'),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: AppColors.secondaryColor.withOpacity(0.2),
+                    child: Icon(Icons.groups, color: AppColors.secondaryColor),
                   ),
-                ),
-                title: Text(
-                  group.name,
-                  style: TextStyles.bodyText.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder:
-                          (_) => GroupDetailsScreen(
-                            groupId: group.id,
-                            groupName: group.name,
-                          ),
+                  title: Text(
+                    group.name,
+                    style: TextStyles.bodyText.copyWith(
+                      fontWeight: FontWeight.bold,
                     ),
-                  );
-                },
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder:
+                            (_) => GroupDetailsScreen(
+                              groupId: group.id,
+                              groupName: group.name,
+                            ),
+                      ),
+                    );
+                  },
+                ),
               );
             },
           ),

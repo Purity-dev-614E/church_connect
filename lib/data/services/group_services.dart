@@ -213,7 +213,7 @@ class GroupServices {
         await await ApiEndpoints.deleteGroup(id),
       );
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 || response.statusCode == 204) {
         return true;
       } else {
         throw Exception(
@@ -231,7 +231,6 @@ class GroupServices {
       // Check if current user has permission
       final userServices = UserServices();
       final userRole = await userServices.getUserRole();
-      log("User Role: $userRole");
 
       if (userRole == null) {
         throw Exception('User role is null');
@@ -265,32 +264,75 @@ class GroupServices {
   Future<bool> addMemberToGroup(String groupId, String userId) async {
     try {
       final endpoint = await await ApiEndpoints.addGroupMember(groupId, userId);
-      print("GroupServices: Adding member to group");
-      print("GroupServices: Endpoint: $endpoint");
-      print("GroupServices: GroupId: $groupId, UserId: $userId");
 
       final response = await _httpClient.post(
         endpoint,
         body: jsonEncode({'userId': userId}),
       );
 
-      print("GroupServices: Response status: ${response.statusCode}");
-      print("GroupServices: Response body: ${response.body}");
-
       if (response.statusCode == 200 || response.statusCode == 201) {
-        print("GroupServices: Successfully added member to group");
         return true;
       } else {
-        print(
-          "GroupServices: Failed to add member - HTTP ${response.statusCode}",
-        );
         throw Exception(
           "Failed to add member to group: HTTP status ${response.statusCode}, Body: ${response.body}",
         );
       }
     } catch (e) {
-      print("GroupServices: Exception adding member to group: $e");
       throw Exception("Failed to add member to group: $e");
+    }
+  }
+
+  // Check if user has access to manage a specific group (region-based validation)
+  Future<bool> canManageGroup(String groupId) async {
+    try {
+      final userServices = UserServices();
+      final userRole = await userServices.getUserRole();
+
+      if (userRole == null) {
+        return false;
+      }
+
+      final normalizedRole = RoleUtils.normalize(userRole);
+
+      // Root and super admin can manage any group
+      if (RoleUtils.isRoot(normalizedRole) ||
+          RoleUtils.isSuperAdmin(normalizedRole)) {
+        return true;
+      }
+
+      // For regional managers, check if group is in their region
+      if (RoleUtils.isRegionalLeadership(normalizedRole)) {
+        final group = await fetchGroupById(groupId);
+        final currentUserId = await userServices.getUserId();
+
+        if (currentUserId == null) {
+          return false;
+        }
+
+        final currentUser = await userServices.fetchCurrentUser(currentUserId);
+
+        if (currentUser.regionalID.isEmpty || group.region_id == null) {
+          return false;
+        }
+
+        return currentUser.regionalID == group.region_id;
+      }
+
+      // For regular admins, check if they are the group admin
+      if (normalizedRole == 'admin') {
+        final group = await fetchGroupById(groupId);
+        final currentUserId = await userServices.getUserId();
+
+        if (currentUserId == null || group.group_admin == null) {
+          return false;
+        }
+
+        return currentUserId == group.group_admin;
+      }
+
+      return false;
+    } catch (e) {
+      return false;
     }
   }
 
@@ -301,7 +343,7 @@ class GroupServices {
         await await ApiEndpoints.removeGroupMember(groupId, userId),
       );
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 || response.statusCode == 204) {
         return true;
       } else {
         throw Exception(
@@ -332,13 +374,33 @@ class GroupServices {
       if (response.statusCode == 404 || response.statusCode == 501) {
         return removeMemberFromGroup(groupId, userId);
       }
+
+      // Handle specific error messages
+      if (response.statusCode == 403) {
+        final responseBody = response.body.toLowerCase();
+        if (responseBody.contains('region')) {
+          throw Exception('Access denied: Group not in your region');
+        } else if (responseBody.contains('permission')) {
+          throw Exception('Access denied: Insufficient permissions');
+        } else {
+          throw Exception(
+            'Access denied: You cannot remove members from this group',
+          );
+        }
+      }
+
       throw Exception(
-        "Failed to remove member: HTTP status ${response.statusCode}",
+        "Failed to remove member: HTTP status ${response.statusCode}, Body: ${response.body}",
       );
     } catch (e) {
+      // Try legacy removal as fallback
       try {
         return await removeMemberFromGroup(groupId, userId);
-      } catch (_) {
+      } catch (legacyError) {
+        // If legacy also fails with 403, preserve the original region error message
+        if (e.toString().contains('Access denied: Group not in your region')) {
+          throw Exception('Access denied: Group not in your region');
+        }
         throw Exception("Failed to remove member from group: $e");
       }
     }
@@ -352,12 +414,31 @@ class GroupServices {
       );
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
-        if (data is! List) return [];
+        final decodedData = jsonDecode(response.body);
+
+        // Handle both direct array response and object-wrapped response
+        List<dynamic> data;
+        if (decodedData is List) {
+          data = decodedData;
+        } else if (decodedData is Map<String, dynamic>) {
+          // If it's an object, try common field names
+          data =
+              decodedData['data'] ??
+              decodedData['members'] ??
+              decodedData['removed_members'] ??
+              decodedData['results'] ??
+              [];
+        } else {
+          print('Unexpected response format: ${decodedData.runtimeType}');
+          return [];
+        }
+
+        print('DEBUG: Removed members API returned ${data.length} items');
         return data
             .map((e) => RemovedMemberModel.fromJson(e as Map<String, dynamic>))
             .toList();
       } else {
+        print('API returned status ${response.statusCode}: ${response.body}');
         return [];
       }
     } catch (e) {

@@ -357,7 +357,7 @@ class _SplashScreenState extends State<SplashScreen>
                       return Opacity(
                         opacity: _fadeInAnimation.value,
                         child: Text(
-                          'Version 1.1.12',
+                          'Version 1.1.13',
                           style: TextStyles.bodyText.copyWith(
                             color: Colors.white.withOpacity(0.7),
                           ),

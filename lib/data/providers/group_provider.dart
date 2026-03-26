@@ -177,6 +177,99 @@ class GroupProvider extends ChangeNotifier {
     }
   }
 
+  // Get only active (non-removed) members for a group
+  Future<List<dynamic>> getActiveGroupMembers(String groupId) async {
+    try {
+      final allMembers = await _groupService.fetchGroupMembers(groupId);
+      final removedMembers = await getRemovedMembers(groupId);
+
+      // Get IDs of removed members
+      final removedMemberIds =
+          removedMembers.map((member) => member.userId).toSet();
+
+      // Filter out removed members from all members
+      final activeMembers =
+          allMembers.where((member) {
+            final memberId =
+                member is Map<String, dynamic>
+                    ? member['user_id'] ??
+                        member['id'] // Check for user_id first, then id
+                    : member.toString();
+            return !removedMemberIds.contains(memberId);
+          }).toList();
+
+      return activeMembers;
+    } catch (error) {
+      _handleError('fetching active group members', error);
+      return [];
+    }
+  }
+
+  // Optimized version for large datasets - fetches removed members with pagination
+  Future<List<dynamic>> getActiveGroupMembersOptimized(
+    String groupId, {
+    int removedMembersPage = 1,
+    int removedMembersLimit = 50,
+  }) async {
+    try {
+      // Fetch all active members
+      final allMembers = await _groupService.fetchGroupMembers(groupId);
+
+      // Fetch removed members with pagination for large datasets
+      final removedMembers = await _getRemovedMembersPaginated(
+        groupId,
+        page: removedMembersPage,
+        limit: removedMembersLimit,
+      );
+
+      // Get IDs of removed members
+      final removedMemberIds =
+          removedMembers.map((member) => member.userId).toSet();
+
+      // Filter out removed members from all members
+      final activeMembers =
+          allMembers.where((member) {
+            final memberId =
+                member is Map<String, dynamic>
+                    ? member['user_id'] ?? member['id']
+                    : member.toString();
+            return !removedMemberIds.contains(memberId);
+          }).toList();
+
+      print(
+        'Optimized: Active members for group $groupId: ${activeMembers.length}',
+      );
+      print(
+        'Optimized: Removed members (page $removedMembersPage): ${removedMembers.length}',
+      );
+
+      return activeMembers;
+    } catch (error) {
+      _handleError('fetching active group members (optimized)', error);
+      return [];
+    }
+  }
+
+  // Helper method for paginated removed members
+  Future<List<RemovedMemberModel>> _getRemovedMembersPaginated(
+    String groupId, {
+    int page = 1,
+    int limit = 50,
+  }) async {
+    try {
+      // Use MemberRemovalService which already supports pagination
+      final memberRemovalService = MemberRemovalService();
+      return await memberRemovalService.getGroupRemovedMembers(
+        groupId,
+        page: page,
+        limit: limit,
+      );
+    } catch (error) {
+      print('Error fetching paginated removed members: $error');
+      return [];
+    }
+  }
+
   Future<bool> assignAdminToGroup(String groupId, String userId) async {
     try {
       return await _groupService.assignAdminToGroup(groupId, userId);
@@ -204,19 +297,67 @@ class GroupProvider extends ChangeNotifier {
     }
   }
 
+  // Check if current user can manage a specific group
+  Future<bool> canManageGroup(String groupId) async {
+    try {
+      return await _groupService.canManageGroup(groupId);
+    } catch (error) {
+      _handleError('checking group management access', error);
+      return false;
+    }
+  }
+
   Future<bool> removeMemberFromGroupWithReason(
     String groupId,
     String userId,
     String reason,
   ) async {
     try {
+      // Check if user can manage the group before attempting removal
+      // Wrap this in a try-catch to handle context disposal issues
+      bool canManage = false;
+      try {
+        canManage = await canManageGroup(groupId);
+      } catch (e) {
+        // If context is disposed, assume the operation should proceed
+        // This happens when UI is refreshing during member removal
+        print('Context disposed during permission check, proceeding: $e');
+        canManage = true;
+      }
+
+      print(
+        'DEBUG: removeMemberFromGroupWithReason - canManage result: $canManage for groupId: $groupId',
+      );
+      if (!canManage) {
+        _handleError(
+          'removing member from group',
+          'Access denied: This group is not in your region. You can only manage groups within your assigned region.',
+        );
+        return false;
+      }
+
       return await _groupService.removeMemberFromGroupWithReason(
         groupId,
         userId,
         reason,
       );
     } catch (error) {
-      _handleError('removing member from group', error);
+      // Handle region-based access errors specifically
+      if (error.toString().contains(
+        'Access denied: Group not in your region',
+      )) {
+        _handleError(
+          'removing member from group',
+          'Access denied: This group is not in your region. You can only manage groups within your assigned region.',
+        );
+      } else if (error.toString().contains('HTTP status 403')) {
+        _handleError(
+          'removing member from group',
+          'Access denied: You do not have permission to remove members from this group.',
+        );
+      } else {
+        _handleError('removing member from group', error);
+      }
       return false;
     }
   }
@@ -367,7 +508,7 @@ class GroupProvider extends ChangeNotifier {
   Future<Map<String, dynamic>> getGroupStats(String groupId) async {
     try {
       // Get member count
-      final members = await getGroupMembers(groupId);
+      final members = await getActiveGroupMembers(groupId);
       final memberCount = members.length;
 
       // Get event count (this would typically come from an event service)

@@ -236,7 +236,10 @@ class _RegionGroupAdministrationTabState
         itemCount: _filteredGroups.length,
         itemBuilder: (context, index) {
           final group = _filteredGroups[index];
-          return _buildGroupListItem(group);
+          return Container(
+            key: ValueKey('group_${group.id}'),
+            child: _buildGroupListItem(group),
+          );
         },
       ),
     );
@@ -244,6 +247,7 @@ class _RegionGroupAdministrationTabState
 
   Widget _buildGroupListItem(GroupModel group) {
     return Card(
+      key: ValueKey('group_card_${group.id}'),
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
@@ -256,11 +260,7 @@ class _RegionGroupAdministrationTabState
                 CircleAvatar(
                   backgroundColor: AppColors.secondaryColor,
                   radius: 24,
-                  child: const Icon(
-                    Icons.groups,
-                    color: Colors.white,
-                    size: 28,
-                  ),
+                  child: Icon(Icons.groups, color: Colors.white, size: 28),
                 ),
                 const SizedBox(width: 16),
                 Expanded(

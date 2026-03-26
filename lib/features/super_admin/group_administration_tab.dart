@@ -813,7 +813,7 @@ class _GroupAdministrationTabState extends State<GroupAdministrationTab> {
     try {
       // Fetch member count
       final groupProvider = Provider.of<GroupProvider>(context, listen: false);
-      final members = await groupProvider.getGroupMembers(groupId);
+      final members = await groupProvider.getActiveGroupMembers(groupId);
       stats['memberCount'] = members.length;
 
       // Fetch event count using EventProvider
