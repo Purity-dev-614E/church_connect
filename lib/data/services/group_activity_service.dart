@@ -33,7 +33,13 @@ class GroupActivityService {
       return true;
     }
 
-    pastEvents.sort((a, b) => b.dateTime.compareTo(a.dateTime));
+    // Events are already sorted by createdAt (latest first) from the service, but ensure sort if needed
+    pastEvents.sort((a, b) {
+      if (a.createdAt == null && b.createdAt == null) return 0;
+      if (a.createdAt == null) return 1;
+      if (b.createdAt == null) return -1;
+      return b.createdAt!.compareTo(a.createdAt!);
+    });
     final lastEvent = pastEvents.first;
     final now = DateTime.now();
     final daysSinceLastEvent = now.difference(lastEvent.dateTime).inDays;
@@ -51,7 +57,13 @@ class GroupActivityService {
     final pastEvents = await _eventServices.getPastEvents(groupId);
     if (pastEvents.isEmpty) return null;
 
-    pastEvents.sort((a, b) => b.dateTime.compareTo(a.dateTime));
+    // Events are already sorted by createdAt (latest first) from the service, but ensure sort if needed
+    pastEvents.sort((a, b) {
+      if (a.createdAt == null && b.createdAt == null) return 0;
+      if (a.createdAt == null) return 1;
+      if (b.createdAt == null) return -1;
+      return b.createdAt!.compareTo(a.createdAt!);
+    });
     return pastEvents.first.dateTime;
   }
 

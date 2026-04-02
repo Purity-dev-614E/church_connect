@@ -403,7 +403,18 @@ class EventServices {
       final allEvents = await getEventsByGroup(groupId);
       final now = DateTime.now();
 
-      return allEvents.where((event) => event.dateTime.isAfter(now)).toList();
+      final upcomingEvents =
+          allEvents.where((event) => event.dateTime.isAfter(now)).toList();
+
+      // Sort by createdAt (latest first)
+      upcomingEvents.sort((a, b) {
+        if (a.createdAt == null && b.createdAt == null) return 0;
+        if (a.createdAt == null) return 1;
+        if (b.createdAt == null) return -1;
+        return b.createdAt!.compareTo(a.createdAt!);
+      });
+
+      return upcomingEvents;
     } catch (e) {
       throw Exception('Failed to fetch upcoming events: $e');
     }
@@ -417,7 +428,18 @@ class EventServices {
       final allEvents = await getEventsByGroup(groupId);
       final now = DateTime.now();
 
-      return allEvents.where((event) => event.dateTime.isBefore(now)).toList();
+      final pastEvents =
+          allEvents.where((event) => event.dateTime.isBefore(now)).toList();
+
+      // Sort by createdAt (latest first)
+      pastEvents.sort((a, b) {
+        if (a.createdAt == null && b.createdAt == null) return 0;
+        if (a.createdAt == null) return 1;
+        if (b.createdAt == null) return -1;
+        return b.createdAt!.compareTo(a.createdAt!);
+      });
+
+      return pastEvents;
     } catch (e) {
       throw Exception('Failed to fetch past events: $e');
     }
@@ -434,13 +456,24 @@ class EventServices {
     try {
       final allEvents = await getEventsByGroup(groupId);
 
-      return allEvents
-          .where(
-            (event) =>
-                event.dateTime.isAfter(startDate) &&
-                event.dateTime.isBefore(endDate),
-          )
-          .toList();
+      final dateRangeEvents =
+          allEvents
+              .where(
+                (event) =>
+                    event.dateTime.isAfter(startDate) &&
+                    event.dateTime.isBefore(endDate),
+              )
+              .toList();
+
+      // Sort by createdAt (latest first)
+      dateRangeEvents.sort((a, b) {
+        if (a.createdAt == null && b.createdAt == null) return 0;
+        if (a.createdAt == null) return 1;
+        if (b.createdAt == null) return -1;
+        return b.createdAt!.compareTo(a.createdAt!);
+      });
+
+      return dateRangeEvents;
     } catch (e) {
       throw Exception('Failed to fetch events by date range: $e');
     }
@@ -452,7 +485,17 @@ class EventServices {
       final response = await _httpClient.get(await ApiEndpoints.events);
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
-        return data.map((event) => EventModel.fromJson(event)).toList();
+        final events = data.map((event) => EventModel.fromJson(event)).toList();
+
+        // Sort by createdAt (latest first)
+        events.sort((a, b) {
+          if (a.createdAt == null && b.createdAt == null) return 0;
+          if (a.createdAt == null) return 1;
+          if (b.createdAt == null) return -1;
+          return b.createdAt!.compareTo(a.createdAt!);
+        });
+
+        return events;
       } else {
         throw Exception(
           'Failed to fetch all events: HTTP status ${response.statusCode}',
@@ -708,7 +751,17 @@ class EventServices {
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
-        return data.map((event) => EventModel.fromJson(event)).toList();
+        final events = data.map((event) => EventModel.fromJson(event)).toList();
+
+        // Sort by createdAt (latest first)
+        events.sort((a, b) {
+          if (a.createdAt == null && b.createdAt == null) return 0;
+          if (a.createdAt == null) return 1;
+          if (b.createdAt == null) return -1;
+          return b.createdAt!.compareTo(a.createdAt!);
+        });
+
+        return events;
       } else if (response.statusCode == 404) {
         // No events found for this region
         return [];
@@ -723,9 +776,18 @@ class EventServices {
       // Fallback: Try to get all events and filter by region
       try {
         final allEvents = await getOverallEvents();
-        return allEvents
-            .where((event) => event.regionalId == regionId)
-            .toList();
+        final regionEvents =
+            allEvents.where((event) => event.regionalId == regionId).toList();
+
+        // Sort by createdAt (latest first)
+        regionEvents.sort((a, b) {
+          if (a.createdAt == null && b.createdAt == null) return 0;
+          if (a.createdAt == null) return 1;
+          if (b.createdAt == null) return -1;
+          return b.createdAt!.compareTo(a.createdAt!);
+        });
+
+        return regionEvents;
       } catch (fallbackError) {
         throw Exception(
           'Failed to fetch region events: $e, Fallback error: $fallbackError',
@@ -752,6 +814,14 @@ class EventServices {
         final List<dynamic> data = jsonDecode(response.body);
         print('Successfully fetched ${data.length} events from API');
         events = data.map((event) => EventModel.fromJson(event)).toList();
+
+        // Sort by createdAt (latest first)
+        events.sort((a, b) {
+          if (a.createdAt == null && b.createdAt == null) return 0;
+          if (a.createdAt == null) return 1;
+          if (b.createdAt == null) return -1;
+          return b.createdAt!.compareTo(a.createdAt!);
+        });
       } else if (response.statusCode == 404) {
         print('No events found (404), returning empty list');
         events = [];
@@ -787,6 +857,14 @@ class EventServices {
               'Successfully fetched ${data.length} events from fallback API',
             );
             events = data.map((event) => EventModel.fromJson(event)).toList();
+
+            // Sort by createdAt (latest first)
+            events.sort((a, b) {
+              if (a.createdAt == null && b.createdAt == null) return 0;
+              if (a.createdAt == null) return 1;
+              if (b.createdAt == null) return -1;
+              return b.createdAt!.compareTo(a.createdAt!);
+            });
           } else {
             throw Exception(
               'Fallback API also failed with status ${response.statusCode}',
@@ -821,7 +899,17 @@ class EventServices {
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
-        return data.map((event) => EventModel.fromJson(event)).toList();
+        final events = data.map((event) => EventModel.fromJson(event)).toList();
+
+        // Sort by createdAt (latest first)
+        events.sort((a, b) {
+          if (a.createdAt == null && b.createdAt == null) return 0;
+          if (a.createdAt == null) return 1;
+          if (b.createdAt == null) return -1;
+          return b.createdAt!.compareTo(a.createdAt!);
+        });
+
+        return events;
       } else {
         final errorData = jsonDecode(response.body);
         final errorMessage = ApiErrorHandler.getErrorMessage(

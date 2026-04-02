@@ -241,7 +241,7 @@ class EventProvider extends ChangeNotifier {
   Future<void> fetchUpcomingEvents(String groupId) async {
     _setLoading(true);
     try {
-      // Fetch all upcoming events from backend
+      // Fetch all upcoming events from backend (already sorted by createdAt)
       final events = await _eventServices.getUpcomingEvents(groupId);
 
       // Filter only events that are in the future
@@ -249,9 +249,6 @@ class EventProvider extends ChangeNotifier {
           events
               .where((event) => event.dateTime.isAfter(DateTime.now()))
               .toList();
-
-      // Sort by soonest first
-      _upcomingEvents.sort((a, b) => a.dateTime.compareTo(b.dateTime));
 
       _errorMessage = null;
       notifyListeners();
@@ -280,7 +277,7 @@ class EventProvider extends ChangeNotifier {
   Future<EventModel?> fetchLatestEvent(String groupId) async {
     _setLoading(true);
     try {
-      // Fetch past events if you don't have them yet
+      // Fetch past events if you don't have them yet (already sorted by createdAt)
       if (_pastEvents.isEmpty) {
         _pastEvents = await _eventServices.getPastEvents(groupId);
       }
@@ -289,10 +286,8 @@ class EventProvider extends ChangeNotifier {
         return null; // No events at all
       }
 
-      _pastEvents.sort(
-        (a, b) => b.dateTime.compareTo(a.dateTime),
-      ); // Sort newest first
-      return _pastEvents.first; // Return the latest event
+      // Events are already sorted by createdAt (latest first), so return the first one
+      return _pastEvents.first;
     } catch (error) {
       _handleError('fetching latest event', error);
       return null;
@@ -578,16 +573,21 @@ class EventProvider extends ChangeNotifier {
     try {
       debugPrint('Starting to fetch all events...');
 
-      // Load both regular and leadership events
+      // Load both regular and leadership events (already sorted by createdAt)
       final regularEvents = await fetchOverallEvents();
       debugPrint('Fetched ${regularEvents.length} regular events');
 
       final leadershipEvents = await fetchLeadershipEvents();
       debugPrint('Fetched ${leadershipEvents.length} leadership events');
 
-      // Combine and sort by date
+      // Combine and sort by createdAt (latest first)
       final allEvents = [...regularEvents, ...leadershipEvents];
-      allEvents.sort((a, b) => b.dateTime.compareTo(a.dateTime));
+      allEvents.sort((a, b) {
+        if (a.createdAt == null && b.createdAt == null) return 0;
+        if (a.createdAt == null) return 1;
+        if (b.createdAt == null) return -1;
+        return b.createdAt!.compareTo(a.createdAt!);
+      });
 
       _events = allEvents;
       _errorMessage = null;

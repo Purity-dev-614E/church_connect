@@ -21,10 +21,16 @@ class MemberActivityService {
   final HttpClient _httpClient = HttpClient();
 
   /// Returns user IDs that should be marked inactive based on their attendance history.
-  /// Events are ordered from most recent to oldest; we count consecutive absences from the most recent.
+  /// Events are ordered from most recent to oldest by createdAt; we count consecutive absences from the most recent.
   Future<List<String>> computeMembersToMarkInactive(String groupId) async {
     final pastEvents = await _eventServices.getPastEvents(groupId);
-    pastEvents.sort((a, b) => b.dateTime.compareTo(a.dateTime)); // most recent first
+    // Events are already sorted by createdAt (latest first) from the service, but ensure sort if needed
+    pastEvents.sort((a, b) {
+      if (a.createdAt == null && b.createdAt == null) return 0;
+      if (a.createdAt == null) return 1;
+      if (b.createdAt == null) return -1;
+      return b.createdAt!.compareTo(a.createdAt!);
+    });
 
     if (pastEvents.isEmpty) return [];
 
@@ -61,7 +67,8 @@ class MemberActivityService {
 
         // Absent
         consecutiveTotal++;
-        final hasApology = record.apology != null &&
+        final hasApology =
+            record.apology != null &&
             record.apology.toString().trim().isNotEmpty;
         if (!hasApology) {
           consecutiveWithoutApology++;
@@ -122,9 +129,7 @@ class MemberActivityService {
 
   /// Check group members and mark any that meet the inactivity rules.
   /// Call this after marking attendance (fire-and-forget).
-  Future<void> checkAndMarkInactiveAfterAttendance(
-    String groupId,
-  ) async {
+  Future<void> checkAndMarkInactiveAfterAttendance(String groupId) async {
     try {
       final toMark = await computeMembersToMarkInactive(groupId);
       if (toMark.isNotEmpty) {

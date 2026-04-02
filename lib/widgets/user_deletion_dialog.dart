@@ -171,8 +171,8 @@ class _UserDeletionDialogState extends State<UserDeletionDialog> {
         if (mounted) {
           Navigator.pop(context);
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result['message'] ?? 'User completely deleted'),
+            const SnackBar(
+              content: Text('User deleted successfully from the system'),
               backgroundColor: Colors.green,
             ),
           );

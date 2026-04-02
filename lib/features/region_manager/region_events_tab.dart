@@ -160,7 +160,7 @@ class _RegionEventsTabState extends State<RegionEventsTab> {
       // Use the combined events list instead of just region events
       final eventsToSort = uniqueEvents;
 
-      // Sort events by priority: ongoing -> upcoming -> past, then by date within each category
+      // Sort events by priority: ongoing -> upcoming -> past, then by createdAt within each category (latest first)
       final now = DateTime.now();
       eventsToSort.sort((a, b) {
         final bool aIsOngoing =
@@ -180,14 +180,11 @@ class _RegionEventsTabState extends State<RegionEventsTab> {
         if (aIsUpcoming && !bIsUpcoming) return -1;
         if (!aIsUpcoming && bIsUpcoming) return 1;
 
-        // Within the same category, sort by date (closest first for ongoing/upcoming, most recent first for past)
-        if (aIsOngoing || aIsUpcoming) {
-          return a.dateTime.compareTo(b.dateTime); // Sooner events first
-        } else {
-          return b.dateTime.compareTo(
-            a.dateTime,
-          ); // More recent past events first
-        }
+        // Within the same category, sort by createdAt (latest first)
+        if (a.createdAt == null && b.createdAt == null) return 0;
+        if (a.createdAt == null) return 1;
+        if (b.createdAt == null) return -1;
+        return b.createdAt!.compareTo(a.createdAt!);
       });
 
       print(
