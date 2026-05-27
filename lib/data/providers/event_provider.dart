@@ -4,12 +4,15 @@ import 'package:group_management_church_app/data/models/event_model.dart';
 import 'package:group_management_church_app/data/models/participant_model.dart';
 import 'package:group_management_church_app/data/models/user_model.dart';
 import 'package:group_management_church_app/data/services/event_services.dart';
+import 'package:group_management_church_app/core/services/data_cache_service.dart';
 
 import '../models/attendance_model.dart';
 
 class EventProvider extends ChangeNotifier {
   // Private fields
   final EventServices _eventServices = EventServices();
+  final DataCacheService _cacheService = DataCacheService();
+
   List<EventModel> _events = [];
   List<EventModel> _upcomingEvents = [];
   List<EventModel> _pastEvents = [];
@@ -22,6 +25,10 @@ class EventProvider extends ChangeNotifier {
   String? _errorMessage;
   String? _currentGroupId;
   bool _isFetchingAll = false; // Flag to prevent multiple fetches
+
+  void _sortEventsByLatestDate(List<EventModel> events) {
+    events.sort((a, b) => b.dateTime.compareTo(a.dateTime));
+  }
 
   // Getters
   List<EventModel> get events => _events;
@@ -86,7 +93,9 @@ class EventProvider extends ChangeNotifier {
       _events = await _eventServices.getEventsByGroup(groupId);
       _errorMessage = null;
       print("Fetched events: ${_events.length}");
-      print('Fetched events: $_events');
+      for (var event in _events) {
+        print('Event: ${event.title} (${event.id}) at ${event.dateTime}');
+      }
       return _events;
     } catch (error) {
       _handleError('fetching events', error);
@@ -241,7 +250,7 @@ class EventProvider extends ChangeNotifier {
   Future<void> fetchUpcomingEvents(String groupId) async {
     _setLoading(true);
     try {
-      // Fetch all upcoming events from backend (already sorted by createdAt)
+      // Fetch all upcoming events from backend.
       final events = await _eventServices.getUpcomingEvents(groupId);
 
       // Filter only events that are in the future
@@ -249,6 +258,7 @@ class EventProvider extends ChangeNotifier {
           events
               .where((event) => event.dateTime.isAfter(DateTime.now()))
               .toList();
+      _sortEventsByLatestDate(_upcomingEvents);
 
       _errorMessage = null;
       notifyListeners();
@@ -277,7 +287,7 @@ class EventProvider extends ChangeNotifier {
   Future<EventModel?> fetchLatestEvent(String groupId) async {
     _setLoading(true);
     try {
-      // Fetch past events if you don't have them yet (already sorted by createdAt)
+      // Fetch past events if you don't have them yet.
       if (_pastEvents.isEmpty) {
         _pastEvents = await _eventServices.getPastEvents(groupId);
       }
@@ -286,7 +296,7 @@ class EventProvider extends ChangeNotifier {
         return null; // No events at all
       }
 
-      // Events are already sorted by createdAt (latest first), so return the first one
+      // Events are sorted by event date latest first, so return the first one.
       return _pastEvents.first;
     } catch (error) {
       _handleError('fetching latest event', error);
@@ -573,33 +583,76 @@ class EventProvider extends ChangeNotifier {
     try {
       debugPrint('Starting to fetch all events...');
 
-      // Load both regular and leadership events (already sorted by createdAt)
+      // Try to load from cache first
+      final cachedEvents = await _cacheService.getCachedEvents();
+      if (cachedEvents.isNotEmpty) {
+        _events = cachedEvents;
+        notifyListeners();
+        debugPrint('Loaded ${cachedEvents.length} events from cache');
+      }
+
+      // Load both regular and leadership events.
       final regularEvents = await fetchOverallEvents();
       debugPrint('Fetched ${regularEvents.length} regular events');
 
       final leadershipEvents = await fetchLeadershipEvents();
       debugPrint('Fetched ${leadershipEvents.length} leadership events');
 
-      // Combine and sort by createdAt (latest first)
       final allEvents = [...regularEvents, ...leadershipEvents];
-      allEvents.sort((a, b) {
-        if (a.createdAt == null && b.createdAt == null) return 0;
-        if (a.createdAt == null) return 1;
-        if (b.createdAt == null) return -1;
-        return b.createdAt!.compareTo(a.createdAt!);
-      });
+      _sortEventsByLatestDate(allEvents);
 
       _events = allEvents;
+
+      // Cache the updated data
+      await _cacheService.cacheEvents(allEvents);
+
       _errorMessage = null;
       debugPrint('Successfully loaded ${allEvents.length} total events');
       return allEvents;
     } catch (error) {
       debugPrint('Error in fetchAllEvents: $error');
       _handleError('fetching all events', error);
-      return [];
+      // Return cached data if available
+      if (_events.isNotEmpty) {
+        _errorMessage = null; // Clear error since we have cached data
+        notifyListeners();
+      }
+      return _events;
     } finally {
       _setLoading(false);
       _isFetchingAll = false;
+    }
+  }
+
+  // Initialize cached data on app start
+  Future<void> initializeCachedData() async {
+    try {
+      final hasCachedData = await _cacheService.hasCachedData();
+      if (hasCachedData) {
+        final cachedEvents = await _cacheService.getCachedEvents();
+        if (cachedEvents.isNotEmpty) {
+          _events = cachedEvents;
+          notifyListeners();
+          debugPrint('Initialized with ${cachedEvents.length} cached events');
+        }
+      }
+    } catch (e) {
+      debugPrint('Error initializing cached data: $e');
+    }
+  }
+
+  // Clear cache (for logout)
+  Future<void> clearCache() async {
+    try {
+      await _cacheService.clearCache();
+      _events.clear();
+      _upcomingEvents.clear();
+      _pastEvents.clear();
+      _leadershipEvents.clear();
+      notifyListeners();
+      debugPrint('Event cache cleared');
+    } catch (e) {
+      debugPrint('Error clearing cache: $e');
     }
   }
 }

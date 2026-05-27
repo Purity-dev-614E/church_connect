@@ -28,6 +28,10 @@ class EventServices {
        _userServices = userServices ?? UserServices(),
        _httpClient = httpClient ?? HttpClient();
 
+  void _sortEventsByLatestDate(List<EventModel> events) {
+    events.sort((a, b) => b.dateTime.compareTo(a.dateTime));
+  }
+
   // SECTION: Authentication and Authorization
 
   /// Get authentication token
@@ -290,7 +294,9 @@ class EventServices {
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
-        return data.map((event) => EventModel.fromJson(event)).toList();
+        final events = data.map((event) => EventModel.fromJson(event)).toList();
+        _sortEventsByLatestDate(events);
+        return events;
       } else {
         throw Exception(
           'Failed to fetch group events: HTTP status ${response.statusCode}',
@@ -406,13 +412,7 @@ class EventServices {
       final upcomingEvents =
           allEvents.where((event) => event.dateTime.isAfter(now)).toList();
 
-      // Sort by createdAt (latest first)
-      upcomingEvents.sort((a, b) {
-        if (a.createdAt == null && b.createdAt == null) return 0;
-        if (a.createdAt == null) return 1;
-        if (b.createdAt == null) return -1;
-        return b.createdAt!.compareTo(a.createdAt!);
-      });
+      _sortEventsByLatestDate(upcomingEvents);
 
       return upcomingEvents;
     } catch (e) {
@@ -431,13 +431,7 @@ class EventServices {
       final pastEvents =
           allEvents.where((event) => event.dateTime.isBefore(now)).toList();
 
-      // Sort by createdAt (latest first)
-      pastEvents.sort((a, b) {
-        if (a.createdAt == null && b.createdAt == null) return 0;
-        if (a.createdAt == null) return 1;
-        if (b.createdAt == null) return -1;
-        return b.createdAt!.compareTo(a.createdAt!);
-      });
+      _sortEventsByLatestDate(pastEvents);
 
       return pastEvents;
     } catch (e) {
@@ -465,13 +459,7 @@ class EventServices {
               )
               .toList();
 
-      // Sort by createdAt (latest first)
-      dateRangeEvents.sort((a, b) {
-        if (a.createdAt == null && b.createdAt == null) return 0;
-        if (a.createdAt == null) return 1;
-        if (b.createdAt == null) return -1;
-        return b.createdAt!.compareTo(a.createdAt!);
-      });
+      _sortEventsByLatestDate(dateRangeEvents);
 
       return dateRangeEvents;
     } catch (e) {
@@ -487,13 +475,7 @@ class EventServices {
         final List<dynamic> data = jsonDecode(response.body);
         final events = data.map((event) => EventModel.fromJson(event)).toList();
 
-        // Sort by createdAt (latest first)
-        events.sort((a, b) {
-          if (a.createdAt == null && b.createdAt == null) return 0;
-          if (a.createdAt == null) return 1;
-          if (b.createdAt == null) return -1;
-          return b.createdAt!.compareTo(a.createdAt!);
-        });
+        _sortEventsByLatestDate(events);
 
         return events;
       } else {
@@ -753,13 +735,7 @@ class EventServices {
         final List<dynamic> data = jsonDecode(response.body);
         final events = data.map((event) => EventModel.fromJson(event)).toList();
 
-        // Sort by createdAt (latest first)
-        events.sort((a, b) {
-          if (a.createdAt == null && b.createdAt == null) return 0;
-          if (a.createdAt == null) return 1;
-          if (b.createdAt == null) return -1;
-          return b.createdAt!.compareTo(a.createdAt!);
-        });
+        _sortEventsByLatestDate(events);
 
         return events;
       } else if (response.statusCode == 404) {
@@ -779,13 +755,7 @@ class EventServices {
         final regionEvents =
             allEvents.where((event) => event.regionalId == regionId).toList();
 
-        // Sort by createdAt (latest first)
-        regionEvents.sort((a, b) {
-          if (a.createdAt == null && b.createdAt == null) return 0;
-          if (a.createdAt == null) return 1;
-          if (b.createdAt == null) return -1;
-          return b.createdAt!.compareTo(a.createdAt!);
-        });
+        _sortEventsByLatestDate(regionEvents);
 
         return regionEvents;
       } catch (fallbackError) {
@@ -815,13 +785,7 @@ class EventServices {
         print('Successfully fetched ${data.length} events from API');
         events = data.map((event) => EventModel.fromJson(event)).toList();
 
-        // Sort by createdAt (latest first)
-        events.sort((a, b) {
-          if (a.createdAt == null && b.createdAt == null) return 0;
-          if (a.createdAt == null) return 1;
-          if (b.createdAt == null) return -1;
-          return b.createdAt!.compareTo(a.createdAt!);
-        });
+        _sortEventsByLatestDate(events);
       } else if (response.statusCode == 404) {
         print('No events found (404), returning empty list');
         events = [];
@@ -858,13 +822,7 @@ class EventServices {
             );
             events = data.map((event) => EventModel.fromJson(event)).toList();
 
-            // Sort by createdAt (latest first)
-            events.sort((a, b) {
-              if (a.createdAt == null && b.createdAt == null) return 0;
-              if (a.createdAt == null) return 1;
-              if (b.createdAt == null) return -1;
-              return b.createdAt!.compareTo(a.createdAt!);
-            });
+            _sortEventsByLatestDate(events);
           } else {
             throw Exception(
               'Fallback API also failed with status ${response.statusCode}',
@@ -901,13 +859,7 @@ class EventServices {
         final List<dynamic> data = jsonDecode(response.body);
         final events = data.map((event) => EventModel.fromJson(event)).toList();
 
-        // Sort by createdAt (latest first)
-        events.sort((a, b) {
-          if (a.createdAt == null && b.createdAt == null) return 0;
-          if (a.createdAt == null) return 1;
-          if (b.createdAt == null) return -1;
-          return b.createdAt!.compareTo(a.createdAt!);
-        });
+        _sortEventsByLatestDate(events);
 
         return events;
       } else {

@@ -6,6 +6,7 @@ import '../../data/services/group_services.dart';
 import '../../data/services/member_removal_service.dart';
 import '../../core/constants/app_endpoints.dart';
 import '../../data/services/http_client.dart';
+import '../../core/services/data_cache_service.dart';
 
 class GroupProvider extends ChangeNotifier {
   List<GroupModel> _groups = [];
@@ -20,6 +21,7 @@ class GroupProvider extends ChangeNotifier {
   final GroupServices _groupService = GroupServices();
   final HttpClient _httpClient = HttpClient();
   final MemberRemovalService _memberRemovalService = MemberRemovalService();
+  final DataCacheService _cacheService = DataCacheService();
 
   // Helper method to handle loading state
   void _setLoading(bool loading) {
@@ -42,10 +44,30 @@ class GroupProvider extends ChangeNotifier {
   Future<void> fetchGroups() async {
     _setLoading(true);
     try {
-      _groups = await _groupService.fetchAllGroups();
+      // Try to load from cache first
+      final cachedGroups = await _cacheService.getCachedGroups();
+      if (cachedGroups.isNotEmpty) {
+        _groups = cachedGroups;
+        notifyListeners();
+        print('Loaded ${cachedGroups.length} groups from cache');
+      }
+
+      // Then fetch fresh data
+      final groups = await _groupService.fetchAllGroups();
+      _groups = groups;
+      
+      // Cache the updated data
+      await _cacheService.cacheGroups(groups);
+      
       _errorMessage = null;
+      notifyListeners();
     } catch (error) {
       _handleError('fetching groups', error);
+      // Return cached data if available
+      if (_groups.isNotEmpty) {
+        _errorMessage = null; // Clear error since we have cached data
+        notifyListeners();
+      }
     } finally {
       _setLoading(false);
     }
@@ -519,6 +541,35 @@ class GroupProvider extends ChangeNotifier {
     } catch (error) {
       _handleError('getting group stats', error);
       return {'memberCount': 0, 'eventCount': 0};
+    }
+  }
+
+  // Initialize cached data on app start
+  Future<void> initializeCachedData() async {
+    try {
+      final hasCachedData = await _cacheService.hasCachedData();
+      if (hasCachedData) {
+        final cachedGroups = await _cacheService.getCachedGroups();
+        if (cachedGroups.isNotEmpty) {
+          _groups = cachedGroups;
+          notifyListeners();
+          print('Initialized with ${cachedGroups.length} cached groups');
+        }
+      }
+    } catch (e) {
+      print('Error initializing cached data: $e');
+    }
+  }
+
+  // Clear cache (for logout)
+  Future<void> clearCache() async {
+    try {
+      await _cacheService.clearCache();
+      _groups.clear();
+      notifyListeners();
+      print('Group cache cleared');
+    } catch (e) {
+      print('Error clearing cache: $e');
     }
   }
 }

@@ -72,7 +72,9 @@ class _AuthErrorObserver extends NavigatorObserver {
   void _setupAuthErrorListener(Route<dynamic> route) {
     if (route.settings.name != '/login' &&
         route.settings.name != '/signup' &&
-        route.settings.name != '/reset-password') {
+        route.settings.name != '/reset-password' &&
+        route.settings.name != '/reset-password-handler' &&
+        route.settings.name != '/new-password') {
       Future.delayed(Duration.zero, () {
         if (navigator?.context != null) {
           final authProvider = Provider.of<AuthProvider>(
@@ -126,8 +128,16 @@ class MyApp extends StatelessWidget {
           '/new-password': (context) {
             // Extract tokens from URL if coming from email link
             final uri = Uri.base;
-            final accessToken = uri.queryParameters['access_token'];
-            final refreshToken = uri.queryParameters['refresh_token'];
+            Map<String, String> fragmentParameters = {};
+            if (uri.fragment.isNotEmpty) {
+              fragmentParameters = Uri.splitQueryString(uri.fragment);
+            }
+            final accessToken =
+                uri.queryParameters['access_token'] ??
+                fragmentParameters['access_token'];
+            final refreshToken =
+                uri.queryParameters['refresh_token'] ??
+                fragmentParameters['refresh_token'];
             return NewPasswordScreen(
               accessToken: accessToken,
               refreshToken: refreshToken,

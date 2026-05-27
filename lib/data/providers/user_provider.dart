@@ -6,24 +6,53 @@ import '../services/regional_alias_service.dart';
 import '../../data/services/user_services.dart';
 import '../../data/services/auth_services.dart';
 import '../../data/models/user_model.dart';
+import '../../core/services/data_cache_service.dart';
 
 class UserProvider with ChangeNotifier {
   final UserServices _userService = UserServices();
   final AuthServices _authService = AuthServices();
   final RegionalAliasService _aliasService = RegionalAliasService();
+  final DataCacheService _cacheService = DataCacheService();
+  
   UserModel? _currentUser;
+  List<UserModel> _cachedUsers = [];
+  bool _isLoading = false;
+  
   UserModel? get currentUser => _currentUser;
+  List<UserModel> get cachedUsers => _cachedUsers;
+  bool get isLoading => _isLoading;
 
   Future<void> loadUser(String userId) async {
     try {
+      // Try to load from cache first
+      final cachedUser = await _cacheService.getCachedCurrentUser();
+      if (cachedUser != null && cachedUser.id == userId) {
+        _currentUser = cachedUser;
+        notifyListeners();
+        log('Loaded user from cache: ${_currentUser!.fullName}');
+      }
+
+      // Then fetch fresh data
       final fetchedUser = await _userService.fetchCurrentUser(userId);
       final alias = await _aliasService.getAlias(userId);
       _currentUser = fetchedUser.copyWith(regionalTitle: alias);
+      
+      // Cache the updated user data
+      await _cacheService.cacheCurrentUser(_currentUser!);
+      
       notifyListeners();
       log('User Found: ${_currentUser!.fullName} (ID: ${_currentUser!.id})');
     } catch (e) {
       print('Error loading user: $e');
-      // Don't update _currentUser if there's an error
+      // Try to use cached data if available
+      if (_currentUser == null) {
+        final cachedUser = await _cacheService.getCachedCurrentUser();
+        if (cachedUser != null && cachedUser.id == userId) {
+          _currentUser = cachedUser;
+          notifyListeners();
+          log('Using cached user due to error: ${_currentUser!.fullName}');
+        }
+      }
     }
   }
 
@@ -67,12 +96,35 @@ class UserProvider with ChangeNotifier {
   }
 
   Future<List<UserModel>> getAllUsers() async {
+    _setLoading(true);
     try {
+      // Try to load from cache first
+      final cachedUsers = await _cacheService.getCachedUsers();
+      if (cachedUsers.isNotEmpty) {
+        _cachedUsers = cachedUsers;
+        notifyListeners();
+        log('Loaded ${cachedUsers.length} users from cache');
+      }
+
+      // Then fetch fresh data
       final users = await _userService.fetchAllUsers();
-      return await _attachAliases(users);
+      final usersWithAliases = await _attachAliases(users);
+      
+      // Cache the updated data
+      await _cacheService.cacheUsers(usersWithAliases);
+      _cachedUsers = usersWithAliases;
+      
+      notifyListeners();
+      return usersWithAliases;
     } catch (error) {
       print('Error fetching users: $error');
+      // Return cached data if available
+      if (_cachedUsers.isNotEmpty) {
+        return _cachedUsers;
+      }
       return [];
+    } finally {
+      _setLoading(false);
     }
   }
 
@@ -207,5 +259,39 @@ class UserProvider with ChangeNotifier {
                   : user,
         )
         .toList();
+  }
+
+  void _setLoading(bool loading) {
+    _isLoading = loading;
+    notifyListeners();
+  }
+
+  // Initialize cached data on app start
+  Future<void> initializeCachedData() async {
+    try {
+      final hasCachedData = await _cacheService.hasCachedData();
+      if (hasCachedData) {
+        final cachedUsers = await _cacheService.getCachedUsers();
+        if (cachedUsers.isNotEmpty) {
+          _cachedUsers = cachedUsers;
+          notifyListeners();
+          log('Initialized with ${cachedUsers.length} cached users');
+        }
+      }
+    } catch (e) {
+      print('Error initializing cached data: $e');
+    }
+  }
+
+  // Clear cache (for logout)
+  Future<void> clearCache() async {
+    try {
+      await _cacheService.clearCache();
+      _cachedUsers.clear();
+      notifyListeners();
+      log('User cache cleared');
+    } catch (e) {
+      print('Error clearing cache: $e');
+    }
   }
 }

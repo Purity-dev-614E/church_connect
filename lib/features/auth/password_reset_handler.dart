@@ -58,9 +58,12 @@ class _PasswordResetHandlerState extends State<PasswordResetHandler> {
     refreshToken ??= uri.queryParameters['refresh_token'];
 
     if (accessToken != null && refreshToken != null) {
-      // Set the session with the tokens
-      final response = await Supabase.instance.client.auth.setSession(accessToken);
-      
+      // Supabase restores recovery sessions with the refresh token from the
+      // reset link. Passing the access token here makes valid links fail.
+      final response = await Supabase.instance.client.auth.setSession(
+        refreshToken,
+      );
+
       if (response.session != null) {
         setState(() {
           _accessToken = accessToken;

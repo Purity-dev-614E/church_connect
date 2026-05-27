@@ -5,8 +5,10 @@ import 'package:group_management_church_app/data/models/group_model.dart';
 import 'package:group_management_church_app/data/providers/attendance_provider.dart';
 import 'package:group_management_church_app/data/providers/group_provider.dart';
 import 'package:group_management_church_app/data/providers/user_provider.dart';
+import 'package:group_management_church_app/data/providers/event_provider.dart';
 import 'package:group_management_church_app/features/admin/Admin_dashboard.dart';
 import 'dart:developer';
+import 'package:group_management_church_app/core/services/data_cache_service.dart';
 
 /// A wrapper widget that ensures all required providers are available for the AdminDashboard
 /// and fetches the first group if needed
@@ -26,6 +28,7 @@ class _AdminDashboardWrapperState extends State<AdminDashboardWrapper> {
   @override
   void initState() {
     super.initState();
+    _initializeCachedData();
     _initializeGroupData();
   }
 
@@ -65,9 +68,7 @@ class _AdminDashboardWrapperState extends State<AdminDashboardWrapper> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     if (_error != null) {
@@ -110,6 +111,27 @@ class _AdminDashboardWrapperState extends State<AdminDashboardWrapper> {
           groupName: _effectiveGroupName,
         ),
       );
+    }
+  }
+
+  // Initialize cached data for admin dashboard
+  Future<void> _initializeCachedData() async {
+    try {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final groupProvider = Provider.of<GroupProvider>(context, listen: false);
+      final eventProvider = Provider.of<EventProvider>(context, listen: false);
+
+      // Initialize cached data in parallel
+      await Future.wait([
+        userProvider.initializeCachedData(),
+        groupProvider.initializeCachedData(),
+        eventProvider.initializeCachedData(),
+      ]);
+
+      print('Admin Dashboard: Cached data initialized');
+    } catch (e) {
+      print('Error initializing cached data in admin dashboard: $e');
+      // Don't block dashboard initialization if cache fails
     }
   }
 }

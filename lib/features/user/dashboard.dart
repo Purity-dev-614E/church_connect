@@ -15,6 +15,7 @@ import 'package:group_management_church_app/widgets/custom_notification.dart';
 import 'package:provider/provider.dart';
 import 'package:group_management_church_app/features/auth/login.dart';
 import 'package:group_management_church_app/features/user/no_group_screen.dart';
+import 'package:group_management_church_app/core/services/data_cache_service.dart';
 
 class UserDashboard extends StatefulWidget {
   final String groupId;
@@ -46,6 +47,10 @@ class _UserDashboardState extends State<UserDashboard>
   bool _isLoadingGroup = true;
   bool _isLoadingEvents = true;
 
+  void _sortEventsByLatestDate(List<EventModel> events) {
+    events.sort((a, b) => b.dateTime.compareTo(a.dateTime));
+  }
+
   @override
   void initState() {
     super.initState();
@@ -53,7 +58,10 @@ class _UserDashboardState extends State<UserDashboard>
     // Initialize with widget.groupId, don't use defaultGroupId string
     groupId = widget.groupId;
     // Schedule data loading after the current build is complete
-    Future.microtask(() => _loadData());
+    Future.microtask(() {
+      _initializeCachedData();
+      _loadData();
+    });
 
     // Add a timeout to reset loading state if it takes too long
     Future.delayed(const Duration(seconds: 10), () {
@@ -351,6 +359,27 @@ class _UserDashboardState extends State<UserDashboard>
     }
   }
 
+  // Initialize cached data for user dashboard
+  Future<void> _initializeCachedData() async {
+    try {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final groupProvider = Provider.of<GroupProvider>(context, listen: false);
+      final eventProvider = Provider.of<EventProvider>(context, listen: false);
+
+      // Initialize cached data in parallel
+      await Future.wait([
+        userProvider.initializeCachedData(),
+        groupProvider.initializeCachedData(),
+        eventProvider.initializeCachedData(),
+      ]);
+
+      print('User Dashboard: Cached data initialized');
+    } catch (e) {
+      print('Error initializing cached data in user dashboard: $e');
+      // Don't block dashboard initialization if cache fails
+    }
+  }
+
   // Load event data
   Future<void> _loadEventData() async {
     setState(() => _isLoading = true);
@@ -368,6 +397,7 @@ class _UserDashboardState extends State<UserDashboard>
             ...eventProvider.upcomingEvents,
             ...eventProvider.pastEvents,
           ];
+          _sortEventsByLatestDate(_allEvents);
 
           // Filter events for this week
           _weekEvents = _filterEventsForThisWeek(_allEvents);
@@ -393,12 +423,14 @@ class _UserDashboardState extends State<UserDashboard>
     final startOfWeek = _getStartOfWeek(now);
     final endOfWeek = _getEndOfWeek(now);
 
-    return events.where((event) {
+    final weekEvents = events.where((event) {
       return event.dateTime.isAfter(
             startOfWeek.subtract(const Duration(days: 1)),
           ) &&
           event.dateTime.isBefore(endOfWeek.add(const Duration(days: 1)));
     }).toList();
+    _sortEventsByLatestDate(weekEvents);
+    return weekEvents;
   }
 
   // Get start of week (Monday)

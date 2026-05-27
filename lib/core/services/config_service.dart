@@ -23,7 +23,7 @@ class ConfigService {
       _config = json.decode(configString);
 
       // Set environment directly - no SharedPreferences confusion
-      _currentEnvironment = 'development'; // Change this manually when needed
+      _currentEnvironment = 'production'; // Change this manually when needed
     } catch (e) {
       _config = {
         'development': {

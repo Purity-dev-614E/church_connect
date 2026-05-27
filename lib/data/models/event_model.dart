@@ -161,4 +161,9 @@ class EventModel {
     'invited_count': invitedCount,
     'created_at': createdAt?.toUtc().toIso8601String(),
   };
+
+  @override
+  String toString() {
+    return 'EventModel(id: $id, title: $title, dateTime: $dateTime, location: $location)';
+  }
 }

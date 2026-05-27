@@ -816,7 +816,7 @@ class _NewPasswordScreenState extends State<NewPasswordScreen> {
         final newPassword = _passwordController.text.trim();
 
         if (widget.accessToken != null && widget.refreshToken != null) {
-          await SupabaseService.client.auth.setSession(widget.accessToken!);
+          await SupabaseService.client.auth.setSession(widget.refreshToken!);
         } else {
           final session = SupabaseService.client.auth.currentSession;
           if (session == null) {

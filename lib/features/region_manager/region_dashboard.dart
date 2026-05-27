@@ -31,6 +31,7 @@ import 'package:flutter/foundation.dart';
 import 'package:group_management_church_app/data/services/auth_services.dart';
 import '../../data/services/group_activity_service.dart';
 import '../../data/providers/analytics_providers/regional_manager_analytics_provider.dart';
+import '../../core/services/data_cache_service.dart';
 
 class RegionDashboard extends StatefulWidget {
   final String regionId;
@@ -97,6 +98,7 @@ class _RegionDashboardState extends State<RegionDashboard> {
 
       // Use Future.microtask to avoid calling setState during build
       Future.microtask(() {
+        _initializeCachedData();
         _checkAuthAndLoadData();
       });
     } catch (e) {
@@ -1170,5 +1172,26 @@ class _RegionDashboardState extends State<RegionDashboard> {
         ],
       ),
     );
+  }
+
+  // Initialize cached data for region dashboard
+  Future<void> _initializeCachedData() async {
+    try {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final groupProvider = Provider.of<GroupProvider>(context, listen: false);
+      final eventProvider = Provider.of<EventProvider>(context, listen: false);
+
+      // Initialize cached data in parallel
+      await Future.wait([
+        userProvider.initializeCachedData(),
+        groupProvider.initializeCachedData(),
+        eventProvider.initializeCachedData(),
+      ]);
+
+      print('Region Dashboard: Cached data initialized');
+    } catch (e) {
+      print('Error initializing cached data in region dashboard: $e');
+      // Don't block dashboard initialization if cache fails
+    }
   }
 }

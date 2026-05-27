@@ -5,6 +5,7 @@ import 'package:group_management_church_app/data/providers/auth_provider.dart';
 import 'package:group_management_church_app/data/providers/group_provider.dart';
 import 'package:group_management_church_app/data/providers/region_provider.dart';
 import 'package:group_management_church_app/data/providers/user_provider.dart';
+import 'package:group_management_church_app/data/providers/event_provider.dart';
 import 'package:group_management_church_app/data/services/auth_services.dart';
 import 'package:group_management_church_app/data/services/user_services.dart';
 import 'package:group_management_church_app/features/admin/admin_dashboard_wrapper.dart';
@@ -20,6 +21,7 @@ import '../../features/admin/Admin_dashboard.dart';
 import '../../features/super_admin/dashboard_cleaned.dart';
 import '../constants/text_styles.dart';
 import '../utils/role_utils.dart';
+import '../services/data_cache_service.dart';
 
 class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
@@ -34,30 +36,30 @@ class _AuthWrapperState extends State<AuthWrapper> {
   bool _isLoading = true;
   String? _error;
   UserModel? _currentUser;
-  
+
   @override
   void initState() {
     super.initState();
     _checkAuthAndNavigate();
   }
-  
+
   Future<void> _checkAuthAndNavigate() async {
     try {
       setState(() {
         _isLoading = true;
         _error = null;
       });
-      
+
       // Check if user is logged in
       final bool isLoggedIn = await _authServices.isLoggedIn();
-      
+
       if (!isLoggedIn) {
         setState(() {
           _isLoading = false;
         });
         return; // Will show login screen
       }
-      
+
       // Get user ID
       final String? userId = await _authServices.getUserId();
       if (userId == null) {
@@ -67,11 +69,11 @@ class _AuthWrapperState extends State<AuthWrapper> {
         });
         return;
       }
-      
+
       // Load user data
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       await userProvider.loadUser(userId);
-      
+
       // Check if user has completed profile setup
       final UserModel? user = userProvider.currentUser;
       if (user == null) {
@@ -83,17 +85,16 @@ class _AuthWrapperState extends State<AuthWrapper> {
       }
 
       log('User Name: ${user.fullName}');
-      
+
       // Check if profile is incomplete (name is empty)
       if (user.fullName.isEmpty || user.fullName == '') {
         // Navigate to profile setup
         if (mounted) {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
-              builder: (context) => ProfileSetupScreen(
-                userId: userId,
-                email: user.email,
-              ),
+              builder:
+                  (context) =>
+                      ProfileSetupScreen(userId: userId, email: user.email),
             ),
           );
         }
@@ -102,25 +103,35 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
       // Check group membership for regular users
       if (user.role.toLowerCase() == 'user') {
-        final groupProvider = Provider.of<GroupProvider>(context, listen: false);
+        final groupProvider = Provider.of<GroupProvider>(
+          context,
+          listen: false,
+        );
         final userGroups = await groupProvider.getUserGroups(userId);
-        
+
         if (userGroups.isEmpty) {
           // User is not in any group, try to add them to their assigned group
           log('User is not in any groups, attempting to add to assigned group');
           log('User group ID (stored in regionId): ${user.regionId}');
-          
+
           if (user.regionId.isNotEmpty) {
             try {
               // Since regionId actually contains the group ID, add user directly to that group
               log('Attempting to add user to group: ${user.overalRegionName}');
-              
-              final addToGroupSuccess = await groupProvider.addMemberToGroup(user.regionId, userId);
-              
+
+              final addToGroupSuccess = await groupProvider.addMemberToGroup(
+                user.regionId,
+                userId,
+              );
+
               if (addToGroupSuccess) {
-                log('Successfully added user to group: ${user.overalRegionName}');
+                log(
+                  'Successfully added user to group: ${user.overalRegionName}',
+                );
                 // Refresh user groups and continue with normal flow
-                final updatedUserGroups = await groupProvider.getUserGroups(userId);
+                final updatedUserGroups = await groupProvider.getUserGroups(
+                  userId,
+                );
                 if (updatedUserGroups.isNotEmpty) {
                   log('User now has ${updatedUserGroups.length} group(s)');
                   // Continue with normal flow - user now has groups
@@ -128,7 +139,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
                   log('Failed to verify group membership after adding');
                   if (mounted) {
                     Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(builder: (context) => const NoGroupScreen()),
+                      MaterialPageRoute(
+                        builder: (context) => const NoGroupScreen(),
+                      ),
                     );
                   }
                   return;
@@ -137,7 +150,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
                 log('Failed to add user to group: ${user.regionId}');
                 if (mounted) {
                   Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(builder: (context) => const NoGroupScreen()),
+                    MaterialPageRoute(
+                      builder: (context) => const NoGroupScreen(),
+                    ),
                   );
                 }
                 return;
@@ -146,7 +161,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
               log('Error adding user to assigned group: $e');
               if (mounted) {
                 Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (context) => const NoGroupScreen()),
+                  MaterialPageRoute(
+                    builder: (context) => const NoGroupScreen(),
+                  ),
                 );
               }
               return;
@@ -162,7 +179,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
           }
         }
       }
-      
+
+      // Initialize cached data after successful authentication
+      await _initializeCachedData();
+
       setState(() {
         _isLoading = false;
         _currentUser = user;
@@ -175,18 +195,35 @@ class _AuthWrapperState extends State<AuthWrapper> {
       });
     }
   }
-  
+
+  // Initialize cached data for all providers
+  Future<void> _initializeCachedData() async {
+    try {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final groupProvider = Provider.of<GroupProvider>(context, listen: false);
+      final eventProvider = Provider.of<EventProvider>(context, listen: false);
+
+      // Initialize cached data in parallel
+      await Future.wait([
+        userProvider.initializeCachedData(),
+        groupProvider.initializeCachedData(),
+        eventProvider.initializeCachedData(),
+      ]);
+
+      log('Cached data initialized for all providers');
+    } catch (e) {
+      log('Error initializing cached data: $e');
+      // Don't block authentication flow if cache initialization fails
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // Show loading indicator while checking auth status
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    
+
     // Show error if any
     if (_error != null) {
       return Scaffold(
@@ -204,7 +241,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
               TextButton(
                 onPressed: () {
                   Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(builder: (context) => const LoginScreen()),
+                    MaterialPageRoute(
+                      builder: (context) => const LoginScreen(),
+                    ),
                   );
                 },
                 child: const Text('Go to Login'),
@@ -214,18 +253,18 @@ class _AuthWrapperState extends State<AuthWrapper> {
         ),
       );
     }
-    
+
     // Check authentication status from provider
     final authProvider = Provider.of<AuthProvider>(context);
     if (authProvider.status != AuthStatus.authenticated) {
       return const LoginScreen();
     }
-    
+
     // If we have a current user, show the appropriate dashboard
     if (_currentUser != null) {
       return _RoleBasedNavigator(user: _currentUser!);
     }
-    
+
     // Default to login screen if no user is found
     return const LoginScreen();
   }
@@ -239,7 +278,7 @@ class _RoleBasedNavigator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     log('User role: ${user.role}');
-    
+
     switch (user.role.toLowerCase()) {
       case 'super_admin':
       case 'root':
@@ -261,10 +300,7 @@ class _RoleBasedNavigator extends StatelessWidget {
                 children: [
                   const Icon(Icons.error_outline, size: 64, color: Colors.red),
                   const SizedBox(height: 16),
-                  Text(
-                    'No Region Assigned',
-                    style: TextStyles.bodyText,
-                  ),
+                  Text('No Region Assigned', style: TextStyles.bodyText),
                   const SizedBox(height: 8),
                   Text(
                     'You have been assigned as a Regional Manager but no region has been assigned to you yet.',
@@ -274,19 +310,21 @@ class _RoleBasedNavigator extends StatelessWidget {
                   const SizedBox(height: 24),
                   ElevatedButton(
                     onPressed: () async {
-                      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                      final authProvider = Provider.of<AuthProvider>(
+                        context,
+                        listen: false,
+                      );
                       await authProvider.logout();
                       if (context.mounted) {
                         Navigator.pushReplacement(
                           context,
-                          MaterialPageRoute(builder: (context) => const LoginScreen()),
+                          MaterialPageRoute(
+                            builder: (context) => const LoginScreen(),
+                          ),
                         );
                       }
                     },
-                    child: Text(
-                      'Logout',
-                      style: TextStyles.bodyText,
-                    ),
+                    child: Text('Logout', style: TextStyles.bodyText),
                   ),
                 ],
               ),
@@ -295,7 +333,6 @@ class _RoleBasedNavigator extends StatelessWidget {
         }
 
         return RegionDashboard(regionId: user.regionalID);
-
 
       case 'admin':
         log('Navigating to AdminDashboard');

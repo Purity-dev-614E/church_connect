@@ -148,8 +148,8 @@ class _AdminDashboardState extends State<AdminDashboard>
             );
             if (tagComparison != 0) return tagComparison;
 
-            // Then sort by date (soonest first)
-            return a.dateTime.toLocal().compareTo(b.dateTime.toLocal());
+            // Then sort by event date (latest first)
+            return b.dateTime.toLocal().compareTo(a.dateTime.toLocal());
           });
 
     // Debug classification output (limited to first few events)

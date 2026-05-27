@@ -99,7 +99,20 @@ class _RegionEventsTabState extends State<RegionEventsTab> {
       try {
         leadershipEvents = await eventProvider.fetchLeadershipEvents();
         print('Leadership events fetched: ${leadershipEvents.length}');
+
+        // Debug: Print all leadership events with their regional IDs
+        if (leadershipEvents.isNotEmpty) {
+          print('All leadership events details:');
+          for (int i = 0; i < leadershipEvents.length && i < 5; i++) {
+            final event = leadershipEvents[i];
+            print(
+              '  ${i + 1}. ${event.title} - regionalId: ${event.regionalId} - isLeadership: ${event.isLeadershipEvent}',
+            );
+          }
+        }
+
         // Filter leadership events for this region
+        final beforeFilterCount = leadershipEvents.length;
         leadershipEvents =
             leadershipEvents
                 .where(
@@ -109,7 +122,20 @@ class _RegionEventsTabState extends State<RegionEventsTab> {
                       event.regionalId!.isEmpty,
                 )
                 .toList();
-        print('Leadership events for this region: ${leadershipEvents.length}');
+        print(
+          'Leadership events for this region: ${leadershipEvents.length} (filtered from $beforeFilterCount)',
+        );
+
+        // Debug: Print filtered leadership events
+        if (leadershipEvents.isNotEmpty) {
+          print('Filtered leadership events:');
+          for (int i = 0; i < leadershipEvents.length && i < 3; i++) {
+            final event = leadershipEvents[i];
+            print(
+              '  ${i + 1}. ${event.title} - regionalId: ${event.regionalId}',
+            );
+          }
+        }
       } catch (e) {
         print('Error fetching leadership events: $e');
       }
@@ -140,11 +166,18 @@ class _RegionEventsTabState extends State<RegionEventsTab> {
       print('Group events fetched: ${groupEvents.length}');
 
       // Combine all events: region events + leadership events + group events, remove duplicates
+      print('=== Event Breakdown Before Combining ===');
+      print('Region events: ${regionEvents.length}');
+      print('Leadership events: ${leadershipEvents.length}');
+      print('Group events: ${groupEvents.length}');
+
       final allRegionEvents = [
         ...regionEvents,
         ...leadershipEvents,
         ...groupEvents,
       ];
+      print('Combined events (with duplicates): ${allRegionEvents.length}');
+
       final Set<String> seenEventIds = {};
       final uniqueEvents =
           allRegionEvents.where((event) {
@@ -157,35 +190,24 @@ class _RegionEventsTabState extends State<RegionEventsTab> {
 
       print('Total unique events for region: ${uniqueEvents.length}');
 
+      // Debug: Show leadership events in final list
+      final leadershipEventsInFinal =
+          uniqueEvents.where((e) => e.isLeadershipEvent).toList();
+      print(
+        'Leadership events in final list: ${leadershipEventsInFinal.length}',
+      );
+      if (leadershipEventsInFinal.isNotEmpty) {
+        print('Final leadership events:');
+        for (int i = 0; i < leadershipEventsInFinal.length && i < 3; i++) {
+          final event = leadershipEventsInFinal[i];
+          print('  ${i + 1}. ${event.title} - regionalId: ${event.regionalId}');
+        }
+      }
+
       // Use the combined events list instead of just region events
       final eventsToSort = uniqueEvents;
 
-      // Sort events by priority: ongoing -> upcoming -> past, then by createdAt within each category (latest first)
-      final now = DateTime.now();
-      eventsToSort.sort((a, b) {
-        final bool aIsOngoing =
-            now.isAfter(a.dateTime) &&
-            now.isBefore(a.dateTime.add(const Duration(hours: 2)));
-        final bool bIsOngoing =
-            now.isAfter(b.dateTime) &&
-            now.isBefore(b.dateTime.add(const Duration(hours: 2)));
-        final bool aIsUpcoming = a.dateTime.isAfter(now);
-        final bool bIsUpcoming = b.dateTime.isAfter(now);
-
-        // Ongoing events come first
-        if (aIsOngoing && !bIsOngoing) return -1;
-        if (!aIsOngoing && bIsOngoing) return 1;
-
-        // If both are ongoing or neither is ongoing, check upcoming
-        if (aIsUpcoming && !bIsUpcoming) return -1;
-        if (!aIsUpcoming && bIsUpcoming) return 1;
-
-        // Within the same category, sort by createdAt (latest first)
-        if (a.createdAt == null && b.createdAt == null) return 0;
-        if (a.createdAt == null) return 1;
-        if (b.createdAt == null) return -1;
-        return b.createdAt!.compareTo(a.createdAt!);
-      });
+      eventsToSort.sort((a, b) => b.dateTime.compareTo(a.dateTime));
 
       print(
         'Events fetched for region ${widget.regionId}: ${eventsToSort.length}',

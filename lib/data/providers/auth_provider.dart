@@ -6,6 +6,7 @@ import '../models/user_model.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../../core/services/data_cache_service.dart';
 
 enum AuthStatus {
   initial,
@@ -236,6 +237,11 @@ class AuthProvider extends ChangeNotifier {
       await _authService.logout();
       _status = AuthStatus.unauthenticated;
       _currentUser = null;
+
+      // Clear cached data on logout
+      final cacheService = DataCacheService();
+      await cacheService.clearCache();
+
       notifyListeners();
       return true;
     } catch (e) {
