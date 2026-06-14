@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:group_management_church_app/features/auth/reset_password.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 class PasswordResetHandler extends StatefulWidget {
   const PasswordResetHandler({super.key});
@@ -13,7 +12,6 @@ class _PasswordResetHandlerState extends State<PasswordResetHandler> {
   bool _isLoading = true;
   String? _error;
   String? _accessToken;
-  String? _refreshToken;
 
   @override
   void initState() {
@@ -23,16 +21,9 @@ class _PasswordResetHandlerState extends State<PasswordResetHandler> {
 
   Future<void> _handlePasswordReset() async {
     try {
-      // Get the current URI to extract tokens
       final Uri? uri = ModalRoute.of(context)?.settings.arguments as Uri?;
-      
-      if (uri == null) {
-        // Try to get from current route if no arguments passed
-        final contextUri = Uri.base;
-        await _extractTokensFromUri(contextUri);
-      } else {
-        await _extractTokensFromUri(uri);
-      }
+      final contextUri = uri ?? Uri.base;
+      _extractTokenFromUri(contextUri);
     } catch (e) {
       setState(() {
         _error = 'Invalid password reset link. Please request a new one.';
@@ -41,44 +32,26 @@ class _PasswordResetHandlerState extends State<PasswordResetHandler> {
     }
   }
 
-  Future<void> _extractTokensFromUri(Uri uri) async {
-    // Extract tokens from URL fragment or query parameters
+  void _extractTokenFromUri(Uri uri) {
     String? accessToken;
-    String? refreshToken;
 
-    // Check URL fragment ( Supabase uses fragments for security)
+    // Supabase embeds tokens in the URL fragment (#access_token=...&type=recovery)
     if (uri.fragment.isNotEmpty) {
-      final fragmentUri = Uri.parse('https://example.com?${uri.fragment}');
-      accessToken = fragmentUri.queryParameters['access_token'];
-      refreshToken = fragmentUri.queryParameters['refresh_token'];
+      final fragmentParams = Uri.splitQueryString(uri.fragment);
+      accessToken = fragmentParams['access_token'];
     }
 
-    // Fallback to query parameters
+    // Fallback: some redirect configurations use query parameters
     accessToken ??= uri.queryParameters['access_token'];
-    refreshToken ??= uri.queryParameters['refresh_token'];
 
-    if (accessToken != null && refreshToken != null) {
-      // Supabase restores recovery sessions with the refresh token from the
-      // reset link. Passing the access token here makes valid links fail.
-      final response = await Supabase.instance.client.auth.setSession(
-        refreshToken,
-      );
-
-      if (response.session != null) {
-        setState(() {
-          _accessToken = accessToken;
-          _refreshToken = refreshToken;
-          _isLoading = false;
-        });
-      } else {
-        setState(() {
-          _error = 'Invalid or expired reset link. Please request a new one.';
-          _isLoading = false;
-        });
-      }
+    if (accessToken != null && accessToken.isNotEmpty) {
+      setState(() {
+        _accessToken = accessToken;
+        _isLoading = false;
+      });
     } else {
       setState(() {
-        _error = 'Missing tokens in reset link. Please request a new one.';
+        _error = 'Missing token in reset link. Please request a new one.';
         _isLoading = false;
       });
     }
@@ -87,7 +60,7 @@ class _PasswordResetHandlerState extends State<PasswordResetHandler> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return Scaffold(
+      return const Scaffold(
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -104,38 +77,34 @@ class _PasswordResetHandlerState extends State<PasswordResetHandler> {
     if (_error != null) {
       return Scaffold(
         appBar: AppBar(
-          title: Text('Reset Password'),
+          title: const Text('Reset Password'),
           backgroundColor: Colors.red,
         ),
         body: Center(
           child: Padding(
-            padding: EdgeInsets.all(24.0),
+            padding: const EdgeInsets.all(24.0),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.error_outline,
-                  color: Colors.red,
-                  size: 64,
-                ),
-                SizedBox(height: 16),
+                const Icon(Icons.error_outline, color: Colors.red, size: 64),
+                const SizedBox(height: 16),
                 Text(
                   'Error',
                   style: Theme.of(context).textTheme.headlineSmall,
                   textAlign: TextAlign.center,
                 ),
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
                 Text(
                   _error!,
                   style: Theme.of(context).textTheme.bodyMedium,
                   textAlign: TextAlign.center,
                 ),
-                SizedBox(height: 24),
+                const SizedBox(height: 24),
                 ElevatedButton(
                   onPressed: () {
                     Navigator.pushReplacementNamed(context, '/reset-password');
                   },
-                  child: Text('Request New Reset Link'),
+                  child: const Text('Request New Reset Link'),
                 ),
               ],
             ),
@@ -144,10 +113,6 @@ class _PasswordResetHandlerState extends State<PasswordResetHandler> {
       );
     }
 
-    // If tokens are valid, navigate to new password screen
-    return NewPasswordScreen(
-      accessToken: _accessToken,
-      refreshToken: _refreshToken,
-    );
+    return NewPasswordScreen(accessToken: _accessToken);
   }
 }

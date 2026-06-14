@@ -429,7 +429,39 @@ class AuthServices {
     }
   }
 
-  // Reset password method
+  // Submit new password using access_token from the reset email link
+  Future<bool> submitNewPassword(
+    String accessToken,
+    String newPassword,
+  ) async {
+    try {
+      final response = await http.post(
+        Uri.parse(await ApiEndpoints.resetPassword),
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        body: json.encode({
+          "access_token": accessToken,
+          "new_password": newPassword,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        print("Password reset successfully");
+        return true;
+      } else {
+        final data = json.decode(response.body);
+        print("Password reset failed: ${data['message']}");
+        return false;
+      }
+    } catch (e) {
+      print("Submit new password error: $e");
+      return false;
+    }
+  }
+
+  // Reset password method — sends the reset email
   Future<bool> resetPassword(String email) async {
     try {
       final response = await http.post(

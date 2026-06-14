@@ -21,6 +21,8 @@ class ApiEndpoints {
   static Future<String> get login async => '${await auth}/login';
   static Future<String> get forgotPassword async =>
       '${await auth}/forgot-password';
+  static Future<String> get resetPassword async =>
+      '${await auth}/reset-password';
   static Future<String> get refreshToken async => '${await auth}/refresh-token';
 
   // User Endpoints

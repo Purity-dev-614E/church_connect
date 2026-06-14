@@ -126,7 +126,6 @@ class MyApp extends StatelessWidget {
           '/reset-password': (context) => const ResetPasswordScreen(),
           '/reset-password-handler': (context) => const PasswordResetHandler(),
           '/new-password': (context) {
-            // Extract tokens from URL if coming from email link
             final uri = Uri.base;
             Map<String, String> fragmentParameters = {};
             if (uri.fragment.isNotEmpty) {
@@ -135,13 +134,7 @@ class MyApp extends StatelessWidget {
             final accessToken =
                 uri.queryParameters['access_token'] ??
                 fragmentParameters['access_token'];
-            final refreshToken =
-                uri.queryParameters['refresh_token'] ??
-                fragmentParameters['refresh_token'];
-            return NewPasswordScreen(
-              accessToken: accessToken,
-              refreshToken: refreshToken,
-            );
+            return NewPasswordScreen(accessToken: accessToken);
           },
         },
         navigatorObservers: [_AuthErrorObserver()],
